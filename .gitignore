@@ -18,6 +18,10 @@ config.json
 # data on a public repo). Recreate with scripts/link_data.py.
 data/
 
+# Analysis outputs derived from the (private) data — figures/tables.
+# Findings are summarised in committed docs/FINDINGS_*.md instead.
+analysis_out/
+
 # NEVER commit real microscopy data (it is referenced via config.json, not
 # stored here). Ignore data files anywhere, then re-allow ONLY the synthetic
 # sample's data files (so e.g. .DS_Store stays ignored even under sample_data).

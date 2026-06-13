@@ -14,5 +14,9 @@ dependencies:
   - tifffile
   - pyqtgraph>=0.13
   - pyqt>=5.15          # provides PyQt5
-  - matplotlib          # static preview / future plots
+  - matplotlib          # static preview / plots
+  # analysis stack (maskviewer/analysis/* — the viewer itself doesn't need these)
+  - scipy
+  - scikit-learn
+  - pandas
   - pytest              # tests

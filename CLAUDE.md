@@ -96,6 +96,19 @@ screen.
   `maskviewer/analysis/` as pure, GUI-free, testable functions** — not
   inside the GUI.
 
+## Analysis done so far (see docs/FINDINGS_followup.md)
+
+`maskviewer/analysis/{feature_tables,multivariate,dynamics,interactions}.py`
++ `scripts/run_followup.py` probe for treatment effects beneath the state /
+contact confounds (recording = unit; needs scipy/sklearn/pandas, now in the
+env). **Headline: a multivariate (PERMANOVA + leave-one-recording-out
+classifier) test recovers a real KO-vs-WT phenotype (p=0.004, AUC=0.80) — KO
+spread cells are rounder + less persistent — that univariate tests missed.**
+The drug arm is null by every method (underpowered); dynamics/contact
+analyses are data-starved at the current plating density; the WT-vs-DMSO
+vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
+`data/` (couples to those formats — see `feature_tables.py`).
+
 ## Good first expansions (seeds)
 
 - Per-cell / per-frame tables + CSV export from `analysis/` (areas,

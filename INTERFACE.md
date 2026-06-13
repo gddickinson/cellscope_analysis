@@ -6,6 +6,9 @@ Read this before opening source files. Update it when modules change.
 - **docs/DATA.md** — what's in `data/`, every per-recording file, and how the
   masks were produced (CellScope detection → review → cleaning). Read this for
   data provenance.
+- **docs/FINDINGS_followup.md** — results of the multivariate/dynamics/
+  interaction investigation: the KO multivariate phenotype (the win), the
+  informative nulls, and evidence-weighted next steps.
 - **CLAUDE.md** — agent handoff (formats, how to run, conventions, seeds).
 
 ## Entry points
@@ -19,6 +22,10 @@ Read this before opening source files. Update it when modules change.
 - **scripts/link_data.py** — populates the gitignored `data/` folder with
   symlinks into a CellScope tree (`by_condition`, flat `recordings/`,
   `results/`, `gt/`). Convenience browser + viewer `data_root`. Idempotent.
+- **scripts/run_followup.py** — runs the multivariate / dynamics /
+  interactions investigation and prints arm-structured results.
+- **scripts/plot_followup.py** — writes the multivariate figures (genetic-arm
+  PCA, KO fingerprint) to `analysis_out/` (gitignored).
 
 ## maskviewer/ (package)
 - **config.py** — `load_config(path)` → dict with `data_roots` (always
@@ -51,6 +58,18 @@ Read this before opening source files. Update it when modules change.
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
   `track_lengths`, `centroids`, `summary(labels, um_per_px)`. No GUI/IO deps.
+- **feature_tables.py** — data layer for the follow-up analyses: loads the
+  CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,
+  `tracks()`) + the experimental design (`ARMS`, `VEHICLE`) +
+  `arm_tests()` (per-arm KW + within-arm Bonferroni + vehicle MWU).
+  Needs scipy/pandas.
+- **multivariate.py** — recording-level `permanova`, leave-one-recording-out
+  `loro_auc` (logistic), and `loadings` (Cohen's d fingerprint). `run()`.
+  **Found the KO phenotype** the univariate tests missed (needs sklearn).
+- **dynamics.py** — `transition_rate`, `dwell_median`, `contact_response`,
+  `rounding_on_contact` over the per-cell time series → arm tests. `run()`.
+- **interactions.py** — `density_slope_test` (treatment×crowding) +
+  `clean_subset_test` (stable/non-dividing/in-view cells). `run()`.
 
 ## tests/
 - **test_io.py** — smoke tests (discover / load / summary) against the

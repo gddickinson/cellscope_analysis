@@ -5,6 +5,35 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Follow-up treatment-effect investigation
+
+Added `maskviewer/analysis/{feature_tables,multivariate,dynamics,
+interactions}.py` + `scripts/{run_followup,plot_followup}.py` to test the
+strategies recommended last session, on the CellScope IC295 results (read via
+`data/`; recording = unit). Added scipy/scikit-learn/pandas to the env.
+
+**Bore fruit:** multivariate (PERMANOVA + leave-one-recording-out logistic)
+recovers a **KO-vs-WT phenotype invisible to univariate tests** — PERMANOVA
+p=0.004 (Bonferroni-safe, replicates an independent run), LORO-AUC=0.80
+(perm p=0.022); fingerprint = KO spread cells rounder/more compact
+(↓eccentricity d=−1.8, ↑circularity, ↑solidity) + less persistent. GOF n.s.;
+**drug arm null by every method**.
+
+**Informative nulls:** dynamics (transition/dwell/contact) found no treatment
+effect AND contact analysis is event-starved at this density (only 2–5
+recordings have enough contact onsets); clean-cell subsetting *lost* the KO
+signal (over-filtering); treatment×density n.s. The **WT-vs-DMSO vehicle/batch
+effect is large** (multivariate AUC=0.83; rounded-dwell p=0.010) — as strong
+as the genetic effect.
+
+Findings in `docs/FINDINGS_followup.md`; figures in `analysis_out/`
+(gitignored). Recommendations forward: adopt multivariate as primary;
+drug arm needs power (dose-response, ~25/cond, batch control); image
+denser/larger fields for contact; don't over-filter; design out batch
+(co-culture).
+
+---
+
 ## 2026-06-13 — docs/DATA.md (data + mask provenance)
 
 Wrote `docs/DATA.md` explaining the IC295 dataset (6 conditions / 2 arms +

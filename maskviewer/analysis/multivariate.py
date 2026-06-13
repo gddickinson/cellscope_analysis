@@ -1,0 +1,142 @@
+"""Multivariate treatment-vs-control tests at the recording level.
+
+Univariate per-metric tests diluted the genetic effect; aggregating the
+whole recording-level feature vector recovers it. Two complementary tests
+per contrast, plus a feature 'fingerprint':
+
+  permanova   permutational MANOVA on z-scored Euclidean distances
+              (handles p > n; permutation null on the labels).
+  loro_auc    leave-ONE-RECORDING-out logistic classifier; AUC over the
+              held-out predictions, with a label-permutation null (valid
+              even though the model can overfit — the null overfits too).
+  loadings    per-feature standardized mean difference (Cohen's d),
+              ranked — what drives the separation.
+
+Recording = experimental unit throughout (CV folds and permutations are by
+recording, never by cell).
+"""
+from __future__ import annotations
+
+import numpy as np
+
+from . import feature_tables as ft
+
+# Recording-level features (biologically meaningful; drop bookkeeping cols).
+FEATURES = [
+    "n_cells", "division_rate", "frac_rounded_mean",
+    "mean_speed_rounded_mean", "mean_speed_spread_mean",
+    "persistence_spread_mean", "straightness_spread_mean",
+    "mean_area_um2_spread_mean", "mean_circularity_spread_mean",
+    "mean_solidity_spread_mean", "mean_eccentricity_spread_mean",
+    "mean_aspect_ratio_spread_mean",
+]
+
+
+def _matrix(df, conds, features=FEATURES):
+    sub = df[df["condition"].isin(conds)].copy()
+    X = sub[features].to_numpy(dtype=float)
+    for j in range(X.shape[1]):                       # median-impute, z-score
+        col = X[:, j]
+        col[~np.isfinite(col)] = np.nanmedian(col)
+        sd = col.std()
+        X[:, j] = (col - col.mean()) / (sd if sd else 1.0)
+    return X, sub["condition"].to_numpy()
+
+
+def permanova(X, labels, b=4999, seed=0):
+    rng = np.random.default_rng(seed)
+    D2 = ((X[:, None, :] - X[None, :, :]) ** 2).sum(-1)    # squared euclidean
+    N = len(labels)
+    sst = D2.sum() / (2 * N)
+
+    def within(lab):
+        s = 0.0
+        for g in np.unique(lab):
+            m = np.where(lab == g)[0]
+            s += D2[np.ix_(m, m)].sum() / (2 * len(m))
+        return s
+
+    a = len(np.unique(labels))
+    ssw = within(labels)
+    F = ((sst - ssw) / (a - 1)) / (ssw / (N - a))
+    ge = 1
+    for _ in range(b):
+        sw = within(rng.permutation(labels))
+        Fp = ((sst - sw) / (a - 1)) / (sw / (N - a))
+        ge += Fp >= F
+    return float(F), ge / (b + 1)
+
+
+def loro_auc(X, y, b=999, seed=0):
+    """y: 0/1. Leave-one-out logistic AUC + label-permutation p."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
+    rng = np.random.default_rng(seed)
+
+    def loo_auc(yy):
+        if len(np.unique(yy)) < 2:
+            return 0.5
+        scores = np.empty(len(yy))
+        for i in range(len(yy)):
+            tr = np.arange(len(yy)) != i
+            if len(np.unique(yy[tr])) < 2:
+                scores[i] = 0.5
+                continue
+            clf = LogisticRegression(C=0.3, max_iter=2000)
+            clf.fit(X[tr], yy[tr])
+            scores[i] = clf.predict_proba(X[i:i + 1])[0, 1]
+        return roc_auc_score(yy, scores)
+
+    obs = loo_auc(y)
+    ge = 1
+    for _ in range(b):
+        ge += loo_auc(rng.permutation(y)) >= obs
+    return float(obs), ge / (b + 1)
+
+
+def loadings(df, ctrl, test, features=FEATURES, top=6):
+    """Per-feature Cohen's d (test − ctrl), ranked by |d|."""
+    out = []
+    for f in features:
+        a = df.loc[df["condition"] == ctrl, f].to_numpy(float)
+        b = df.loc[df["condition"] == test, f].to_numpy(float)
+        a, b = a[np.isfinite(a)], b[np.isfinite(b)]
+        if len(a) < 2 or len(b) < 2:
+            continue
+        sp = np.sqrt((a.var(ddof=1) + b.var(ddof=1)) / 2) or 1.0
+        out.append((f, (b.mean() - a.mean()) / sp))
+    out.sort(key=lambda kv: -abs(kv[1]))
+    return out[:top]
+
+
+CONTRASTS = [("genetic", "WT", "KO"), ("genetic", "WT", "GOF"),
+             ("drug", "DMSO", "Y1"), ("drug", "DMSO", "OT"),
+             ("vehicle", "WT", "DMSO")]
+
+
+def run():
+    df = ft.recordings()
+    print("=== MULTIVARIATE (recording-level) ===")
+    results = {}
+    # arm omnibus
+    for arm, spec in ft.ARMS.items():
+        X, lab = _matrix(df, spec["conditions"])
+        F, p = permanova(X, lab)
+        print(f"  omnibus {arm:8s} ({'/'.join(spec['conditions'])}): "
+              f"PERMANOVA F={F:.2f} p={ft.stars(p)}")
+        results[f"omnibus_{arm}"] = {"F": F, "p": p}
+    # pairwise contrasts
+    for arm, ctrl, test in CONTRASTS:
+        X, lab = _matrix(df, [ctrl, test])
+        y = (lab == test).astype(int)
+        F, pp = permanova(X, lab)
+        auc, pa = loro_auc(X, y)
+        ld = loadings(df, ctrl, test)
+        print(f"\n  {test} vs {ctrl} ({arm}): PERMANOVA F={F:.2f} p={ft.stars(pp)}"
+              f" | LORO-AUC={auc:.2f} p={ft.stars(pa)}")
+        print("     top features (Cohen's d): " +
+              ", ".join(f"{f}={d:+.2f}" for f, d in ld))
+        results[f"{test}_vs_{ctrl}"] = {
+            "permanova_F": F, "permanova_p": pp, "loro_auc": auc,
+            "loro_p": pa, "loadings": ld}
+    return results
