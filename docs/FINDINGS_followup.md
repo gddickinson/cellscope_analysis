@@ -46,6 +46,43 @@ at n=8.
 > visual separation — expected, since the discriminating direction is
 > multivariate, not the top 2 PCs.
 
+## Refinement: the shape features are collinear → one roundness score
+
+The fingerprint above lists eccentricity, circularity, solidity and aspect
+ratio as separate bars, but they are **largely one axis** (across all 48
+recordings: circularity↔solidity r=+0.92, circularity↔eccentricity r=−0.68,
+frac_rounded↔circularity +0.61). Treating them as independent evidence
+overstates the phenotype's richness.
+
+**The test was still valid** (permutation/CV make no independence
+assumption); only the interpretation needed fixing. The KO result is robust
+to the redundancy — KO vs WT survives every de-collinearised variant:
+
+| feature set | PERMANOVA p | LORO-AUC |
+|---|---|---|
+| full 12 | 0.004 | 0.80 |
+| curated 6 (1 shape metric) | 0.030 | 0.86 |
+| eccentricity_spread alone | 0.003 | 0.81 |
+| circularity_spread alone | 0.005 | 0.77 |
+| PCA-decorrelated (6 PCs) | 0.004 | 0.77 |
+
+**So the four shape metrics are collapsed into one `shape_roundness` score**
+= PC1 of the standardised cluster (62% of their variance; circularity +0.62,
+solidity +0.58, eccentricity −0.51, aspect_ratio −0.14 → higher = rounder /
+more compact). This single, interpretable axis is the *strongest* single
+discriminator of all:
+
+- **`shape_roundness`: WT=−0.14 vs KO=+1.69, MWU p=0.0006** (survives
+  Bonferroni; beats any individual feature and the 12-feature test).
+- GOF=+1.12 (also elevated), drug arm all negative.
+
+So the honest statement of the phenotype is one dimension, not twelve:
+**KO (and to a lesser extent GOF) spread cells are rounder / more compact**,
+with reduced migratory persistence as a secondary, separable effect.
+(`add_shape_score` in `multivariate.py`; figure `mv_shape_score.png`.) The
+WT/GOF/KO-vs-drug-arm gap in the score is cross-arm and confounded by the
+vehicle/batch effect — only the within-genetic KO-vs-WT contrast is valid.
+
 ## The informative nulls
 
 - **Dynamics found no treatment effect** on state-transition rate, dwell
@@ -101,6 +138,10 @@ design is a priority (see below).
 - **`mv_feature_heatmap.png`** — recordings × features; the KO shift is
   modest/noisy per recording and spread across features (why aggregation is
   needed; eccentricity is the strongest single axis).
+- **`mv_shape_score.png`** — the **combined roundness score**: how the four
+  collinear shape features collapse into PC1 (left), and the score by
+  condition (right) — KO highest, GOF intermediate, WT ≈ 0 (KO vs WT
+  p=0.0006). The honest, de-duplicated headline.
 - **`mv_top_pair.png`** — the top-2 features overlap per-axis, separate more
   when combined.
 - `plot_followup.py` also writes the plain PCA + fingerprint.

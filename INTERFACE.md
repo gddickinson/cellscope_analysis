@@ -69,9 +69,11 @@ Read this before opening source files. Update it when modules change.
   Needs scipy/pandas.
 - **multivariate.py** — recording-level `permanova`, leave-one-recording-out
   `loro_auc` / `loro_detail` (held-out scores + permutation null), `loadings`
-  (Cohen's d fingerprint), `univariate_p` (per-feature, for the why-
-  multivariate plot). `run()`. **Found the KO phenotype** the univariate
-  tests missed (needs sklearn).
+  (Cohen's d fingerprint), `univariate_p`, and `add_shape_score` (collapses
+  the collinear shape cluster `SHAPE_FEATURES` into one `shape_roundness`
+  PC1; `FEATURES_COMBINED` is the de-duplicated set). `run()`. **Found the KO
+  phenotype** (one roundness axis, KO vs WT p=0.0006) the univariate tests
+  missed (needs sklearn).
 - **dynamics.py** — `transition_rate`, `dwell_median`, `contact_response`,
   `rounding_on_contact` over the per-cell time series → arm tests. `run()`.
 - **interactions.py** — `density_slope_test` (treatment×crowding) +

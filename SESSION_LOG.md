@@ -5,6 +5,23 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Collinearity check + combined roundness score
+
+Flagged that the shape fingerprint features are collinear (circularity↔
+solidity r=0.92, circularity↔eccentricity r=−0.68) — can't be read as
+independent evidence. Verified the KO result is NOT an artefact: holds with
+one shape feature (eccentricity alone p=0.003, AUC=0.81), a curated 6-feature
+set (AUC=0.86), and PCA-decorrelated PCs (p=0.004). Collapsed the four shape
+metrics into one `shape_roundness` score (PC1, 62% of their variance) — which
+is the *strongest* single discriminator: **KO vs WT p=0.0006** (Bonferroni-
+safe). So the phenotype is one interpretable axis (KO/GOF spread cells
+rounder + more compact), not 12. Added `add_shape_score`/`FEATURES_COMBINED`
+to `multivariate.py`; new figure `mv_shape_score.png`; story panel A/F + the
+fingerprint now use the combined score. Documented in
+`docs/FINDINGS_followup.md`.
+
+---
+
 ## 2026-06-13 — Follow-up treatment-effect investigation
 
 Added `maskviewer/analysis/{feature_tables,multivariate,dynamics,

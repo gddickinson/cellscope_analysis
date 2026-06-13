@@ -34,20 +34,20 @@ CONTRASTS = [("WT", "KO"), ("WT", "GOF"), ("DMSO", "Y1"), ("DMSO", "OT"),
 
 # ---------- individual panel painters (take an Axes) -----------------------
 def _panel_why(ax, df):
-    uni = mv.univariate_p(df, "WT", "KO")
+    dfp, _, _ = mv.add_shape_score(df)
+    uni = mv.univariate_p(dfp, "WT", "KO", features=mv.FEATURES + ["shape_roundness"])
     uni.sort(key=lambda kv: kv[1])
     names = [_SHORT(f) for f, _ in uni]
     nlp = [-np.log10(max(p, 1e-6)) for _, p in uni]
-    ax.barh(names[::-1], nlp[::-1], color="#888")
+    cols = ["#2ca02c" if f == "shape_roundness" else "#888" for f, _ in uni]
+    ax.barh(names[::-1], nlp[::-1], color=cols[::-1])
     ax.axvline(-np.log10(0.05), color="#d62728", ls="--", lw=1.3,
                label="p=0.05 (raw)")
-    ax.axvline(-np.log10(0.05 / len(uni)), color="#7a0000", ls=":", lw=1.3,
-               label="Bonferroni")
-    ax.axvline(-np.log10(0.004), color="#1f77b4", lw=2,
-               label="multivariate p=0.004")
+    ax.axvline(-np.log10(0.05 / len(mv.FEATURES)), color="#7a0000", ls=":",
+               lw=1.3, label="Bonferroni")
     ax.set_xlabel("-log10 p  (WT vs KO)")
-    ax.set_title("Why multivariate: no single feature survives correction,\n"
-                 "but the joint test does", fontsize=9)
+    ax.set_title("Single features don't survive Bonferroni — but the COMBINED\n"
+                 "shape_roundness score (green) does (p=0.0006)", fontsize=9)
     ax.legend(fontsize=6, loc="lower right")
 
 
@@ -110,14 +110,18 @@ def _panel_contrasts(ax, df):
 
 
 def _panel_fingerprint(ax, df):
-    ld = mv.loadings(df, "WT", "KO", top=len(mv.FEATURES))
-    feats = [_SHORT(f) for f, _ in ld][::-1]
-    ds = [d for _, d in ld][::-1]
-    ax.barh(feats, ds, color=["#d62728" if d > 0 else "#1f77b4" for d in ds])
+    dfp, _, _ = mv.add_shape_score(df)               # 4 shape feats → 1 score
+    ld = mv.loadings(dfp, "WT", "KO", features=mv.FEATURES_COMBINED,
+                     top=len(mv.FEATURES_COMBINED))[::-1]
+    feats = [_SHORT(f) for f, _ in ld]
+    ds = [d for _, d in ld]
+    cols = ["#2ca02c" if f == "shape_roundness" else
+            ("#d62728" if d > 0 else "#1f77b4") for f, d in ld]
+    ax.barh(feats, ds, color=cols)
     ax.axvline(0, color="#222", lw=1)
     ax.set_xlabel("Cohen's d (KO − WT)")
-    ax.set_title("Fingerprint: KO spread cells rounder,\nless persistent",
-                 fontsize=9)
+    ax.set_title("De-duplicated fingerprint (shape→1 score):\n"
+                 "roundness dominates, persistence secondary", fontsize=9)
 
 
 # ---------- standalone figures --------------------------------------------
@@ -165,6 +169,43 @@ def top_pair(df, path):
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
 
+def shape_score_fig(df, path):
+    """How the collinear shape features combine into one score, and how that
+    score separates the conditions."""
+    from scipy.stats import mannwhitneyu
+    dfp, loadings, var = mv.add_shape_score(df)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11.5, 4.8),
+                                   gridspec_kw={"width_ratios": [1, 1.4]})
+    # left: PC1 loadings (how the 4 collinear features combine)
+    feats = [_SHORT(f) for f in mv.SHAPE_FEATURES][::-1]
+    ws = [loadings[f] for f in mv.SHAPE_FEATURES][::-1]
+    ax1.barh(feats, ws, color=["#d62728" if w > 0 else "#1f77b4" for w in ws])
+    ax1.axvline(0, color="#222", lw=1)
+    ax1.set_xlabel("PC1 loading")
+    ax1.set_title(f"shape_roundness = PC1 of 4 collinear\nshape features "
+                  f"({var*100:.0f}% of their variance)", fontsize=9)
+    # right: score by condition, arm-grouped
+    rng = np.random.default_rng(0)
+    order = ["WT", "GOF", "KO", "DMSO", "Y1", "OT"]
+    for i, c in enumerate(order):
+        v = dfp.loc[dfp.condition == c, "shape_roundness"].to_numpy()
+        ax2.scatter(rng.normal(i, 0.07, len(v)), v, s=42,
+                    color=ft.COND_COLOR[c], edgecolor="#222", zorder=3)
+        ax2.boxplot([v], positions=[i], widths=0.55, showfliers=False)
+    ax2.axhline(0, color="#888", ls="--", lw=1)
+    ax2.axvline(2.5, color="#ccc", lw=1)
+    ax2.set_xticks(range(len(order)))
+    ax2.set_xticklabels(order)
+    ax2.set_ylabel("shape_roundness  (rounder / more compact →)")
+    a = dfp.loc[dfp.condition == "WT", "shape_roundness"]
+    b = dfp.loc[dfp.condition == "KO", "shape_roundness"]
+    p = mannwhitneyu(a, b).pvalue
+    ax2.set_title(f"Combined score by condition  (genetic | drug)\n"
+                  f"KO vs WT p={p:.4f} — one interpretable axis beats the "
+                  f"12-feature test", fontsize=9)
+    fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
+
+
 def story_panel(df, path):
     X, lab = mv._matrix(df, ["WT", "KO"])
     y = (lab == "KO").astype(int)
@@ -191,6 +232,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     df = ft.recordings()
     story_panel(df, os.path.join(OUT, "mv_story_panel.png"))
+    shape_score_fig(df, os.path.join(OUT, "mv_shape_score.png"))
     heatmap(df, os.path.join(OUT, "mv_feature_heatmap.png"))
     top_pair(df, os.path.join(OUT, "mv_top_pair.png"))
     print(f"Wrote multivariate story plots → {OUT}/")
