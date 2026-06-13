@@ -134,6 +134,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
     os.makedirs(OUT, exist_ok=True)
     df = ft.recordings()
+    if args.metric == "shape_roundness":          # derived score, not a CSV column
+        from maskviewer.analysis import multivariate as mv
+        df = mv.add_shape_score(df)[0]
     col = _col(df, args.metric)
     if col not in df.columns:
         print(f"metric '{args.metric}' not found (col '{col}'). Available "

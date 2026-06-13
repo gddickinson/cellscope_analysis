@@ -195,6 +195,13 @@ design is a priority (see below).
   excluding 0) — though the *Bonferroni-corrected* pairwise MWU is n.s. at
   n=8, so it is suggestive, not Bonferroni-robust. The drug arm is flat. This
   corroborates the "less persistent" secondary axis of the KO phenotype.
+  Run for the other spread metrics too (`--metric straightness_spread |
+  mean_speed_spread | shape_roundness`): **shape_roundness** is the robust hit
+  (genetic KW **, KO-vs-WT Bonferroni **), persistence is suggestive, while
+  **straightness and speed are flat everywhere** (all n.s.). So the KO
+  phenotype is specifically *rounder + lower local persistence*, with
+  unchanged global straightness and speed — and persistence dropping while
+  straightness doesn't is exactly why those two were not merged.
 
 All feature-based plots use the **de-duplicated** set (shape→`shape_roundness`):
 the fingerprint, heatmap, PCA and this scatter show one roundness axis, not
