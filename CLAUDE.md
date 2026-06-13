@@ -35,8 +35,21 @@ format. The committed `sample_data/Pos_demo/` is a **synthetic** stand-in
 zero setup. When adding data handling, never commit real `.ome.tif`/`.npz`
 (the `.gitignore` blocks them outside `sample_data/` — keep it that way).
 
-Current `config.json` on this machine points at
-`…/cellscope/ic295_analysis/by_condition` (48 recordings, 6 conditions).
+For convenience there's also a local **`data/`** folder of symlinks into the
+CellScope tree (gitignored — same public-repo reason). Recreate it with
+`python scripts/link_data.py` (idempotent); it makes:
+
+```
+data/by_condition               -> …/ic295_analysis/by_condition   (whole tree)
+data/recordings/<cond>__<label> -> each recording folder            (flat, 48)
+data/results/{compare,compare_pooled}
+data/gt/{ic295_gt_full,legacy_gt}
+```
+
+Current `config.json` points the viewer at `data/by_condition` (so the
+project references its own `data/` symlink — re-run `link_data.py` if the
+CellScope path moves). The real source is `…/cellscope/ic295_analysis`
+(48 recordings, 6 conditions).
 
 ## How to run
 

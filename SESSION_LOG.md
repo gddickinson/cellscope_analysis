@@ -5,6 +5,20 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Local data/ symlink folder (gitignored)
+
+Added `scripts/link_data.py` + a gitignored **`data/`** folder of symlinks
+into the CellScope tree: `by_condition` (whole tree), flat `recordings/`
+(48 `<cond>__<label>` links), `results/{compare,compare_pooled}`, and
+`gt/{ic295_gt_full,legacy_gt}`. `config.json` now points the viewer at
+`data/by_condition` (project references its own folder). Verified discovery
++ load of a real 2048² recording through the symlink. `data/` is gitignored
+(public repo — symlinks point at private local data); recreate with
+`python scripts/link_data.py`. Also tightened `.gitignore` so the sample
+re-include (`!sample_data/**/*.tif|*.npz`) no longer un-ignores `.DS_Store`.
+
+---
+
 ## 2026-06-13 — Dedicated CPU-only conda env
 
 Confirmed the viewer needs **no GPU** (no torch/cellpose/CUDA/MPS — it only

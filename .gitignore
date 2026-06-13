@@ -14,11 +14,16 @@ venv/
 # Machine-specific config — points at real data outside the repo
 config.json
 
+# Local convenience folder of symlinks into a CellScope tree (real, private
+# data on a public repo). Recreate with scripts/link_data.py.
+data/
+
 # NEVER commit real microscopy data (it is referenced via config.json, not
-# stored here). Ignore data files anywhere, then re-allow the SYNTHETIC sample.
+# stored here). Ignore data files anywhere, then re-allow ONLY the synthetic
+# sample's data files (so e.g. .DS_Store stays ignored even under sample_data).
 *.ome.tif
 *.tif
 *.tiff
 *.npz
-!sample_data/
-!sample_data/**
+!sample_data/**/*.tif
+!sample_data/**/*.npz

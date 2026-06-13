@@ -10,6 +10,9 @@ Read this before opening source files. Update it when modules change.
 - **scripts/make_sample_data.py** — writes the synthetic `sample_data/Pos_demo/`
   (recording `.ome.tif` + `.ome.json` + `pipeline_results/masks.npz`). Safe,
   fake data so the app runs out of the box.
+- **scripts/link_data.py** — populates the gitignored `data/` folder with
+  symlinks into a CellScope tree (`by_condition`, flat `recordings/`,
+  `results/`, `gt/`). Convenience browser + viewer `data_root`. Idempotent.
 
 ## maskviewer/ (package)
 - **config.py** — `load_config(path)` → dict with `data_roots` (always
@@ -51,3 +54,5 @@ Read this before opening source files. Update it when modules change.
 - **config.example.json** — committed template for `config.json` (gitignored,
   machine-specific, points at real CellScope results).
 - **sample_data/** — committed *synthetic* recording+mask (only data in the repo).
+- **data/** — local, **gitignored** symlinks into a CellScope tree (made by
+  `scripts/link_data.py`); never pushed.
