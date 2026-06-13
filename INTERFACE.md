@@ -27,8 +27,9 @@ Read this before opening source files. Update it when modules change.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
   (genetic-arm PCA, KO fingerprint) to `analysis_out/` (gitignored).
 - **scripts/plot_multivariate.py** — the explain-and-illustrate set:
-  `mv_story_panel.png` (6-panel: why-multivariate, held-out scores, ROC,
-  permutation null, contrasts, fingerprint), `mv_feature_heatmap.png`,
+  `mv_story_panel.png` (6-panel), `mv_shape_score.png` (combined roundness
+  score via `combined_score_fig`), `mv_feature_correlation.png` (which
+  features are redundant / what to combine), `mv_feature_heatmap.png`,
   `mv_top_pair.png`. → `analysis_out/` (gitignored).
 
 ## maskviewer/ (package)

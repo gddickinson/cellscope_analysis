@@ -169,26 +169,24 @@ def top_pair(df, path):
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
 
-def shape_score_fig(df, path):
-    """How the collinear shape features combine into one score, and how that
-    score separates the conditions."""
+def combined_score_fig(df, add_fn, score, feats, orient, path, note=""):
+    """How a collinear cluster combines into one PC1 score (left) and how that
+    score separates the conditions (right). Reused for shape + direction."""
     from scipy.stats import mannwhitneyu
-    dfp, loadings, var = mv.add_shape_score(df)
+    dfp, loadings, var = add_fn(df)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11.5, 4.8),
                                    gridspec_kw={"width_ratios": [1, 1.4]})
-    # left: PC1 loadings (how the 4 collinear features combine)
-    feats = [_SHORT(f) for f in mv.SHAPE_FEATURES][::-1]
-    ws = [loadings[f] for f in mv.SHAPE_FEATURES][::-1]
-    ax1.barh(feats, ws, color=["#d62728" if w > 0 else "#1f77b4" for w in ws])
+    names = [_SHORT(f) for f in feats][::-1]
+    ws = [loadings[f] for f in feats][::-1]
+    ax1.barh(names, ws, color=["#d62728" if w > 0 else "#1f77b4" for w in ws])
     ax1.axvline(0, color="#222", lw=1)
     ax1.set_xlabel("PC1 loading")
-    ax1.set_title(f"shape_roundness = PC1 of 4 collinear\nshape features "
-                  f"({var*100:.0f}% of their variance)", fontsize=9)
-    # right: score by condition, arm-grouped
+    ax1.set_title(f"{score} = PC1 of {len(feats)} features\n"
+                  f"({var*100:.0f}% of their variance){note}", fontsize=9)
     rng = np.random.default_rng(0)
     order = ["WT", "GOF", "KO", "DMSO", "Y1", "OT"]
     for i, c in enumerate(order):
-        v = dfp.loc[dfp.condition == c, "shape_roundness"].to_numpy()
+        v = dfp.loc[dfp.condition == c, score].to_numpy()
         ax2.scatter(rng.normal(i, 0.07, len(v)), v, s=42,
                     color=ft.COND_COLOR[c], edgecolor="#222", zorder=3)
         ax2.boxplot([v], positions=[i], widths=0.55, showfliers=False)
@@ -196,13 +194,42 @@ def shape_score_fig(df, path):
     ax2.axvline(2.5, color="#ccc", lw=1)
     ax2.set_xticks(range(len(order)))
     ax2.set_xticklabels(order)
-    ax2.set_ylabel("shape_roundness  (rounder / more compact →)")
-    a = dfp.loc[dfp.condition == "WT", "shape_roundness"]
-    b = dfp.loc[dfp.condition == "KO", "shape_roundness"]
-    p = mannwhitneyu(a, b).pvalue
-    ax2.set_title(f"Combined score by condition  (genetic | drug)\n"
-                  f"KO vs WT p={p:.4f} — one interpretable axis beats the "
-                  f"12-feature test", fontsize=9)
+    ax2.set_ylabel(f"{score}  ({orient} →)")
+    a = dfp.loc[dfp.condition == "WT", score]
+    b = dfp.loc[dfp.condition == "KO", score]
+    ax2.set_title(f"{score} by condition (genetic | drug)\n"
+                  f"KO vs WT p={mannwhitneyu(a, b).pvalue:.4f}", fontsize=9)
+    fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
+
+
+def correlation_fig(df, path):
+    """Full feature correlation matrix — shows which features are redundant.
+    Answers 'what else should be combined?': only the shape cluster."""
+    F = mv.FEATURES
+    X = df[F].to_numpy(float)
+    for j in range(X.shape[1]):
+        c = X[:, j]
+        c[~np.isfinite(c)] = np.nanmedian(c)
+        X[:, j] = (c - c.mean()) / (c.std() or 1)
+    C = np.corrcoef(X.T)
+    names = [_SHORT(f) for f in F]
+    fig, ax = plt.subplots(figsize=(9, 8))
+    im = ax.imshow(C, cmap="RdBu_r", vmin=-1, vmax=1)
+    ax.set_xticks(range(len(F)))
+    ax.set_xticklabels(names, rotation=45, ha="right", fontsize=8)
+    ax.set_yticks(range(len(F)))
+    ax.set_yticklabels(names, fontsize=8)
+    for i in range(len(F)):
+        for j in range(len(F)):
+            if i != j and abs(C[i, j]) >= 0.5:
+                ax.text(j, i, f"{C[i, j]:.2f}", ha="center", va="center",
+                        fontsize=6.5)
+    fig.colorbar(im, ax=ax, shrink=0.7, label="Pearson r")
+    ax.set_title("Feature correlations (48 recordings) — |r|≥0.5 labelled\n"
+                 "Only the shape cluster (circularity/solidity/eccentricity/"
+                 "aspect) is strongly collinear → combined.\n"
+                 "persistence~straightness r=0.25 → kept separate; nothing "
+                 "else clusters.", fontsize=9)
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
 
@@ -232,7 +259,10 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     df = ft.recordings()
     story_panel(df, os.path.join(OUT, "mv_story_panel.png"))
-    shape_score_fig(df, os.path.join(OUT, "mv_shape_score.png"))
+    combined_score_fig(df, mv.add_shape_score, "shape_roundness",
+                       mv.SHAPE_FEATURES, "rounder / more compact",
+                       os.path.join(OUT, "mv_shape_score.png"))
+    correlation_fig(df, os.path.join(OUT, "mv_feature_correlation.png"))
     heatmap(df, os.path.join(OUT, "mv_feature_heatmap.png"))
     top_pair(df, os.path.join(OUT, "mv_top_pair.png"))
     print(f"Wrote multivariate story plots → {OUT}/")

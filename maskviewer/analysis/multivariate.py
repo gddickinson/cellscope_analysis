@@ -31,22 +31,25 @@ FEATURES = [
     "mean_aspect_ratio_spread_mean",
 ]
 
-# These four are collinear (circularity~solidity r=.92, circularity~
-# eccentricity r=-.68) — one "roundness/compactness" axis. Collapse them into
-# a single score so they aren't triple-counted in the distance / fingerprint.
+# Only the SHAPE cluster is strongly collinear (circularity~solidity r=.92,
+# ~eccentricity r=-.68) — one "roundness/compactness" axis — so it is the only
+# group collapsed into a single PC1 score. Persistence + straightness were
+# evaluated for the same treatment but are only weakly correlated (r=.25;
+# local angular consistency vs global net/path ratio are distinct), so they
+# are KEPT SEPARATE. A full pairwise scan (scripts/plot_multivariate.py
+# correlation_fig) found no other cluster warranting combination.
 SHAPE_FEATURES = ["mean_circularity_spread_mean", "mean_solidity_spread_mean",
                   "mean_eccentricity_spread_mean", "mean_aspect_ratio_spread_mean"]
-# Non-shape features + the one combined shape score.
+# Non-redundant features + the one combined shape score.
 FEATURES_COMBINED = [f for f in FEATURES if f not in SHAPE_FEATURES] + \
                     ["shape_roundness"]
 
 
-def add_shape_score(df):
-    """Add a `shape_roundness` column = PC1 of the standardised SHAPE_FEATURES
-    (oriented so higher = rounder/more compact). Returns (df, loadings, var).
-    PCA is unsupervised (fit on all rows) — no label leakage."""
-    import pandas as pd  # noqa: F401
-    X = df[SHAPE_FEATURES].to_numpy(float)
+def _pc1_score(df, features, orient_by, name):
+    """Add `name` = PC1 of the standardised `features`, oriented so `orient_by`
+    loads positive. Returns (df, {feature: loading}, variance_explained).
+    Unsupervised (fit on all rows) — no label leakage."""
+    X = df[features].to_numpy(float)
     mu = np.nanmean(X, 0)
     inds = np.where(~np.isfinite(X))
     X[inds] = np.take(mu, inds[1])
@@ -54,13 +57,17 @@ def add_shape_score(df):
     Xz = (X - X.mean(0)) / np.where(sd > 0, sd, 1.0)
     U, S, Vt = np.linalg.svd(Xz - Xz.mean(0), full_matrices=False)
     pc1 = Vt[0]
-    ci = SHAPE_FEATURES.index("mean_circularity_spread_mean")
-    if pc1[ci] < 0:                                   # orient rounder = higher
+    if pc1[features.index(orient_by)] < 0:
         pc1 = -pc1
     out = df.copy()
-    out["shape_roundness"] = (Xz - Xz.mean(0)) @ pc1
-    var = float(S[0] ** 2 / np.sum(S ** 2))
-    return out, dict(zip(SHAPE_FEATURES, pc1)), var
+    out[name] = (Xz - Xz.mean(0)) @ pc1
+    return out, dict(zip(features, pc1)), float(S[0] ** 2 / np.sum(S ** 2))
+
+
+def add_shape_score(df):
+    """`shape_roundness` = PC1 of the shape cluster (higher = rounder/compact)."""
+    return _pc1_score(df, SHAPE_FEATURES, "mean_circularity_spread_mean",
+                      "shape_roundness")
 
 
 def _matrix(df, conds, features=FEATURES):

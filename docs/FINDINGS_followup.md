@@ -83,6 +83,19 @@ with reduced migratory persistence as a secondary, separable effect.
 WT/GOF/KO-vs-drug-arm gap in the score is cross-arm and confounded by the
 vehicle/batch effect — only the within-genetic KO-vs-WT contrast is valid.
 
+**What else should be combined? Nothing (full scan in `mv_feature_correlation.png`).**
+- **persistence + straightness** were evaluated for the same treatment but
+  are only **weakly correlated (r=0.25)** — they measure distinct things
+  (local angular consistency vs global net/path ratio), so combining them
+  would discard ~38% real variance (their local-vs-global difference). **Kept
+  separate.**
+- `frac_rounded` is moderately correlated with the shape metrics (r≈0.6) but
+  is a different construct (fraction of *time* in the rounded state vs the
+  *morphology* of spread-state cells) — kept separate to avoid conflating two
+  biological levels.
+- All other pairs are |r| < 0.5. The shape cluster was the only group that
+  warranted combination.
+
 ## The informative nulls
 
 - **Dynamics found no treatment effect** on state-transition rate, dwell
@@ -142,6 +155,8 @@ design is a priority (see below).
   collinear shape features collapse into PC1 (left), and the score by
   condition (right) — KO highest, GOF intermediate, WT ≈ 0 (KO vs WT
   p=0.0006). The honest, de-duplicated headline.
+- **`mv_feature_correlation.png`** — full feature correlation matrix (why
+  the shape cluster was combined and nothing else was).
 - **`mv_top_pair.png`** — the top-2 features overlap per-axis, separate more
   when combined.
 - `plot_followup.py` also writes the plain PCA + fingerprint.

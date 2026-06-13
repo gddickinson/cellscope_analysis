@@ -5,6 +5,22 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Evaluated persistence+straightness; kept separate; full scan
+
+Checked whether persistence + straightness should be combined like the shape
+cluster: they are only **weakly correlated (r=0.25)** (local angular vs global
+net/path directedness), so combining would discard ~38% real variance —
+**kept separate** (per decision). A full pairwise correlation scan
+(`correlation_fig` → `mv_feature_correlation.png`) confirms the **shape
+cluster was the only strongly-collinear group**; `frac_rounded` is moderately
+correlated with shape (r≈0.6) but is a distinct construct (state-time vs
+morphology) so also kept separate; nothing else clusters (|r|<0.5).
+Generalised the combiner to `_pc1_score` (shape still the only score);
+removed the directionality machinery. Documented in
+`docs/FINDINGS_followup.md`.
+
+---
+
 ## 2026-06-13 — Collinearity check + combined roundness score
 
 Flagged that the shape fingerprint features are collinear (circularity↔
