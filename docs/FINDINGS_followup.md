@@ -96,6 +96,34 @@ vehicle/batch effect — only the within-genetic KO-vs-WT contrast is valid.
 - All other pairs are |r| < 0.5. The shape cluster was the only group that
   warranted combination.
 
+## Edge-truncated cells — excluded from shape; finding is robust
+
+A mask cut by the image border gives unreliable area/circularity/eccentricity
+and a centroid biased inward. Checked how the data handles it:
+
+- **Shape/state is already edge-clean.** The CellScope pipeline voids
+  edge-touching cell-frames to `unknown`, excluding them from all shape
+  metrics + the rounded/spread call. In this corpus 85% of cells *never*
+  touch the edge (frac_in_view median=1.0), only 47/313 have any edge frame,
+  and 0 cells lack clean shape data. (`frac_in_view`, `n_frames_edge` per
+  cell.)
+- **The KO finding survives an extra cell-level edge filter unchanged** —
+  dropping the 25 cells with frac_in_view < 0.8:
+
+  | metric (KO vs WT) | all cells | frac_in_view ≥ 0.8 |
+  |---|---|---|
+  | eccentricity_spread | p=0.0047 | p=0.0047 |
+  | circularity_spread | p=0.0207 | p=0.0207 |
+  | **shape_roundness** | **p=0.0006** | **p=0.0006** |
+
+  So the roundness phenotype is not an edge artefact.
+- **Tracks:** state-based track metrics already exclude edge (edge→unknown).
+  Centroid-based metrics now skip edge frames too (`maskviewer/analysis/
+  edges.py` computes a per-frame edge flag from the masks; `dynamics` NaN-outs
+  edge steps). The remaining track limitation is **field-of-view censoring**
+  (cells that migrate *out* of frame are truncated) — a FOV issue, fixed by
+  larger/tiled imaging, not edge masking.
+
 ## The informative nulls
 
 - **Dynamics found no treatment effect** on state-transition rate, dwell

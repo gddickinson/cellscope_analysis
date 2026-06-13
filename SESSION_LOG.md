@@ -5,6 +5,25 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Edge-truncated cells: verified + dynamics now skip them
+
+Checked whether edge cells (masks cut by the border → unreliable shape +
+inward-biased centroid) contaminate the analysis. Shape/state is already
+edge-clean (CellScope voids edge frames to `unknown`; 85% of cells never
+touch the edge, frac_in_view median=1.0). **The KO shape finding is robust**:
+identical p-values with/without an extra frac_in_view≥0.8 cell filter
+(eccentricity p=0.0047; shape_roundness p=0.0006). Recorded in
+`docs/FINDINGS_followup.md`.
+
+New `maskviewer/analysis/edges.py` recomputes a per-frame edge flag per cell
+from the masks (label touching the border), cached to
+`analysis_out/_edge_flags.pkl`; `dynamics.run()` attaches it so centroid-
+based metrics (contact step-speed, onsets) **skip edge frames**. State-based
+metrics already excluded edge. Remaining track caveat is FOV censoring (cells
+leaving frame), not edge masking. All analysis_out plots regenerated.
+
+---
+
 ## 2026-06-13 — Evaluated persistence+straightness; kept separate; full scan
 
 Checked whether persistence + straightness should be combined like the shape

@@ -75,8 +75,14 @@ Read this before opening source files. Update it when modules change.
   PC1; `FEATURES_COMBINED` is the de-duplicated set). `run()`. **Found the KO
   phenotype** (one roundness axis, KO vs WT p=0.0006) the univariate tests
   missed (needs sklearn).
+- **edges.py** — `edge_flags()` recomputes a per-frame edge-truncation flag
+  per cell from the masks (a cell is edge in frame t if its label touches the
+  border), cached to `analysis_out/_edge_flags.pkl`. Lets centroid-based
+  metrics skip partially-out-of-view frames.
 - **dynamics.py** — `transition_rate`, `dwell_median`, `contact_response`,
-  `rounding_on_contact` over the per-cell time series → arm tests. `run()`.
+  `rounding_on_contact` over the per-cell time series → arm tests. `run()`
+  attaches `edges.edge_flags` so centroid-based metrics **skip edge frames**
+  (state-based ones already exclude edge via the `unknown` state).
 - **interactions.py** — `density_slope_test` (treatment×crowding) +
   `clean_subset_test` (stable/non-dividing/in-view cells). `run()`.
 

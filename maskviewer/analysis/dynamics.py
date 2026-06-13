@@ -27,11 +27,15 @@ MIN_EVENTS = 3                # need >= this many events for a contact metric
 ROUNDED, SPREAD = "rounded", "spread"
 
 
-def _step_speed(cents):
-    """(T-1,) step speed µm/min; NaN where a frame is absent or speed > cap."""
+def _step_speed(cents, edge=None):
+    """(T-1,) step speed µm/min; NaN where a frame is absent, speed > cap, OR
+    either endpoint frame is edge-truncated (biased centroid)."""
     d = np.linalg.norm(np.diff(cents, axis=0), axis=1) / DT
     d[~np.isfinite(d)] = np.nan
     d[d > SPEED_CAP] = np.nan
+    if edge is not None:
+        bad = np.asarray(edge[:-1], bool) | np.asarray(edge[1:], bool)
+        d[bad] = np.nan
     return d
 
 
@@ -64,16 +68,28 @@ def dwell_median(rec, state):
     return float(np.median(runs) * DT) if runs else np.nan
 
 
+def _edge(rec):
+    e = rec.get("_edge")
+    return None if e is None else np.asarray(e, bool)
+
+
 def _contact_onsets(rec):
     nb = np.asarray(rec["n_neighbors"], float)
     ok = np.isfinite(nb)
-    return [t for t in range(1, len(nb))
-            if ok[t] and ok[t - 1] and nb[t - 1] == 0 and nb[t] >= 1]
+    edge = _edge(rec)
+    out = []
+    for t in range(1, len(nb)):
+        if not (ok[t] and ok[t - 1] and nb[t - 1] == 0 and nb[t] >= 1):
+            continue
+        if edge is not None and (edge[t] or edge[t - 1]):    # skip edge onsets
+            continue
+        out.append(t)
+    return out
 
 
 def contact_response(rec):
     """Mean (post − pre) step speed around contact onset; <0 = slows on contact."""
-    sp = _step_speed(rec["cents"])
+    sp = _step_speed(rec["cents"], _edge(rec))
     deltas = []
     for t0 in _contact_onsets(rec):
         pre = sp[max(0, t0 - WIN):t0]
@@ -119,9 +135,31 @@ METRICS = [
 ]
 
 
+def _attach_edge(recs):
+    """Attach each cell's per-frame edge flag (from masks) as rec['_edge'].
+    Centroid-based metrics then skip edge-truncated frames. Degrades to no
+    masking if the edge cache is unavailable."""
+    try:
+        from .edges import edge_flags
+        flags = edge_flags()
+    except Exception as exc:
+        print(f"  (edge flags unavailable — not skipping edge frames: {exc})")
+        return recs
+    miss = 0
+    for r in recs:
+        e = flags.get(r["label"], {}).get(int(r["cell_id"]))
+        if e is None:
+            miss += 1
+        r["_edge"] = e
+    if miss:
+        print(f"  ({miss}/{len(recs)} cells had no edge flag — left unmasked)")
+    return recs
+
+
 def run():
-    recs = ft.tracks()
-    print("=== DYNAMICS (recording-level arm tests) ===")
+    recs = _attach_edge(ft.tracks())
+    print("=== DYNAMICS (recording-level arm tests; centroid metrics skip "
+          "edge frames) ===")
     results = {}
     for name, fn in METRICS:
         by = _per_recording(recs, fn)
