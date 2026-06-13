@@ -5,6 +5,21 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — docs/DATA.md (data + mask provenance)
+
+Wrote `docs/DATA.md` explaining the IC295 dataset (6 conditions / 2 arms +
+vehicle, 0.6523 µm/px, 10-min, 97 frames), the `data/` folder layout, every
+per-recording file (incl. the `masks_{original,reviewed,precleanup}.npz`
+audit trail, `per_cell.csv`, `recording_summary.json`, `divisions.json`,
+`RUN_METADATA.json`), and how masks were produced — verified from a real
+`RUN_METADATA.json` (`pipeline = unified_detection.detect_recording (auto)`):
+cpsam auto-route (cpsam_dic vs raw) → DeepSea union → Hungarian tracking +
+division → 4-phase gap-fill → Cy5 persistence_guard → manual review →
+clean. Flagged the `RUN_METADATA` `um_per_px:1.0` placeholder (trust the
+`.ome.json`). Linked from README / CLAUDE.md / INTERFACE.md.
+
+---
+
 ## 2026-06-13 — Local data/ symlink folder (gitignored)
 
 Added `scripts/link_data.py` + a gitignored **`data/`** folder of symlinks

@@ -13,6 +13,13 @@ file is the first thing to read; `@INTERFACE.md` is the navigation map.
 - **Isn't**: the detection pipeline. Masks are produced by `cellscope`; here
   we only *consume* them. Don't re-implement detection.
 
+## Data provenance
+
+**`docs/DATA.md`** is the canonical explainer of what's in `data/`, every
+per-recording file, and how the masks were generated (CellScope detection →
+manual review → cleaning). Read it (and point users to it) for anything about
+where the data came from. Quick summary below.
+
 ## Data formats (what the loaders expect)
 
 - **Recording** `*.ome.tif`: shape `(T, C, H, W)` uint16 (single-channel

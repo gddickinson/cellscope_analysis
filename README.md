@@ -64,6 +64,11 @@ available as a fallback.
 | Recording | `*.ome.tif`, `(T, C, H, W)` uint16 + `*.ome.json` sidecar (`um_per_px`, `time_interval_min`, `channel_names`) |
 | Masks | `masks.npz`, key `labels`, `(T, H, W)` int32 — `0`=background, positive IDs are cells consistent across frames |
 
+**What the data is and how the masks were made** — see
+[`docs/DATA.md`](docs/DATA.md): the IC295 dataset, the `data/` folder layout,
+every per-recording file, and the CellScope detection → review → cleaning
+provenance.
+
 ## Analysis
 
 `maskviewer/analysis/label_stats.py` provides pure NumPy functions over a

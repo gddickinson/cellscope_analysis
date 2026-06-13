@@ -2,6 +2,12 @@
 
 Read this before opening source files. Update it when modules change.
 
+## Docs
+- **docs/DATA.md** — what's in `data/`, every per-recording file, and how the
+  masks were produced (CellScope detection → review → cleaning). Read this for
+  data provenance.
+- **CLAUDE.md** — agent handoff (formats, how to run, conventions, seeds).
+
 ## Entry points
 - **main_viewer.py** — CLI launcher. Resolves recordings (from `config.json`
   `data_roots`, `--data-root`, or an explicit `--recording/--masks`),
