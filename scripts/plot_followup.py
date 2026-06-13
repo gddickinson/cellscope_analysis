@@ -29,7 +29,8 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 
 def pca_plot(df, path):
     conds = ft.ARMS["genetic"]["conditions"]
-    X, lab = mv._matrix(df, conds)
+    dfp = mv.add_shape_score(df)[0]                  # shape→1 score, no double-count
+    X, lab = mv._matrix(dfp, conds, features=mv.FEATURES_COMBINED)
     X = X - X.mean(0)
     U, S, Vt = np.linalg.svd(X, full_matrices=False)
     pcs = U[:, :2] * S[:2]
@@ -48,16 +49,19 @@ def pca_plot(df, path):
 
 
 def fingerprint_plot(df, path):
-    ld = mv.loadings(df, "WT", "KO", top=len(mv.FEATURES))
-    feats = [f.replace("_mean", "").replace("mean_", "") for f, _ in ld][::-1]
-    ds = [d for _, d in ld][::-1]
+    dfp = mv.add_shape_score(df)[0]                  # 4 collinear shape feats → 1
+    ld = mv.loadings(dfp, "WT", "KO", features=mv.FEATURES_COMBINED,
+                     top=len(mv.FEATURES_COMBINED))[::-1]
+    feats = [f.replace("_mean", "").replace("mean_", "") for f, _ in ld]
+    ds = [d for _, d in ld]
+    cols = ["#2ca02c" if f == "shape_roundness" else
+            ("#d62728" if d > 0 else "#1f77b4") for f, d in ld]
     fig, ax = plt.subplots(figsize=(7.2, 5.2))
-    ax.barh(feats, ds, color=["#d62728" if d > 0 else "#1f77b4" for d in ds])
+    ax.barh(feats, ds, color=cols)
     ax.axvline(0, color="#222", lw=1)
     ax.set_xlabel("Cohen's d  (KO − WT, recording-level)")
-    ax.set_title("KO-vs-WT phenotype fingerprint\n"
-                 "spread cells: rounder (↑circularity, ↓eccentricity), "
-                 "less persistent")
+    ax.set_title("KO-vs-WT phenotype fingerprint (de-duplicated: shape→1 score)\n"
+                 "spread cells rounder/more compact, less persistent")
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
 

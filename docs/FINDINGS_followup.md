@@ -185,8 +185,15 @@ design is a priority (see below).
   p=0.0006). The honest, de-duplicated headline.
 - **`mv_feature_correlation.png`** — full feature correlation matrix (why
   the shape cluster was combined and nothing else was).
-- **`mv_top_pair.png`** — the top-2 features overlap per-axis, separate more
-  when combined.
+- **`mv_phenotype_2d.png`** — the KO phenotype in its two *non-redundant*
+  axes (shape_roundness vs persistence): KO is rounder AND less persistent.
+
+All feature-based plots use the **de-duplicated** set (shape→`shape_roundness`):
+the fingerprint, heatmap, PCA and this scatter show one roundness axis, not
+four collinear bars. The plots that *do* still show circularity/eccentricity
+individually do so on purpose — the correlation matrix (to justify combining),
+the `mv_shape_score` loadings (to show the inputs), and story-panel A (single
+features fail Bonferroni, the combined score doesn't).
 - `plot_followup.py` also writes the plain PCA + fingerprint.
 
 *Analyses: `maskviewer/analysis/{multivariate,dynamics,interactions,

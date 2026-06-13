@@ -127,44 +127,49 @@ def _panel_fingerprint(ax, df):
 # ---------- standalone figures --------------------------------------------
 def heatmap(df, path):
     conds = ft.ARMS["genetic"]["conditions"]
-    X, lab = mv._matrix(df, conds)
-    ld = mv.loadings(df, "WT", "KO", top=len(mv.FEATURES))
-    order = [mv.FEATURES.index(f) for f, _ in ld]          # by |KO-WT effect|
+    dfp = mv.add_shape_score(df)[0]                  # shape→1 score (no 4× shape rows)
+    feats = mv.FEATURES_COMBINED
+    X, lab = mv._matrix(dfp, conds, features=feats)
+    ld = mv.loadings(dfp, "WT", "KO", features=feats, top=len(feats))
+    order = [feats.index(f) for f, _ in ld]                # by |KO-WT effect|
     csort = np.argsort([conds.index(c) for c in lab])
     M = X[csort][:, order].T
-    fig, ax = plt.subplots(figsize=(11, 5.4))
+    fig, ax = plt.subplots(figsize=(11, 5.0))
     im = ax.imshow(M, aspect="auto", cmap="RdBu_r", vmin=-2.5, vmax=2.5)
     ax.set_yticks(range(len(order)))
-    ax.set_yticklabels([_SHORT(mv.FEATURES[i]) for i in order], fontsize=8)
+    ax.set_yticklabels([_SHORT(feats[i]) for i in order], fontsize=8)
     ax.set_xticks([])
     x = 0
     for c in conds:
         n = int((lab == c).sum())
-        ax.add_patch(plt.Rectangle((x - 0.5, -1.4), n, 0.8, color=ft.COND_COLOR[c],
+        ax.add_patch(plt.Rectangle((x - 0.5, -1.2), n, 0.7, color=ft.COND_COLOR[c],
                                    clip_on=False))
-        ax.text(x + n / 2 - 0.5, -1.9, c, ha="center", fontsize=10)
+        ax.text(x + n / 2 - 0.5, -1.7, c, ha="center", fontsize=10)
         x += n
     fig.colorbar(im, ax=ax, label="z-score", shrink=0.7)
-    ax.set_title("Genetic-arm recordings × features (z-scored, ordered by "
-                 "KO-vs-WT effect)\nThe KO shift is modest + noisy per "
-                 "recording and spread across features — why it must be "
-                 "aggregated (top row, eccentricity, is the strongest single "
-                 "axis: WT red → KO blue)", fontsize=10)
+    ax.set_title("Genetic-arm recordings × de-duplicated features (z-scored, "
+                 "ordered by KO-vs-WT effect)\nKO shift is modest per "
+                 "recording; shape_roundness (top row) is the strongest single "
+                 "axis: WT blue (less round) → KO red (rounder)", fontsize=10)
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
 
-def top_pair(df, path):
-    ld = mv.loadings(df, "WT", "KO", top=2)
-    fx, fy = ld[0][0], ld[1][0]
-    fig, ax = plt.subplots(figsize=(6.2, 5.6))
+def phenotype_2d(df, path):
+    """The KO phenotype in its two NON-redundant axes: combined roundness vs
+    persistence (the per-axis shape features were collinear; this replaces the
+    old eccentricity-vs-circularity scatter)."""
+    dfp = mv.add_shape_score(df)[0]
+    fx, fy = "shape_roundness", "persistence_spread_mean"
+    fig, ax = plt.subplots(figsize=(6.4, 5.6))
     for c in ft.ARMS["genetic"]["conditions"]:
-        s = df[df["condition"] == c]
+        s = dfp[dfp["condition"] == c]
         ax.scatter(s[fx], s[fy], s=70, color=ft.COND_COLOR[c], edgecolor="#222",
                    label=c)
-    ax.set_xlabel(_SHORT(fx)); ax.set_ylabel(_SHORT(fy))
-    ax.set_title("Top-2 fingerprint features: KO (red) trends to lower "
-                 "eccentricity / higher\ncircularity than WT, but overlaps — "
-                 "partial per-feature, sharper across all 12", fontsize=9)
+    ax.set_xlabel("shape_roundness  (rounder / more compact →)")
+    ax.set_ylabel("persistence_spread  (more directed →)")
+    ax.set_title("KO phenotype in its two non-redundant axes:\n"
+                 "rounder (right) AND less persistent (down) than WT",
+                 fontsize=9)
     ax.legend(); ax.grid(alpha=0.3)
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
@@ -264,7 +269,7 @@ def main():
                        os.path.join(OUT, "mv_shape_score.png"))
     correlation_fig(df, os.path.join(OUT, "mv_feature_correlation.png"))
     heatmap(df, os.path.join(OUT, "mv_feature_heatmap.png"))
-    top_pair(df, os.path.join(OUT, "mv_top_pair.png"))
+    phenotype_2d(df, os.path.join(OUT, "mv_phenotype_2d.png"))
     print(f"Wrote multivariate story plots → {OUT}/")
     return 0
 
