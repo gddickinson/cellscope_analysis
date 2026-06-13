@@ -40,15 +40,20 @@ Current `config.json` on this machine points at
 
 ## How to run
 
-Use the CellScope **`cellpose4`** conda env (already has pyqtgraph, PyQt5,
-tifffile, numpy — no install needed):
+**CPU-only — no GPU / torch / cellpose** (it only views pre-computed masks).
+Use the dedicated env (`environment.yml`):
 
 ```bash
-conda run -n cellpose4 python main_viewer.py                 # discover via config.json
-conda run -n cellpose4 python main_viewer.py --data-root /path/to/by_condition
-conda run -n cellpose4 python main_viewer.py --recording R.ome.tif --masks M.npz
+conda env create -f environment.yml      # once
+conda activate cellscope_analysis
+python main_viewer.py                     # discover via config.json
+python main_viewer.py --data-root /path/to/by_condition
+python main_viewer.py --recording R.ome.tif --masks M.npz
 python scripts/make_sample_data.py        # (re)create the synthetic sample
 ```
+
+The CellScope `cellpose4` env also has these deps (`conda run -n cellpose4 …`)
+if you prefer not to make a second env.
 
 GUI: pick a recording, choose a channel, scrub frames (slider or ←/→ keys),
 toggle masks / outlines-only, adjust overlay opacity; the status bar shows
@@ -56,11 +61,11 @@ frame/time/scale/cell-count and the cell under the cursor.
 
 ## Testing without a display
 
-`tests/test_io.py` covers IO + analysis (needs `pytest`, not in `cellpose4`
-by default — `pip install pytest` or run the asserts directly). For the GUI,
-construct it headless with `QT_QPA_PLATFORM=offscreen` and drive the widgets
-(see SESSION_LOG for the smoke snippet) — this is how an agent should verify
-GUI changes without a screen.
+`tests/test_io.py` covers IO + analysis (`python -m pytest -q`; `pytest` is in
+the `cellscope_analysis` env). For the GUI, construct it headless with
+`QT_QPA_PLATFORM=offscreen` and drive the widgets (see SESSION_LOG for the
+smoke snippet) — this is how an agent should verify GUI changes without a
+screen.
 
 ## Conventions (inherited from the global prefs)
 

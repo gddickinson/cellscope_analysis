@@ -11,17 +11,26 @@ them. It is intentionally small and modular, meant to grow.
 
 ![recording with mask overlay (synthetic sample)](docs/preview.png)
 
-## Quick start
+## Environment
 
-Uses the same Python deps as CellScope (PyQt5, pyqtgraph, tifffile, numpy) —
-the CellScope `cellpose4` conda env already has them:
+**CPU-only — no GPU, no torch/cellpose.** It only views/analyses
+pre-computed masks. Create the dedicated env once:
+
+```bash
+conda env create -f environment.yml      # python, numpy, tifffile, pyqtgraph, PyQt5, matplotlib, pytest
+conda activate cellscope_analysis
+```
+
+(The CellScope `cellpose4` env also has these deps if you'd rather reuse it.)
+
+## Quick start
 
 ```bash
 # 1) (optional) make the bundled synthetic sample so it runs with no setup
 python scripts/make_sample_data.py
 
 # 2) launch — discovers recordings from config.json, else the sample
-conda run -n cellpose4 python main_viewer.py
+python main_viewer.py
 
 # point at your own results instead:
 python main_viewer.py --data-root /path/to/results/by_condition
@@ -70,8 +79,7 @@ See **INTERFACE.md** for the full map. `maskviewer/{io,gui,analysis}` +
 ## Tests
 
 ```bash
-pip install pytest        # not in cellpose4 by default
-python -m pytest -q
+python -m pytest -q       # in the cellscope_analysis env
 ```
 
 ## License

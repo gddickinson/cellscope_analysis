@@ -1,0 +1,18 @@
+# Dedicated CPU-only conda env for cellscope_analysis.
+#   conda env create -f environment.yml
+#   conda activate cellscope_analysis
+#   python main_viewer.py
+#
+# The viewer only VIEWS/analyses pre-computed masks — no torch / cellpose /
+# CUDA / MPS, so no GPU is required. These are all lightweight CPU packages.
+name: cellscope_analysis
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - tifffile
+  - pyqtgraph>=0.13
+  - pyqt>=5.15          # provides PyQt5
+  - matplotlib          # static preview / future plots
+  - pytest              # tests

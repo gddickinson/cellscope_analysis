@@ -1,9 +1,10 @@
-# cellscope_analysis runtime deps.
-# Already satisfied by the CellScope `cellpose4` conda env — these pins are
-# for creating a standalone environment if you prefer one.
+# cellscope_analysis runtime deps (CPU-only — no GPU/torch/cellpose).
+# Preferred install is the conda env: `conda env create -f environment.yml`.
+# This pip list is for a venv / non-conda setup.
 numpy>=1.24
 tifffile>=2023.0
 pyqtgraph>=0.13
 PyQt5>=5.15
+matplotlib>=3.6
 # dev / tests
 pytest>=7.0

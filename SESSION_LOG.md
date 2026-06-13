@@ -5,6 +5,18 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Dedicated CPU-only conda env
+
+Confirmed the viewer needs **no GPU** (no torch/cellpose/CUDA/MPS — it only
+views pre-computed masks). Added `environment.yml` and created a dedicated
+**`cellscope_analysis`** env (conda-forge: python 3.11, numpy, tifffile,
+pyqtgraph 0.14, pyqt 5.15, matplotlib, pytest). Verified in the new env:
+`torch present? False`, `pytest` 3/3 pass, headless GUI smoke OK. Docs
+(README, CLAUDE.md, requirements.txt) updated to prefer this env;
+`cellpose4` still works as a fallback.
+
+---
+
 ## 2026-06-13 — Project bootstrap (viewer + analysis scaffold)
 
 Split a dedicated analysis project out of `cellscope` to keep detection-result
