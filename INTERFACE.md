@@ -35,7 +35,9 @@ Read this before opening source files. Update it when modules change.
   score via `combined_score_fig`), `mv_feature_correlation.png` (which
   features are redundant / what to combine), `mv_fingerprint_grid.png` (all 4
   treatment-vs-control fingerprints, shared scale + PERMANOVA/AUC — why KO is
-  the only significant one), `mv_feature_heatmap.png`, `mv_phenotype_2d.png`.
+  the only significant one), `mv_roundness_vs_persistence.png` (are the two KO
+  axes linked? between-condition yes / within-condition no → distinct,
+  non-redundant), `mv_feature_heatmap.png`, `mv_phenotype_2d.png`.
   → `analysis_out/` (gitignored).
 
 ## maskviewer/ (package)

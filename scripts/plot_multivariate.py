@@ -238,6 +238,64 @@ def correlation_fig(df, path):
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
 
+_CELL_SHAPE = ["mean_circularity_spread", "mean_solidity_spread",
+               "mean_eccentricity_spread", "mean_aspect_ratio_spread"]
+
+
+def _cell_roundness(cells):
+    sub = cells.dropna(subset=_CELL_SHAPE + ["persistence_spread"]).copy()
+    X = sub[_CELL_SHAPE].to_numpy(float)
+    Xz = (X - X.mean(0)) / X.std(0)
+    U, S, Vt = np.linalg.svd(Xz - Xz.mean(0), full_matrices=False)
+    pc1 = Vt[0]
+    pc1 = pc1 if pc1[0] >= 0 else -pc1
+    sub["roundness"] = (Xz - Xz.mean(0)) @ pc1
+    return sub
+
+
+def roundness_persistence_fig(df, path):
+    """Are roundness and persistence linked? Across recordings yes (modest,
+    KO-driven); within a condition no — so they're parallel KO effects, not a
+    cell-level mechanism, and not redundant → keep separate."""
+    from scipy.stats import pearsonr, spearmanr
+    rec = mv.add_shape_score(df)[0].dropna(
+        subset=["shape_roundness", "persistence_spread_mean"])
+    sub = _cell_roundness(ft.cells())
+    rr = sub["roundness"] - sub.groupby("condition")["roundness"].transform("mean")
+    rp = (sub["persistence_spread"]
+          - sub.groupby("condition")["persistence_spread"].transform("mean"))
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 5))
+    # A: recording level (the analysis unit)
+    for c in ft.CONDITIONS:
+        g = rec[rec.condition == c]
+        a1.scatter(g["shape_roundness"], g["persistence_spread_mean"], s=55,
+                   color=ft.COND_COLOR[c], edgecolor="#222", label=c)
+    pr, pp = pearsonr(rec["shape_roundness"], rec["persistence_spread_mean"])
+    b = np.polyfit(rec["shape_roundness"], rec["persistence_spread_mean"], 1)
+    xx = np.linspace(rec["shape_roundness"].min(), rec["shape_roundness"].max(), 40)
+    a1.plot(xx, np.polyval(b, xx), "--", color="#222", lw=2)
+    a1.set_xlabel("shape_roundness (rounder →)")
+    a1.set_ylabel("persistence_spread (more directed →)")
+    a1.set_title(f"Across recordings (n={len(rec)}): r={pr:+.2f}, p={pp:.3f}\n"
+                 "rounder recordings ARE less persistent — but KO drives both")
+    a1.legend(fontsize=7, ncol=2); a1.grid(alpha=0.3)
+    # B: within-condition (residuals) — is it a cell-level law?
+    rho, pw = spearmanr(rr, rp)
+    a2.scatter(rr, rp, s=14, alpha=0.5, color="#555")
+    a2.axhline(0, color="#bbb", lw=0.8); a2.axvline(0, color="#bbb", lw=0.8)
+    a2.set_xlabel("roundness (within-condition residual)")
+    a2.set_ylabel("persistence (within-condition residual)")
+    a2.set_title(f"Within a condition (n={len(sub)} cells): rho={rho:+.2f}, "
+                 f"p={pw:.2f}\nNO link → not a cell-level mechanism, two "
+                 "parallel effects")
+    a2.grid(alpha=0.3)
+    fig.suptitle("Are roundness & persistence linked? Between conditions yes "
+                 "(KO-driven), within a condition no — so they are distinct, "
+                 "non-redundant axes", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.savefig(path, dpi=140); plt.close(fig)
+
+
 def fingerprint_grid(df, path):
     """All four treatment-vs-control fingerprints (Cohen's d per de-duplicated
     feature) on ONE shared scale + shared feature order, each annotated with
@@ -316,6 +374,7 @@ def main():
                        os.path.join(OUT, "mv_shape_score.png"))
     correlation_fig(df, os.path.join(OUT, "mv_feature_correlation.png"))
     fingerprint_grid(df, os.path.join(OUT, "mv_fingerprint_grid.png"))
+    roundness_persistence_fig(df, os.path.join(OUT, "mv_roundness_vs_persistence.png"))
     heatmap(df, os.path.join(OUT, "mv_feature_heatmap.png"))
     phenotype_2d(df, os.path.join(OUT, "mv_phenotype_2d.png"))
     print(f"Wrote multivariate story plots → {OUT}/")

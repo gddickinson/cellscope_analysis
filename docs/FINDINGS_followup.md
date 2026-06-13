@@ -96,6 +96,42 @@ vehicle/batch effect — only the within-genetic KO-vs-WT contrast is valid.
 - All other pairs are |r| < 0.5. The shape cluster was the only group that
   warranted combination.
 
+### Are roundness and persistence linked? (and is multivariate appropriate?)
+
+A reasonable hypothesis: rounded cells are less attached → less directed, so
+`shape_roundness` and `persistence_spread` might be one underlying axis. The
+data (`mv_roundness_vs_persistence.png`) says **between conditions yes, within
+a condition no**:
+
+- **Across recordings (n=48): r = −0.37, p=0.009** — rounder recordings are
+  less persistent. But this is **driven by KO** (both rounder and less
+  persistent); a partial regression shows roundness adds *nothing* to
+  predicting persistence once KO is in the model (roundness β p=0.84).
+- **Within a condition (n=283 cells): ρ = +0.02, p=0.71** — individual
+  rounder cells are NOT less persistent (per-condition ρ scattered −0.1…+0.2).
+
+So the link is **not a cell-level mechanism** — they are two *parallel*
+consequences of KO that co-occur at the population level, not a causal chain.
+(The within-condition null also means the feared centroid-noise artefact —
+rounded→noisy centroid→low persistence — is not operating; it would have
+shown up within condition.)
+
+**Is multivariate analysis appropriate? Yes.** Because the two features are
+**not redundant** (uncorrelated within condition; only r=−0.37 / ~14% shared
+variance between recordings), they carry largely independent information — so
+keeping them separate is right and **combining them would NOT be justified**
+(unlike the shape cluster at r=.92). The PERMANOVA/classifier test is valid
+regardless of the modest correlation (permutation null assumes no
+independence), and the result is robust to it: the **PCA-decorrelated** test
+(removes all feature correlation) still gives p=0.004, and crucially the KO
+signal is dominated by roundness — adding the correlated persistence *diluted*
+the multivariate p (roundness-alone 0.0006 → 9-feature 0.023), so the
+correlation is not inflating the result. Caveat for strict rigour: at the
+recording level the −0.37 correlation means a covariance-aware (Mahalanobis)
+distance would be marginally more principled than Euclidean, but n=16 is too
+small to estimate a 9×9 covariance, and the decorrelated check already
+confirms robustness.
+
 ## Edge-truncated cells — excluded from shape; finding is robust
 
 A mask cut by the image border gives unreliable area/circularity/eccentricity
