@@ -187,6 +187,14 @@ design is a priority (see below).
   the shape cluster was combined and nothing else was).
 - **`mv_phenotype_2d.png`** — the KO phenotype in its two *non-redundant*
   axes (shape_roundness vs persistence): KO is rounder AND less persistent.
+- **`persistence_spread_arms.png`** / **`persistence_spread_effect.png`**
+  (`scripts/plot_metric_arms.py`, reusable for any metric) — control-vs-
+  treatment comparison of directional persistence. **Persistence is graded
+  down in the genetic arm** (WT 0.39 → GOF 0.22 → KO 0.10; genetic-arm
+  Kruskal-Wallis significant; KO-vs-WT Cohen's d ≈ −1.3 with a bootstrap CI
+  excluding 0) — though the *Bonferroni-corrected* pairwise MWU is n.s. at
+  n=8, so it is suggestive, not Bonferroni-robust. The drug arm is flat. This
+  corroborates the "less persistent" secondary axis of the KO phenotype.
 
 All feature-based plots use the **de-duplicated** set (shape→`shape_roundness`):
 the fingerprint, heatmap, PCA and this scatter show one roundness axis, not

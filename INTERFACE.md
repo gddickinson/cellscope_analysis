@@ -26,6 +26,10 @@ Read this before opening source files. Update it when modules change.
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
   (genetic-arm PCA, KO fingerprint) to `analysis_out/` (gitignored).
+- **scripts/plot_metric_arms.py** — arm-structured control-vs-treatment
+  comparison of any recording-level metric (`--metric`, default
+  `persistence_spread`): box+strip per arm with within-arm Bonferroni stars
+  (`<metric>_arms.png`) + a Cohen's-d-vs-control forest (`<metric>_effect.png`).
 - **scripts/plot_multivariate.py** — the explain-and-illustrate set:
   `mv_story_panel.png` (6-panel), `mv_shape_score.png` (combined roundness
   score via `combined_score_fig`), `mv_feature_correlation.png` (which
