@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+
+# Local environments
+.venv/
+venv/
+
+# Machine-specific config — points at real data outside the repo
+config.json
+
+# NEVER commit real microscopy data (it is referenced via config.json, not
+# stored here). Ignore data files anywhere, then re-allow the SYNTHETIC sample.
+*.ome.tif
+*.tif
+*.tiff
+*.npz
+!sample_data/
+!sample_data/**

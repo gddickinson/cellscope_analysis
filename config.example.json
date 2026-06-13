@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy to config.json (gitignored) and set data_roots to your CellScope results. Each root is scanned recursively for recording folders (a *.ome.tif + pipeline_results/masks.npz). The bundled sample_data/ is always added as a fallback.",
+  "data_roots": [
+    "/Users/george/claude_test/cellscope/ic295_analysis/by_condition"
+  ]
+}

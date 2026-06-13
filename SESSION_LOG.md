@@ -1,0 +1,47 @@
+# cellscope_analysis — Session Log
+
+Chronological log of substantive changes. Append an entry for any non-trivial
+change. Most recent first.
+
+---
+
+## 2026-06-13 — Project bootstrap (viewer + analysis scaffold)
+
+Split a dedicated analysis project out of `cellscope` to keep detection-result
+review/analysis simple and expandable. Initial scope: **view recordings with
+their mask overlays in a GUI**, with a GUI-free analysis package to grow.
+
+- **Stack**: PyQt5 + pyqtgraph (already in CellScope's `cellpose4` env; no new
+  deps). napari was considered but isn't installed and is heavier.
+- **IO** (`maskviewer/io/`): `load_recording` (`.ome.tif` `(T,C,H,W)` +
+  `.ome.json` sidecar), `load_masks` (`masks.npz` → `labels (T,H,W)`),
+  `discover` (walks `data_roots` for recording folders).
+- **GUI** (`maskviewer/gui/`): `ImageCanvas` (base channel + LUT-coloured
+  label overlay, outline mode, hover→cell ID), `ControlPanel`, `ViewerWindow`
+  (channel/frame/opacity, ←/→ stepping, status bar). Verified headless with
+  `QT_QPA_PLATFORM=offscreen`: loads, scrubs, channel switch, outline, hover.
+- **analysis** (`maskviewer/analysis/label_stats.py`): per-frame counts,
+  areas, track lengths, centroids, `summary` — the expansion seed.
+- **Data policy**: PUBLIC repo → **no real data committed**. Real recordings
+  referenced via gitignored `config.json` (`data_roots`); committed
+  `sample_data/Pos_demo/` is **synthetic** (`scripts/make_sample_data.py`).
+  Verified discovery finds the synthetic sample AND the 48 real IC295
+  recordings via a local `config.json`.
+- Docs: README, CLAUDE.md (handoff + data formats + expansion seeds),
+  INTERFACE.md (navigation map), MIT LICENSE.
+
+Headless smoke (the agent's GUI test without a screen):
+```bash
+QT_QPA_PLATFORM=offscreen conda run -n cellpose4 python - <<'PY'
+from PyQt5 import QtWidgets; import sys
+from maskviewer.config import load_config
+from maskviewer.io import discover
+from maskviewer.gui import ViewerWindow
+app=QtWidgets.QApplication(sys.argv)
+w=ViewerWindow(discover(load_config()['data_roots']))
+w.controls.frame.setValue(3); print(w.status.currentMessage())
+PY
+```
+
+Next ideas (see CLAUDE.md): CSV export + plots from `analysis/`, a per-cell
+info panel, an HTTP remote-control hook for headless agent testing.
