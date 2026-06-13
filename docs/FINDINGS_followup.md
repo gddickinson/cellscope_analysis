@@ -187,6 +187,12 @@ design is a priority (see below).
   the shape cluster was combined and nothing else was).
 - **`mv_phenotype_2d.png`** — the KO phenotype in its two *non-redundant*
   axes (shape_roundness vs persistence): KO is rounder AND less persistent.
+- **`mv_fingerprint_grid.png`** — all four treatment-vs-control fingerprints
+  (both arms) on a shared Cohen's-d scale + shared feature order, each
+  annotated with its PERMANOVA p / AUC. Shows *why* KO is the only
+  significant multivariate difference: KO moves one feature (shape_roundness,
+  d≈+2) a lot and coherently, while GOF/Y1/OT have small, scattered bars that
+  don't aggregate.
 - **`persistence_spread_arms.png`** / **`persistence_spread_effect.png`**
   (`scripts/plot_metric_arms.py`, reusable for any metric) — control-vs-
   treatment comparison of directional persistence. **Persistence is graded

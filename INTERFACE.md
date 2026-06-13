@@ -33,8 +33,10 @@ Read this before opening source files. Update it when modules change.
 - **scripts/plot_multivariate.py** — the explain-and-illustrate set:
   `mv_story_panel.png` (6-panel), `mv_shape_score.png` (combined roundness
   score via `combined_score_fig`), `mv_feature_correlation.png` (which
-  features are redundant / what to combine), `mv_feature_heatmap.png`,
-  `mv_top_pair.png`. → `analysis_out/` (gitignored).
+  features are redundant / what to combine), `mv_fingerprint_grid.png` (all 4
+  treatment-vs-control fingerprints, shared scale + PERMANOVA/AUC — why KO is
+  the only significant one), `mv_feature_heatmap.png`, `mv_phenotype_2d.png`.
+  → `analysis_out/` (gitignored).
 
 ## maskviewer/ (package)
 - **config.py** — `load_config(path)` → dict with `data_roots` (always

@@ -238,6 +238,53 @@ def correlation_fig(df, path):
     fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
 
 
+def fingerprint_grid(df, path):
+    """All four treatment-vs-control fingerprints (Cohen's d per de-duplicated
+    feature) on ONE shared scale + shared feature order, each annotated with
+    its multivariate PERMANOVA p / LORO-AUC. Shows at a glance why KO is the
+    only treatment with large, coherent deviations (→ significant) while the
+    others hug zero."""
+    dfp = mv.add_shape_score(df)[0]
+    feats = mv.FEATURES_COMBINED
+    ko = dict(mv.loadings(dfp, "WT", "KO", features=feats, top=len(feats)))
+    order = sorted(feats, key=lambda f: -abs(ko[f]))        # by |KO-vs-WT d|
+    contrasts = [("WT", "GOF"), ("WT", "KO"), ("DMSO", "Y1"), ("DMSO", "OT")]
+    panels, dmax = [], 0.0
+    for ctrl, test in contrasts:
+        ld = dict(mv.loadings(dfp, ctrl, test, features=feats, top=len(feats)))
+        X, lab = mv._matrix(dfp, [ctrl, test], features=feats)
+        p = mv.permanova(X, lab)[1]
+        auc = mv.loro_auc(X, (lab == test).astype(int), b=999)[0]
+        panels.append((f"{test} vs {ctrl}", ld, p, auc))
+        dmax = max(dmax, max(abs(v) for v in ld.values()))
+    dmax = np.ceil(dmax * 2) / 2
+    yy = np.arange(len(order))
+    labs = [_SHORT(f) for f in order]
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 8.5), sharex=True, sharey=True)
+    for ax, (title, ld, p, auc) in zip(axes.flat, panels):
+        cols = ["#2ca02c" if f == "shape_roundness" else
+                ("#d62728" if ld[f] > 0 else "#1f77b4") for f in order]
+        ax.barh(yy, [ld[f] for f in order], color=cols)
+        ax.axvline(0, color="#222", lw=1)
+        ax.set_yticks(yy); ax.set_yticklabels(labs, fontsize=8)
+        ax.set_xlim(-dmax, dmax)
+        ax.grid(alpha=0.3, axis="x")
+        sig = p is not None and p < 0.05
+        ax.set_title(f"{title}   —   PERMANOVA {ft.stars(p)}, AUC={auc:.2f}",
+                     fontsize=10, color=("#b00000" if sig else "#333"),
+                     fontweight=("bold" if sig else "normal"))
+    axes[0, 0].invert_yaxis()                  # once (shared y) → strongest on top
+    for ax in axes[1]:
+        ax.set_xlabel("Cohen's d  (treatment − control)")
+    fig.suptitle("Treatment-vs-control fingerprints — shared scale + feature "
+                 "order (de-duplicated features)\nKO alone shows large, "
+                 "coherent deviations (rounder ↑, less persistent) → the only "
+                 "significant multivariate difference; GOF/Y1/OT hug zero",
+                 fontsize=12, y=0.97)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.savefig(path, dpi=150); plt.close(fig)
+
+
 def story_panel(df, path):
     X, lab = mv._matrix(df, ["WT", "KO"])
     y = (lab == "KO").astype(int)
@@ -268,6 +315,7 @@ def main():
                        mv.SHAPE_FEATURES, "rounder / more compact",
                        os.path.join(OUT, "mv_shape_score.png"))
     correlation_fig(df, os.path.join(OUT, "mv_feature_correlation.png"))
+    fingerprint_grid(df, os.path.join(OUT, "mv_fingerprint_grid.png"))
     heatmap(df, os.path.join(OUT, "mv_feature_heatmap.png"))
     phenotype_2d(df, os.path.join(OUT, "mv_phenotype_2d.png"))
     print(f"Wrote multivariate story plots → {OUT}/")
