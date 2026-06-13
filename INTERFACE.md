@@ -24,8 +24,12 @@ Read this before opening source files. Update it when modules change.
   `results/`, `gt/`). Convenience browser + viewer `data_root`. Idempotent.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
-- **scripts/plot_followup.py** — writes the multivariate figures (genetic-arm
-  PCA, KO fingerprint) to `analysis_out/` (gitignored).
+- **scripts/plot_followup.py** — writes the basic multivariate figures
+  (genetic-arm PCA, KO fingerprint) to `analysis_out/` (gitignored).
+- **scripts/plot_multivariate.py** — the explain-and-illustrate set:
+  `mv_story_panel.png` (6-panel: why-multivariate, held-out scores, ROC,
+  permutation null, contrasts, fingerprint), `mv_feature_heatmap.png`,
+  `mv_top_pair.png`. → `analysis_out/` (gitignored).
 
 ## maskviewer/ (package)
 - **config.py** — `load_config(path)` → dict with `data_roots` (always
@@ -64,8 +68,10 @@ Read this before opening source files. Update it when modules change.
   `arm_tests()` (per-arm KW + within-arm Bonferroni + vehicle MWU).
   Needs scipy/pandas.
 - **multivariate.py** — recording-level `permanova`, leave-one-recording-out
-  `loro_auc` (logistic), and `loadings` (Cohen's d fingerprint). `run()`.
-  **Found the KO phenotype** the univariate tests missed (needs sklearn).
+  `loro_auc` / `loro_detail` (held-out scores + permutation null), `loadings`
+  (Cohen's d fingerprint), `univariate_p` (per-feature, for the why-
+  multivariate plot). `run()`. **Found the KO phenotype** the univariate
+  tests missed (needs sklearn).
 - **dynamics.py** — `transition_rate`, `dwell_median`, `contact_response`,
   `rounding_on_contact` over the per-cell time series → arm tests. `run()`.
 - **interactions.py** — `density_slope_test` (treatment×crowding) +

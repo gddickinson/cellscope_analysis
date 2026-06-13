@@ -88,5 +88,22 @@ design is a priority (see below).
    acquisition, and ideally differentially-labelled WT+KO **co-culture in one
    field** (kills batch + density confounds for the genetic arm).
 
+## Figures (regenerate into `analysis_out/`, gitignored)
+
+`python scripts/plot_multivariate.py` writes the explain-and-illustrate set:
+
+- **`mv_story_panel.png`** — the whole argument in six panels: (A) *why
+  multivariate* — single features don't survive Bonferroni but the joint
+  test does; (B) held-out leave-one-recording-out scores cleanly split
+  WT/KO; (C) ROC (AUC=0.80); (D) permutation null (the classifier isn't just
+  overfitting); (E) effect across all contrasts (KO + vehicle separate, drug
+  arm flat); (F) the Cohen's-d fingerprint.
+- **`mv_feature_heatmap.png`** — recordings × features; the KO shift is
+  modest/noisy per recording and spread across features (why aggregation is
+  needed; eccentricity is the strongest single axis).
+- **`mv_top_pair.png`** — the top-2 features overlap per-axis, separate more
+  when combined.
+- `plot_followup.py` also writes the plain PCA + fingerprint.
+
 *Analyses: `maskviewer/analysis/{multivariate,dynamics,interactions,
 feature_tables}.py`. Figures in `analysis_out/` (gitignored).*

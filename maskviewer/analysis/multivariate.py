@@ -94,6 +94,50 @@ def loro_auc(X, y, b=999, seed=0):
     return float(obs), ge / (b + 1)
 
 
+def loro_detail(X, y, b=999, seed=0):
+    """Like loro_auc but also returns the held-out scores + permutation null
+    (for ROC / score-distribution / null-histogram plots)."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
+
+    def loo_scores(yy):
+        s = np.full(len(yy), 0.5)
+        for i in range(len(yy)):
+            tr = np.arange(len(yy)) != i
+            if len(np.unique(yy[tr])) < 2:
+                continue
+            clf = LogisticRegression(C=0.3, max_iter=2000).fit(X[tr], yy[tr])
+            s[i] = clf.predict_proba(X[i:i + 1])[0, 1]
+        return s
+
+    rng = np.random.default_rng(seed)
+    scores = loo_scores(y)
+    auc = roc_auc_score(y, scores)
+    perm = np.empty(b)
+    for k in range(b):
+        yp = rng.permutation(y)
+        perm[k] = roc_auc_score(yp, loo_scores(yp))
+    p = (int((perm >= auc).sum()) + 1) / (b + 1)
+    return {"scores": scores, "auc": float(auc), "perm_aucs": perm, "p": p}
+
+
+def univariate_p(df, ctrl, test, features=FEATURES):
+    """Mann-Whitney p per feature (recording-level) — shows why single
+    features 'fail' (multiple-comparison penalty) while the joint test holds."""
+    from scipy.stats import mannwhitneyu
+    out = []
+    for f in features:
+        a = df.loc[df["condition"] == ctrl, f].to_numpy(float)
+        b = df.loc[df["condition"] == test, f].to_numpy(float)
+        a, b = a[np.isfinite(a)], b[np.isfinite(b)]
+        try:
+            p = float(mannwhitneyu(a, b, alternative="two-sided").pvalue)
+        except ValueError:
+            p = 1.0
+        out.append((f, p))
+    return out
+
+
 def loadings(df, ctrl, test, features=FEATURES, top=6):
     """Per-feature Cohen's d (test − ctrl), ranked by |d|."""
     out = []
