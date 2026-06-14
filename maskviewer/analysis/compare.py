@@ -209,6 +209,27 @@ def effect_sizes(by_cond, arms=None):
     return out
 
 
+def per_condition_summary(per_recording, metric):
+    """[{group, n, mean, sem, median}] over recordings, per condition (unit=rec).
+
+    The tabular companion to the distribution plots (the Data tab); ``n`` is the
+    number of recordings contributing, not cells.
+    """
+    out = []
+    if (per_recording is None or per_recording.empty
+            or metric not in per_recording.columns):
+        return out
+    for cond, g in per_recording.groupby("condition"):
+        v = g[metric].to_numpy(float)
+        v = v[np.isfinite(v)]
+        if v.size == 0:
+            continue
+        sem = float(v.std(ddof=1) / np.sqrt(v.size)) if v.size > 1 else 0.0
+        out.append({"group": cond, "n": int(v.size), "mean": float(v.mean()),
+                    "sem": sem, "median": float(np.median(v))})
+    return out
+
+
 def by_condition(per_recording, metric):
     """{condition: [per-recording values]} for arm tests (recording = unit)."""
     out = {}

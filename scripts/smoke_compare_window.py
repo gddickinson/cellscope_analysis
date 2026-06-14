@@ -34,11 +34,13 @@ def fake_data(conditions, n_rec=4, n_cells=15):
         for r in range(n_rec):
             rec = f"{cond}__{r}"
             for cid in range(n_cells):
+                fs = float(np.clip(rng.normal(0.5 * bump, 0.1), 0, 1))
                 pc_rows.append({
                     "recording": rec, "condition": cond, "cell_id": cid,
                     "frames_tracked": int(rng.integers(3, 30)),
                     "mean_area_um2": float(rng.normal(120 * bump, 20)),
-                    "frac_spread": float(np.clip(rng.normal(0.5 * bump, 0.1), 0, 1)),
+                    "frac_spread": fs, "frac_rounded": 1.0 - fs,
+                    "track_quality": float(np.clip(rng.normal(0.6, 0.2), 0, 1)),
                     "mean_n_neighbors": float(abs(rng.normal(2.0, 0.6))),
                     "shape_roundness": float(np.clip(rng.normal(0.6, 0.1), 0, 1)),
                 })
@@ -57,7 +59,8 @@ def make_project(name, conditions):
 
 
 def drive(win, label):
-    """Exercise every tab + the dist kinds + OLS + stats table."""
+    """Exercise every left tab, the dist kinds, OLS, the new filters, and the
+    right-panel Stats / Histogram / Data tabs."""
     # Distributions: strip / box / superplot
     win.tabs.setCurrentIndex(0)
     for k in range(win.dist_kind.count()):
@@ -70,13 +73,31 @@ def drive(win, label):
     win.tabs.setCurrentIndex(2)
     if win.metric_y.count() > 1:
         win.metric_y.setCurrentIndex(1)
-    # OLS-adjust + a min-frames filter, back on Distributions
     win.tabs.setCurrentIndex(0)
     win.ols.setChecked(True)
+
+    # right panel always tracks the metric: stats + histogram + data populated
+    win.metric.setCurrentText("mean_area_um2")
+    assert win.table.rowCount() > 0, f"{label}: stats table empty"
+    assert win.rec_table.rowCount() > 0, f"{label}: per-recording data empty"
+    assert win.cond_table.rowCount() > 0, f"{label}: per-group data empty"
+    assert len(win.hist_plot.listDataItems()) > 0, f"{label}: histogram empty"
+    # units reached the headers + axes
+    assert "µm²" in win.rec_table.horizontalHeaderItem(3).text(), \
+        win.rec_table.horizontalHeaderItem(3).text()
+
+    # new filters: quality / state / min-cells (each must not crash + keep data)
     win.min_frames.setValue(5)
-    rows = win.table.rowCount()
-    assert rows > 0, f"{label}: stats table is empty"
-    print(f"  {label}: tabs OK · stats rows={rows} · omnibus={win.omnibus.text()[:48]!r}")
+    win.min_quality.setValue(0.3)
+    win.state_sel.setCurrentText("mostly spread")
+    win.min_cells.setValue(2)
+    assert win.rec_table.rowCount() > 0, f"{label}: filters emptied everything"
+    win.min_cells.setValue(99999)                     # drop all recordings
+    win.min_cells.setValue(0)
+    win.min_quality.setValue(0.0)
+    win.state_sel.setCurrentText("all cells")
+    print(f"  {label}: tabs+filters+units OK · stats rows={win.table.rowCount()} "
+          f"· per-rec rows={win.rec_table.rowCount()}")
 
 
 def drive_editor(win, app):
@@ -139,10 +160,16 @@ def main():
         win.min_frames.setValue(1)
         win.tabs.setCurrentIndex(0)
         win.dist_kind.setCurrentIndex(1)
-        win.resize(1180, 720)
+        win.right_tabs.setCurrentIndex(0)             # Stats
+        win.resize(1180, 740)
         app.processEvents()
         win.grab().save(shot)
         print(f"  saved screenshot → {shot}")
+        win.right_tabs.setCurrentIndex(1)             # Histogram tab (units on axis)
+        app.processEvents()
+        win.grab().save(shot.replace(".png", "_histogram.png"))
+        print(f"  saved screenshot → {shot.replace('.png', '_histogram.png')}")
+        win.right_tabs.setCurrentIndex(0)
 
     eshot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--editshot=")), None)
     if eshot:                                         # clean editor, before any edits

@@ -106,6 +106,60 @@ EXTRA = {
 }
 
 
+_UNIT_SUFFIXES = ("_um2_per_min", "_px2_per_min", "_um_per_min", "_px_per_min",
+                  "_um_per_frame", "_px_per_frame", "_um2", "_px2", "_um", "_px")
+
+
+def column_units(col: str) -> str:
+    """Display units for an aggregated comparison column (from its suffix).
+    Dimensionless (ratios/scores) → ''."""
+    c = col
+    for per, lab in (("_per_min", "/min"), ("_per_frame", "/frame")):
+        if c.endswith(per):
+            base = c[: -len(per)]
+            if base.endswith("_um2"):
+                return "µm²" + lab
+            if base.endswith("_um"):
+                return "µm" + lab
+            if base.endswith("_px"):
+                return "px" + lab
+            return "1" + lab
+    if "area" in c and c.endswith("_px"):
+        return "px²"
+    for suf, u in (("_um2", "µm²"), ("_px2", "px²"), ("_um", "µm"), ("_px", "px")):
+        if c.endswith(suf):
+            return u
+    if c.endswith("_min") or "persistence_time" in c:
+        return "min"
+    if c.startswith("frac_") or c == "track_quality":
+        return ""                       # fraction / 0–1 score
+    if c == "n_cells" or c.startswith("n_") or "n_neighbors" in c:
+        return "count"
+    if "frames" in c:
+        return "frames"
+    return ""
+
+
+def column_label(col: str) -> str:
+    """Human-readable metric name (drops the unit suffix; underscores → spaces)."""
+    c = col
+    for suf in _UNIT_SUFFIXES:
+        if c.endswith(suf):
+            c = c[: -len(suf)]
+            break
+    else:
+        if c.endswith("_min"):
+            c = c[:-4]
+    return c.replace("_", " ").strip()
+
+
+def axis_label(col: str) -> str:
+    """`label (units)` for a plot axis / table header (units omitted if none)."""
+    u = column_units(col)
+    lab = column_label(col)
+    return f"{lab} ({u})" if u else lab
+
+
 def doc(key: str):
     """(what, how) for a metric key (handles per-channel prefixes)."""
     if key in METRICS:

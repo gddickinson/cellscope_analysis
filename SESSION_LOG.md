@@ -5,6 +5,33 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Comparison: more filters, axis units, Histogram + Data tabs
+
+Extended the Comparison window per the request — more filtering, units on graphs,
+and histogram + tabular tabs alongside the per-contrast stats.
+
+- **Filters** (new second toolbar row): min frames tracked, **min track-quality**,
+  **min cells/recording** (drop low-N recordings — recording = unit), and a
+  **cell-state** filter (all / mostly spread / mostly rounded via frac_spread/
+  frac_rounded ≥ 0.5). Cell-level filters apply before aggregation; min-cells drops
+  recordings (and their cells) consistently across plots, stats, histogram, data
+  and the MSD curves.
+- **Units on graphs**: `metric_docs.column_units` / `column_label` / `axis_label`
+  turn an aggregated column into "mean area (µm²)" etc.; used on every distribution
+  / scatter axis, the histogram axis, and the Data-tab headers.
+- **Right panel is now tabbed** (`StatsTablesMixin` split into `gui/compare_tables.py`):
+  **Stats** (the existing per-contrast table + omnibus/vehicle) · **Histogram**
+  (`compare_plots.histogram` — per-cell distribution by group, shared bins, legend)
+  · **Data** (per-recording table + per-group summary `compare.per_condition_summary`,
+  unit-tagged; exportable, +`comparison_per_group_summary.csv`).
+
+Tests: `pytest` **37 passed** (new `tests/test_compare_extras.py` — units/labels +
+per-group summary). `scripts/smoke_compare_window.py` now drives the filters + the
+three right tabs + units and writes `docs/screenshots/comparison{,_histogram}.png`.
+All files < 500 lines (stats/data table code moved to `compare_tables.py`).
+
+---
+
 ## 2026-06-14 — Status-bar progress bars + ETA (off-thread compute)
 
 Long compute (the per-frame regionprops / contour passes) now reports into a

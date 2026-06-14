@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pyqtgraph as pg
 
-from ..analysis import compare, feature_tables
+from ..analysis import compare, feature_tables, metric_docs
 
 _REC_PALETTE = [(31, 119, 180), (255, 127, 14), (44, 160, 44), (214, 39, 40),
                 (148, 103, 189), (140, 86, 75), (227, 119, 194), (127, 127, 127)]
@@ -59,7 +59,7 @@ def strip(plot, per_rec, metric, design, pick_cb=None):
                                      pen=pg.mkPen("w", width=2)))
         plot.plot([i - 0.22, i + 0.22], [mean, mean], pen=pg.mkPen("w", width=2))
     _ticks(plot, conds)
-    plot.setLabel("left", metric)
+    plot.setLabel("left", metric_docs.axis_label(metric))
     plot.setTitle("each point = one recording (mean ± SEM)")
 
 
@@ -95,7 +95,7 @@ def box(plot, per_rec, metric, design):
                     lbl.setPos(conds.index(t), max(bc[t]))
                     plot.addItem(lbl)
     _ticks(plot, conds)
-    plot.setLabel("left", metric)
+    plot.setLabel("left", metric_docs.axis_label(metric))
     plot.setTitle("box = recordings/condition · * vs arm control (Bonferroni)")
 
 
@@ -122,7 +122,7 @@ def superplot(plot, per_cell, per_rec, metric, design):
             plot.plot([i - 0.22, i + 0.22], [mr.mean(), mr.mean()],
                       pen=pg.mkPen("w", width=2))
     _ticks(plot, conds)
-    plot.setLabel("left", metric)
+    plot.setLabel("left", metric_docs.axis_label(metric))
     plot.setTitle("small = cells (by recording) · large = recording means")
 
 
@@ -161,11 +161,40 @@ def scatter(plot, per_rec, mx, my, design, pick_cb=None):
     x = per_rec[mx].to_numpy(float)
     y = per_rec[my].to_numpy(float)
     ok = np.isfinite(x) & np.isfinite(y)
-    title = f"{mx} vs {my}"
+    title = f"{metric_docs.column_label(mx)} vs {metric_docs.column_label(my)}"
     if ok.sum() >= 3:
         from scipy.stats import spearmanr
         rho, p = spearmanr(x[ok], y[ok])
         title += f"   (Spearman ρ={rho:.2f}, p={p:.3f})"
-    plot.setLabel("bottom", mx)
-    plot.setLabel("left", my)
+    plot.setLabel("bottom", metric_docs.axis_label(mx))
+    plot.setLabel("left", metric_docs.axis_label(my))
     plot.setTitle(title)
+
+
+def histogram(plot, per_cell, metric, design, density=True):
+    """Per-cell distribution of ``metric``, one outlined+filled curve per group
+    (shared bins, design colours). Complements the recording-level views."""
+    if per_cell is None or per_cell.empty or metric not in per_cell.columns:
+        return
+    allv = per_cell[metric].to_numpy(float)
+    allv = allv[np.isfinite(allv)]
+    if allv.size == 0:
+        return
+    lo, hi = np.percentile(allv, [0.5, 99.5])
+    if not np.isfinite([lo, hi]).all() or hi <= lo:
+        lo, hi = float(allv.min()), float(allv.max()) + 1e-9
+    edges = np.linspace(lo, hi, 31)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    for cond in _conds(per_cell, design):
+        v = per_cell[per_cell["condition"] == cond][metric].to_numpy(float)
+        v = v[np.isfinite(v)]
+        if v.size == 0:
+            continue
+        h, _ = np.histogram(v, bins=edges, density=density)
+        col = _rgb(design.color(cond))
+        plot.addItem(pg.PlotCurveItem(centres, h, name=cond, fillLevel=0,
+                                      pen=pg.mkPen(col, width=2),
+                                      brush=pg.mkBrush(*col, 55)))
+    plot.setLabel("bottom", metric_docs.axis_label(metric))
+    plot.setLabel("left", "density" if density else "cells")
+    plot.setTitle("per-cell distribution by group")

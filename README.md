@@ -41,9 +41,12 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   `Ctrl+Shift+C`) for cross-recording / treatment analysis (**recording =
   experimental unit**): tabbed **Distributions** (strip / box+Bonferroni /
   superplot) · **Ensemble MSD** (mean±SEM or median+CI) · **Scatter** (X-vs-Y +
-  Spearman), beside a sortable per-contrast **stats table** (p / Bonferroni /
-  Cohen's d / covariate-adjusted OLS) with per-arm Kruskal-Wallis + vehicle
-  test. Background compute + per-project cache; click a point → load that
+  Spearman), all with **units on the axes**. A **Filters** row (min frames, min
+  track-quality, min cells/recording, cell-state) refines the cells/recordings
+  used; the right panel is tabbed — **Stats** (per-contrast p / Bonferroni /
+  Cohen's d / covariate-adjusted OLS + per-arm KW + vehicle) · **Histogram**
+  (per-cell distribution by group) · **Data** (per-recording + per-group tables,
+  unit-tagged). Background compute + per-project cache; click a point → load that
   recording in the viewer.
 - **Groups & Comparisons editor** (Comparison window ▸ **Groups…**) — assign
   recordings to **groups**, **include/exclude** any recording, define which groups
@@ -58,7 +61,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
-![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + per-contrast stats table](docs/screenshots/comparison.png)
+![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
+
+![the Comparison window Histogram tab — per-cell distribution by group, units on the axis](docs/screenshots/comparison_histogram.png)
 
 ![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 
