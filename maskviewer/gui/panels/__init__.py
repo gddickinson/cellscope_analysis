@@ -8,7 +8,8 @@
   edge_panel.py    EdgePanel        — membrane protrusion/retraction kymograph
   shape_panel.py   ShapeModesPanel  — VAMPIRE-style shape-mode clustering
   population_panel.py PopulationPanel — all-cells plots (time series / mean±err /
-                                      histogram / flower) + filters
+                                      histogram / flower / scatter / lineage) + filters
+  cell_table.py    CellTablePanel   — sortable per-cell metric table
 """
 from .timeline import TimelinePanel
 from .display_panel import DisplayPanel
@@ -17,6 +18,7 @@ from .cell_info import CellInfoPanel
 from .edge_panel import EdgePanel
 from .shape_panel import ShapeModesPanel
 from .population_panel import PopulationPanel
+from .cell_table import CellTablePanel
 
 __all__ = ["TimelinePanel", "DisplayPanel", "ImageAdjustPanel", "CellInfoPanel",
-           "EdgePanel", "ShapeModesPanel", "PopulationPanel"]
+           "EdgePanel", "ShapeModesPanel", "PopulationPanel", "CellTablePanel"]

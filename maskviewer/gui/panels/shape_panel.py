@@ -11,6 +11,7 @@ import pyqtgraph as pg
 from PyQt5 import QtCore, QtWidgets
 
 from ...analysis import shape_modes
+from ..plot_export import save_plot
 
 PALETTE = [(31, 119, 180), (255, 127, 14), (44, 160, 44), (214, 39, 40),
            (148, 103, 189), (140, 86, 75), (227, 119, 194)]
@@ -29,6 +30,10 @@ class ShapeModesPanel(QtWidgets.QWidget):
         self.info.setWordWrap(True)
         self.compute_btn = QtWidgets.QPushButton("Compute shape modes")
         self.compute_btn.clicked.connect(self._compute)
+        self.save_btn = QtWidgets.QPushButton("Save…")
+        self.save_btn.setToolTip("Save the mode-shapes plot")
+        self.save_btn.clicked.connect(
+            lambda: save_plot(self.shapes, self, "shape_modes.png"))
 
         self.shapes = pg.PlotWidget()
         self.shapes.setAspectLocked(True)
@@ -46,7 +51,10 @@ class ShapeModesPanel(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self)
         lay.addWidget(self.title)
         lay.addWidget(self.info)
-        lay.addWidget(self.compute_btn)
+        brow = QtWidgets.QHBoxLayout()
+        brow.addWidget(self.compute_btn)
+        brow.addWidget(self.save_btn)
+        lay.addLayout(brow)
         lay.addWidget(self.shapes, 1)
         lay.addWidget(self.bars)
 

@@ -1,10 +1,11 @@
-"""Population panel — plot a metric across ALL cells of the current recording.
+"""Population panel — plot metrics across ALL cells of the current recording.
 
-Plot types: every cell's time-course, the population mean ± SEM/SD error band,
-a histogram of the metric's distribution, and a flower plot (origin-centred
-trajectories). Filters: minimum track length, cell state, exclude edge frames.
-The per-(cell, frame) table is built once on Compute (`analysis.population`) and
-cached, then plots are instant. Inspired by CellScope's flower/comparison plots.
+Plot types: every cell's time-course; population mean ± SEM/SD; histogram;
+flower plot (origin-centred trajectories); scatter of one metric vs another
+(per cell, click a point to select that cell); lineage tree and division
+timeline (from divisions.json). Filters: min track length, cell state, exclude
+edge. The per-(cell, frame) table is built once on Compute and cached. Inspired
+by CellScope's flower / comparison / lineage plots.
 """
 from __future__ import annotations
 
@@ -12,12 +13,18 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtWidgets
 
-from ...analysis import population, metric_docs
+from ...analysis import population, metric_docs, lineage
+from ..plot_export import save_plot
 
-_KINDS = ["Time series (all cells)", "Mean ± error", "Histogram", "Flower plot"]
+_KINDS = ["Time series (all cells)", "Mean ± error", "Histogram", "Flower plot",
+          "Scatter (X vs Y)", "Lineage tree", "Division timeline"]
+_NEEDS_DF = {"Time series (all cells)", "Mean ± error", "Histogram",
+             "Scatter (X vs Y)"}
 
 
 class PopulationPanel(QtWidgets.QWidget):
+    cellSelected = QtCore.pyqtSignal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._labels = None
@@ -25,26 +32,32 @@ class PopulationPanel(QtWidgets.QWidget):
         self._dt = None
         self._df = None
         self._flower = None
+        self._divisions = []
+        self.table_provider = None      # callable -> cached population DataFrame
 
         self.title = QtWidgets.QLabel("Population (all cells)")
         self.title.setStyleSheet("font-weight: bold;")
         self.compute_btn = QtWidgets.QPushButton("Compute population")
-        self.compute_btn.setToolTip("Measure every cell in every frame "
-                                    "(one pass), then plot from the cache")
+        self.compute_btn.setToolTip("Measure every cell in every frame (one "
+                                    "pass), then plot from the cache")
         self.compute_btn.clicked.connect(self._compute)
+        self.save_btn = QtWidgets.QPushButton("Save plot…")
+        self.save_btn.clicked.connect(lambda: save_plot(self.plot, self,
+                                                        "population.png"))
 
         self.kind = QtWidgets.QComboBox()
         self.kind.addItems(_KINDS)
         self.kind.currentIndexChanged.connect(self._replot)
         self.metric = QtWidgets.QComboBox()
         self.metric.currentIndexChanged.connect(self._replot)
+        self.metric_y = QtWidgets.QComboBox()
+        self.metric_y.setToolTip("Y metric (for the scatter plot)")
+        self.metric_y.currentIndexChanged.connect(self._replot)
         self.err = QtWidgets.QComboBox()
         self.err.addItems(["SEM", "SD"])
-        self.err.setToolTip("Error band for the mean")
         self.err.currentIndexChanged.connect(self._replot)
         self.show_cells = QtWidgets.QCheckBox("show cells")
         self.show_cells.setChecked(True)
-        self.show_cells.setToolTip("Overlay faint individual-cell curves")
         self.show_cells.toggled.connect(self._replot)
         self.min_frames = QtWidgets.QSpinBox()
         self.min_frames.setRange(1, 9999)
@@ -52,11 +65,9 @@ class PopulationPanel(QtWidgets.QWidget):
         self.min_frames.valueChanged.connect(self._replot)
         self.state_sel = QtWidgets.QComboBox()
         self.state_sel.addItems(["all states", "spread", "rounded"])
-        self.state_sel.setToolTip("Keep only frames in this state")
         self.state_sel.currentIndexChanged.connect(self._replot)
         self.exclude_edge = QtWidgets.QCheckBox("exclude edge")
         self.exclude_edge.setChecked(True)
-        self.exclude_edge.setToolTip("Drop edge-truncated cell-frames")
         self.exclude_edge.toggled.connect(self._replot)
 
         self.plot = pg.PlotWidget()
@@ -64,7 +75,8 @@ class PopulationPanel(QtWidgets.QWidget):
 
         form = QtWidgets.QFormLayout()
         form.addRow("Plot", self.kind)
-        form.addRow("Metric", self.metric)
+        form.addRow("Metric (X)", self.metric)
+        form.addRow("Metric (Y)", self.metric_y)
         erow = QtWidgets.QHBoxLayout()
         erow.addWidget(self.err)
         erow.addWidget(self.show_cells)
@@ -75,13 +87,17 @@ class PopulationPanel(QtWidgets.QWidget):
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.addWidget(self.title)
-        lay.addWidget(self.compute_btn)
+        brow = QtWidgets.QHBoxLayout()
+        brow.addWidget(self.compute_btn)
+        brow.addWidget(self.save_btn)
+        lay.addLayout(brow)
         lay.addLayout(form)
         lay.addWidget(self.plot, 1)
 
     # -- public ----------------------------------------------------------
-    def set_recording(self, labels, um_per_px=None, dt_min=None):
+    def set_recording(self, labels, um_per_px=None, dt_min=None, divisions=None):
         self._labels, self._um, self._dt = labels, um_per_px, dt_min
+        self._divisions = divisions or []
         self._df = self._flower = None
         self.plot.clear()
         self.title.setText("Population (all cells) — click Compute")
@@ -92,22 +108,25 @@ class PopulationPanel(QtWidgets.QWidget):
             return
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         try:
-            self._df = population.population_table(self._labels, self._um, self._dt)
+            self._df = (self.table_provider() if self.table_provider
+                        else population.population_table(self._labels, self._um,
+                                                         self._dt))
             self._flower = population.flower_tracks(self._labels, self._um)
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
         cols = population.metric_columns(self._df)
-        cur = self.metric.currentText()
-        self.metric.blockSignals(True)
-        self.metric.clear()
-        self.metric.addItems(cols)
-        for i, c in enumerate(cols):
-            tip = metric_docs.tooltip(c.rsplit("_um", 1)[0].rsplit("_px", 1)[0])
-            if tip:
-                self.metric.setItemData(i, tip, QtCore.Qt.ToolTipRole)
-        if cur in cols:
-            self.metric.setCurrentText(cur)
-        self.metric.blockSignals(False)
+        for combo in (self.metric, self.metric_y):
+            cur = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(cols)
+            for i, c in enumerate(cols):
+                tip = metric_docs.tooltip(c.rsplit("_um", 1)[0].rsplit("_px", 1)[0])
+                if tip:
+                    combo.setItemData(i, tip, QtCore.Qt.ToolTipRole)
+            if cur in cols:
+                combo.setCurrentText(cur)
+            combo.blockSignals(False)
         n = 0 if self._df is None else self._df["cell_id"].nunique()
         self.title.setText(f"Population — {n} cells")
         self._replot()
@@ -130,16 +149,26 @@ class PopulationPanel(QtWidgets.QWidget):
         return df
 
     def _replot(self):
-        if self._df is None:
-            return
         kind = self.kind.currentText()
+        if self._labels is None:
+            return
+        if kind in _NEEDS_DF and self._df is None:
+            return
         self.plot.clear()
         self.plot.getViewBox().setAspectLocked(kind == "Flower plot")
         if kind == "Flower plot":
             return self._plot_flower()
+        if kind == "Lineage tree":
+            return self._plot_lineage()
+        if kind == "Division timeline":
+            return self._plot_div_timeline()
         df = self._filtered()
+        if df is None or df.empty:
+            return
+        if kind == "Scatter (X vs Y)":
+            return self._plot_scatter(df)
         metric = self.metric.currentText()
-        if df is None or df.empty or metric not in df.columns:
+        if metric not in df.columns:
             return
         if kind == "Histogram":
             self._plot_hist(df, metric)
@@ -188,6 +217,27 @@ class PopulationPanel(QtWidgets.QWidget):
         self.plot.setLabel("bottom", metric)
         self.plot.setLabel("left", "count (cell-frames)")
 
+    def _plot_scatter(self, df):
+        mx, my = self.metric.currentText(), self.metric_y.currentText()
+        if mx not in df.columns or my not in df.columns:
+            return
+        gm = df.groupby("cell_id")
+        xs, ys = gm[mx].mean(), gm[my].mean()
+        spots = [{"pos": (float(xs[c]), float(ys[c])), "data": int(c)}
+                 for c in xs.index
+                 if np.isfinite(xs[c]) and np.isfinite(ys[c])]
+        sp = pg.ScatterPlotItem(size=10, brush=(0, 160, 255, 160),
+                                pen=pg.mkPen("w"))
+        sp.addPoints(spots)
+        sp.sigClicked.connect(self._scatter_clicked)
+        self.plot.addItem(sp)
+        self.plot.setLabel("bottom", f"{mx} (per-cell mean)")
+        self.plot.setLabel("left", f"{my} (per-cell mean)")
+
+    def _scatter_clicked(self, _scatter, points):
+        if len(points):
+            self.cellSelected.emit(int(points[0].data()))
+
     def _plot_flower(self):
         if not self._flower:
             return
@@ -204,6 +254,35 @@ class PopulationPanel(QtWidgets.QWidget):
         u = "µm" if self._um else "px"
         self.plot.setLabel("bottom", f"x from origin ({u})")
         self.plot.setLabel("left", f"y from origin ({u})")
+
+    def _plot_lineage(self):
+        spans = lineage.track_spans(self._labels)
+        if not spans:
+            return
+        rows = lineage.lineage_rows(spans)
+        dt = self._dt or 1.0
+        for cid, (f0, f1) in spans.items():
+            y = rows[cid]
+            self.plot.plot([f0 * dt, f1 * dt], [y, y],
+                           pen=pg.mkPen((150, 150, 150)))
+        for d in self._divisions:
+            if d["parent"] in rows and d["daughter"] in rows:
+                fr = d["frame"] * dt
+                self.plot.plot([fr, fr], [rows[d["parent"]], rows[d["daughter"]]],
+                               pen=pg.mkPen((214, 39, 40), width=2))
+        self.plot.setLabel("bottom", "time (min)" if self._dt else "frame")
+        self.plot.setLabel("left", "track (lifeline row)")
+
+    def _plot_div_timeline(self):
+        n = self._labels.shape[0]
+        counts = lineage.division_counts(self._divisions, n)
+        dt = self._dt or 1.0
+        x = np.arange(n) * dt
+        self.plot.addItem(pg.BarGraphItem(x=x, height=counts, width=0.8 * dt,
+                                          brush=(214, 39, 40, 150)))
+        self.plot.plot(x, np.cumsum(counts), pen=pg.mkPen((0, 120, 255), width=2))
+        self.plot.setLabel("bottom", "time (min)" if self._dt else "frame")
+        self.plot.setLabel("left", "divisions / cumulative")
 
     @staticmethod
     def _wrap(layout):

@@ -34,7 +34,7 @@ class Overlays:
         self.vb = viewbox
         self.um_per_px = None
         self.show = {"info": True, "scalebar": True, "ids": False,
-                     "trails": False, "selection": True}
+                     "trails": False, "selection": True, "divisions": False}
         self._info_text = ""
         self.info = pg.TextItem(color=_W, anchor=(0, 0))
         self.sbar = QtWidgets.QGraphicsLineItem()
@@ -46,8 +46,12 @@ class Overlays:
         self.sel_rect.setBrush(pg.mkBrush(None))
         self.sel_marker = pg.ScatterPlotItem(size=16, symbol="+",
                                              pen=pg.mkPen(_Y, width=2), brush=None)
+        self.div_marker = pg.ScatterPlotItem(size=20, symbol="d",
+                                             pen=pg.mkPen((255, 60, 60), width=2),
+                                             brush=None)
         self._ids: list = []
         for z, it in ((60, self.trails), (80, self.sel_rect), (81, self.sel_marker),
+                      (82, self.div_marker),
                       (100, self.sbar), (100, self.sbar_text), (100, self.info)):
             it.setZValue(z)
             self.vb.addItem(it, ignoreBounds=True)
@@ -62,15 +66,24 @@ class Overlays:
             self.show[key] = bool(on)
 
     def update_overlay(self, *, info_text="", centroids=None, history=None,
-                       frame=0, selected=0, bbox=None):
+                       frame=0, selected=0, bbox=None, division_pts=None):
         """Refresh per-frame overlay items. ``centroids`` / ``bbox`` are
         {id: (y, x)} / {id: (x0, y0, x1, y1)} for the current frame; ``history``
-        is {id: (T, 2) (y, x)} for trails."""
+        is {id: (T, 2) (y, x)} for trails; ``division_pts`` are (y, x) of cells
+        dividing at this frame."""
         self._info_text = info_text
         self._update_ids(centroids if self.show["ids"] else None)
         self._update_trails(history, frame if self.show["trails"] else None)
         self._update_selection(selected, centroids, bbox)
+        self._update_divisions(division_pts if self.show["divisions"] else None)
         self._place_corners()
+
+    def _update_divisions(self, pts):
+        if not pts:
+            self.div_marker.setVisible(False)
+            return
+        self.div_marker.setData([p[1] for p in pts], [p[0] for p in pts])
+        self.div_marker.setVisible(True)
 
     # -- per-frame items -------------------------------------------------
     def _update_ids(self, centroids):

@@ -21,20 +21,20 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from .image_view import ImageCanvas
 from .panels import (TimelinePanel, DisplayPanel, ImageAdjustPanel,
-                     CellInfoPanel, EdgePanel, ShapeModesPanel, PopulationPanel)
+                     CellInfoPanel, EdgePanel, ShapeModesPanel, PopulationPanel,
+                     CellTablePanel)
+from ..analysis import population as _population
 from .luts import DisplayState
 from .menus import build_menubar
-from .export_dialog import CSVExportDialog
+from .window_actions import WindowActionsMixin
 from . import colorby
 from ..analysis import label_stats, cell_metrics, shape_modes, metric_docs
-from ..io.dataset import discover, Entry
-from ..config import PROJECT_ROOT
 
 _RIGHT = QtCore.Qt.RightDockWidgetArea
 _BOTTOM = QtCore.Qt.BottomDockWidgetArea
 
 
-class ViewerWindow(QtWidgets.QMainWindow):
+class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
     def __init__(self, entries, parent=None):
         super().__init__(parent)
         self.setWindowTitle("cellscope_analysis — viewer & workbench")
@@ -49,6 +49,8 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self._track_len = None          # lazy {cid: int} for colour-by track
         self._mean_speed = None         # lazy {cid: float} for colour-by speed
         self._shape_model = None        # lazy VAMPIRE shape-mode model
+        self._pop_df = None             # lazy population table (fixed scale + panel)
+        self.divisions = []             # division events for the recording
         self._cur_lab = None
         self._cur_ncells = 0
         self._show_colorbar = True
@@ -67,6 +69,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.edge = EdgePanel()
         self.shape = ShapeModesPanel()
         self.population = PopulationPanel()
+        self.cell_table = CellTablePanel()
         self.timeline = TimelinePanel()
         self.docks = {}
         self._add_dock("Display", self.display, _RIGHT)
@@ -75,10 +78,13 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self._add_dock("Edge Dynamics", self.edge, _RIGHT)
         self._add_dock("Shape Modes", self.shape, _RIGHT)
         self._add_dock("Population", self.population, _RIGHT)
+        self._add_dock("Cell Table", self.cell_table, _RIGHT)
         self._add_dock("Timeline", self.timeline, _BOTTOM)
-        for name in ("Cell Info", "Edge Dynamics", "Shape Modes", "Population"):
+        for name in ("Cell Info", "Edge Dynamics", "Shape Modes", "Population",
+                     "Cell Table"):
             self.tabifyDockWidget(self.docks["Display"], self.docks[name])
         self.docks["Display"].raise_()
+        self.resizeDocks([self.docks["Display"]], [400], QtCore.Qt.Horizontal)
         self.status = self.statusBar()
 
         build_menubar(self)
@@ -117,6 +123,9 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.cell_info.neighbor_provider = self._centroid_history
         self.cell_info.shape_mode_provider = self._shape_modes_model
         self.shape.set_provider(self._shape_modes_model)
+        self.population.table_provider = self._population_table
+        self.cell_table.cellSelected.connect(self.select_cell)
+        self.population.cellSelected.connect(self.select_cell)
         for key, step in ((QtCore.Qt.Key_Left, -1), (QtCore.Qt.Key_Right, 1)):
             QtWidgets.QShortcut(QtGui.QKeySequence(key), self,
                                 activated=lambda s=step: self.timeline.step(s))
@@ -138,13 +147,18 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self._display = {}
         self.selected = 0
         self._cent_hist = self._track_len = self._mean_speed = None
-        self._shape_model = None
+        self._shape_model = self._pop_df = None
+        self.divisions = entry.load_divisions()
+        labels = self.masks.labels if self.masks is not None else None
         self.cell_info.clear_cell()
+        self.cell_info.divisions = self.divisions
         self.edge.clear_cell()
         self.shape.clear_model()
-        self.population.set_recording(
-            self.masks.labels if self.masks is not None else None,
-            self.recording.um_per_px, self.recording.time_interval_min)
+        self.population.set_recording(labels, self.recording.um_per_px,
+                                      self.recording.time_interval_min,
+                                      divisions=self.divisions)
+        self.cell_table.set_recording(labels, self.recording.um_per_px,
+                                      self.recording.time_interval_min)
         self.canvas.overlays.set_scale(self.recording.um_per_px)
         self.display.set_channels(self.recording.channel_names)
         self.cell_info.set_available(self.recording.channel_names,
@@ -259,6 +273,19 @@ class ViewerWindow(QtWidgets.QMainWindow):
             self._cent_hist = cell_metrics.centroid_history(self.masks.labels)
         return self._cent_hist
 
+    def _population_table(self):
+        """All-cells per-frame table (lazy + cached) — fixed colour scale +
+        the Population panel."""
+        if self._pop_df is None and self.masks is not None:
+            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+            try:
+                self._pop_df = _population.population_table(
+                    self.masks.labels, self.recording.um_per_px,
+                    self.recording.time_interval_min)
+            finally:
+                QtWidgets.QApplication.restoreOverrideCursor()
+        return self._pop_df
+
     def _shape_modes_model(self):
         """VAMPIRE shape-mode model for the recording (lazy + cached)."""
         if self._shape_model is None and self.masks is not None:
@@ -309,9 +336,18 @@ class ViewerWindow(QtWidgets.QMainWindow):
                     for c, r in props.items()}
         if ov["trails"] and self.masks is not None:
             history = self._centroid_history()
+        div_pts = None
+        if self.canvas.overlays.show["divisions"] and self.divisions:
+            div_pts = []
+            for d in self.divisions:
+                if d["frame"] == t:
+                    for key in ("parent_centroid", "daughter_centroid"):
+                        c = d.get(key)
+                        if c:
+                            div_pts.append((c[0], c[1]))
         self.canvas.overlays.update_overlay(
             info_text=self._info_text(t), centroids=centroids, history=history,
-            frame=t, selected=self.selected, bbox=bbox)
+            frame=t, selected=self.selected, bbox=bbox, division_pts=div_pts)
 
     def _info_text(self, t):
         r = self.recording
@@ -333,6 +369,11 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self._update_status()
 
     def _on_click(self, cid):
+        self.select_cell(cid)
+
+    def select_cell(self, cid):
+        """Central selection: view click, plot/table click all route here so
+        every panel stays in sync."""
         self.selected = cid
         if cid and self.masks is not None:
             self.cell_info.set_cell(cid, self.masks.labels,
@@ -343,6 +384,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
             self.edge.set_cell(cid, self.masks.labels, self.recording.um_per_px,
                                self.recording.time_interval_min)
             self.edge.set_frame(self.timeline.value())
+            self.cell_table.select_in_table(cid)
             self.docks["Cell Info"].raise_()
         else:
             self.cell_info.clear_cell()
@@ -366,90 +408,6 @@ class ViewerWindow(QtWidgets.QMainWindow):
         elif self._hover:
             bits.append(f"cursor → cell {self._hover}")
         self.status.showMessage("   |   ".join(bits))
-
-    # -- menu actions ----------------------------------------------------
-    def open_recording_dialog(self):
-        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open recording", "", "OME-TIFF (*.ome.tif *.tif)")
-        if not fn:
-            return
-        mask = os.path.join(os.path.dirname(fn), "pipeline_results", "masks.npz")
-        if not os.path.exists(mask):
-            mn, _ = QtWidgets.QFileDialog.getOpenFileName(
-                self, "Masks for this recording (Cancel for none)",
-                os.path.dirname(fn), "NumPy masks (*.npz)")
-            mask = mn or None
-        self.entries.append(Entry(os.path.splitext(os.path.basename(fn))[0],
-                                  "", fn, mask))
-        self.display.set_recordings(self.entries)
-        self.display.recording.setCurrentIndex(len(self.entries) - 1)
-
-    def open_data_root_dialog(self):
-        d = QtWidgets.QFileDialog.getExistingDirectory(self, "Open data folder")
-        if not d:
-            return
-        found = discover(d)
-        if not found:
-            QtWidgets.QMessageBox.warning(self, "Nothing found",
-                                          "No recordings under that folder.")
-            return
-        self.entries = found
-        self.display.set_recordings(self.entries)
-        self._load_entry(0)
-
-    def export_csv(self):
-        if self.masks is None or self.recording is None:
-            QtWidgets.QMessageBox.information(
-                self, "No masks", "This recording has no masks to export.")
-            return
-        idx = max(self.display.recording.currentIndex(), 0)
-        label = self.entries[idx].label if self.entries else "export"
-        CSVExportDialog(self.masks.labels, self.recording.um_per_px,
-                        self.recording.time_interval_min,
-                        os.path.join(PROJECT_ROOT, "analysis_out"),
-                        f"{label}_", self).exec_()
-
-    def save_screenshot(self):
-        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save screenshot", "view.png", "PNG (*.png)")
-        if fn:
-            self.canvas.grab().save(fn)
-
-    def reset_layout(self):
-        self.restoreState(self._default_state)
-
-    def open_doc(self, rel):
-        QtGui.QDesktopServices.openUrl(
-            QtCore.QUrl.fromLocalFile(os.path.join(PROJECT_ROOT, rel)))
-
-    def show_about(self):
-        QtWidgets.QMessageBox.about(
-            self, "About cellscope_analysis",
-            "<b>cellscope_analysis</b><br>Viewer &amp; analysis workbench for "
-            "CellScope detection results (recordings + tracking masks).<br><br>"
-            "Masks are produced by CellScope; this app views &amp; analyses them.")
-
-    def show_metrics_help(self):
-        dlg = QtWidgets.QDialog(self)
-        dlg.setWindowTitle("Metrics reference")
-        dlg.resize(640, 660)
-        lay = QtWidgets.QVBoxLayout(dlg)
-        browser = QtWidgets.QTextBrowser()
-        browser.setHtml(metric_docs.as_html())
-        lay.addWidget(browser)
-        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
-        btns.rejected.connect(dlg.reject)
-        lay.addWidget(btns)
-        dlg.exec_()
-
-    def show_shortcuts(self):
-        QtWidgets.QMessageBox.information(
-            self, "Keyboard shortcuts",
-            "← / →   step frame\n"
-            "Space   play / pause\n"
-            "Ctrl+O   open recording      Ctrl+E   export CSV\n"
-            "Ctrl+=, Ctrl+-, Ctrl+0   zoom in / out / fit\n"
-            "Ctrl+Shift+A   auto contrast      Ctrl+Shift+P   screenshot")
 
     # -- settings --------------------------------------------------------
     def _restore_settings(self):

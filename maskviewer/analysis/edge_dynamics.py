@@ -132,7 +132,66 @@ def edge_summary(velmat: np.ndarray) -> dict:
     }
 
 
+def _runs(flags, min_len):
+    """[(start, stop)] contiguous True runs of length ≥ min_len."""
+    runs, i, n = [], 0, len(flags)
+    while i < n:
+        if flags[i]:
+            j = i
+            while j < n and flags[j]:
+                j += 1
+            if j - i >= min_len:
+                runs.append((i, j))
+            i = j
+        else:
+            i += 1
+    return runs
+
+
+_EVENT_KEYS = ("n_protrusions", "n_retractions", "protrusion_event_rate",
+               "retraction_event_rate", "mean_protrusion_duration",
+               "mean_retraction_duration", "mean_protrusion_strength",
+               "mean_retraction_strength")
+
+
+def edge_events(velmat, dt_min=None, thresh=None, min_len=2) -> dict:
+    """Discrete protrusion/retraction events on the velocity kymograph (ADAPT-
+    style): per angular sector, time-runs where velocity stays above +thresh
+    (protrusion) or below −thresh (retraction) for ≥ ``min_len`` frames. Default
+    threshold = ½·std of the edge velocity. Returns counts, event rates (per
+    sector·min), and mean duration / strength."""
+    if velmat.size == 0:
+        return {k: np.nan for k in _EVENT_KEYS}
+    fin = velmat[np.isfinite(velmat)]
+    thr = thresh if thresh is not None else (0.5 * float(np.nanstd(fin))
+                                             if fin.size else 0.0)
+    dt = float(dt_min) if dt_min else 1.0
+    nframes, nsec = velmat.shape
+    pdur, pstr, rdur, rstr = [], [], [], []
+    for s in range(nsec):
+        col = velmat[:, s]
+        c = np.nan_to_num(col)
+        for a, b in _runs(c > thr, min_len):
+            pdur.append((b - a) * dt)
+            pstr.append(float(np.nanmean(col[a:b])))
+        for a, b in _runs(c < -thr, min_len):
+            rdur.append((b - a) * dt)
+            rstr.append(float(np.nanmean(col[a:b])))
+    span = nframes * dt * nsec
+    return {
+        "n_protrusions": len(pdur), "n_retractions": len(rdur),
+        "protrusion_event_rate": len(pdur) / span if span else np.nan,
+        "retraction_event_rate": len(rdur) / span if span else np.nan,
+        "mean_protrusion_duration": float(np.mean(pdur)) if pdur else np.nan,
+        "mean_retraction_duration": float(np.mean(rdur)) if rdur else np.nan,
+        "mean_protrusion_strength": float(np.mean(pstr)) if pstr else np.nan,
+        "mean_retraction_strength": float(np.mean(rstr)) if rstr else np.nan,
+    }
+
+
 def edge_summary_for_cell(labels, cell_id, um_per_px=None, dt_min=None) -> dict:
-    """Convenience: velocity kymograph → summary dict for one cell."""
+    """Convenience: velocity kymograph → summary + event metrics for one cell."""
     _, mat = edge_velocity_kymograph(labels, cell_id, um_per_px, dt_min)
-    return edge_summary(mat)
+    out = edge_summary(mat)
+    out.update(edge_events(mat, dt_min))
+    return out

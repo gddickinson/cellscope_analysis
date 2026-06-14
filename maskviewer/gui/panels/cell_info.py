@@ -17,10 +17,12 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtWidgets
 
-from ...analysis import cell_metrics, motion, metric_docs
+from ...analysis import cell_metrics, motion, metric_docs, lineage
+from ..plot_export import save_plot
 
 _MSD = "MSD (log-log)"
 _MSD_LIN = "MSD (linear)"
+_AUTO = "Direction autocorrelation"
 _NN = {"nn_dist", "n_neighbors"}
 
 
@@ -34,6 +36,7 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.available = []                    # selectable metric keys
         self.neighbor_provider = None          # callable -> {cid:(T,2)} | None
         self.shape_mode_provider = None        # callable -> shape-mode model | None
+        self.divisions = []                    # division events for lineage info
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
         dis = self._settings.value("cell_metrics_disabled", [])
         if isinstance(dis, str):                       # QSettings may unwrap a 1-list
@@ -62,9 +65,14 @@ class CellInfoPanel(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self)
         lay.addWidget(self.title)
         lay.addWidget(self.info)
+        self.save_btn = QtWidgets.QPushButton("Save…")
+        self.save_btn.setToolTip("Save this plot as PNG/SVG")
+        self.save_btn.clicked.connect(
+            lambda: save_plot(self.plot, self, f"cell{self.cell_id}.png"))
         mrow = QtWidgets.QHBoxLayout()
         mrow.addWidget(QtWidgets.QLabel("Plot"))
         mrow.addWidget(self.metric, 1)
+        mrow.addWidget(self.save_btn)
         lay.addLayout(mrow)
         lay.addWidget(self.plot)
 
@@ -121,6 +129,12 @@ class CellInfoPanel(QtWidgets.QWidget):
             cls = codes[(codes == 1) | (codes == 2)]
             fr_round = float((codes == 2).sum() / cls.size) if cls.size else float("nan")
             extra = f"<br>rounded fraction: {fr_round:.2f}"
+        if self.divisions:
+            parents, daughters = lineage.relatives(self.divisions, self.cell_id)
+            if parents:
+                extra += f"<br>parent: cell {parents[0]}"
+            if daughters:
+                extra += f"<br>daughters: {', '.join(map(str, daughters))}"
         self.info.setText(
             f"frames tracked: {fr.size}"
             f" ({int(fr[0]) if fr.size else '-'}→{int(fr[-1]) if fr.size else '-'})<br>"
@@ -134,7 +148,7 @@ class CellInfoPanel(QtWidgets.QWidget):
     def _rebuild_combo(self):
         cur = self.metric.currentText()
         s = self._cft.get("series", {})
-        items = sorted(s) + [_MSD, _MSD_LIN]
+        items = sorted(s) + [_MSD, _MSD_LIN, _AUTO]
         self.metric.blockSignals(True)
         self.metric.clear()
         self.metric.addItems(items)
@@ -166,6 +180,8 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.fit.setData([], [])
         if key in (_MSD, _MSD_LIN):
             return self._plot_msd(log=(key == _MSD))
+        if key == _AUTO:
+            return self._plot_autocorr()
         self.plot.setLogMode(x=False, y=False)
         self.marker.show()
         series = self._cft.get("series", {})
@@ -176,6 +192,21 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.curve.setData(self._cft["frame"] * (self._dt or 1.0), np.asarray(vals))
         self.plot.setLabel("left", ylabel)
         self.plot.setLabel("bottom", "time (min)" if self._dt else "frame")
+
+    def _plot_autocorr(self):
+        cen = self._cft.get("centroid_um")
+        if cen is None:
+            self.curve.setData([], [])
+            return
+        ac = motion.direction_autocorrelation(cen)
+        self.marker.hide()
+        self.plot.setLogMode(x=False, y=False)
+        lags = np.arange(ac.size) * (self._dt or 1.0)
+        self.curve.setData(lags, ac)
+        self.plot.setTitle(f"lag-1 persistence = "
+                           f"{ac[1]:.3f}" if ac.size > 1 else "")
+        self.plot.setLabel("left", "direction autocorrelation ⟨cos θ⟩")
+        self.plot.setLabel("bottom", "lag (min)" if self._dt else "lag (frames)")
 
     def _plot_msd(self, log=True):
         cen = self._cft.get("centroid_um")

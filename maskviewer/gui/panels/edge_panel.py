@@ -17,6 +17,7 @@ from scipy import ndimage
 from PyQt5 import QtCore, QtWidgets
 
 from ...analysis import edge_dynamics
+from ..plot_export import save_plot
 
 _MODES = ["Velocity kymograph", "Radius kymograph",
           "Edge this frame: velocity", "Edge this frame: radius"]
@@ -60,6 +61,9 @@ class EdgePanel(QtWidgets.QWidget):
         self.export_btn = QtWidgets.QPushButton("Export kymograph CSV…")
         self.export_btn.clicked.connect(self._export)
         self.export_btn.setEnabled(False)
+        self.save_btn = QtWidgets.QPushButton("Save plot…")
+        self.save_btn.clicked.connect(
+            lambda: save_plot(self.plot, self, f"cell{self.cell_id}_edge.png"))
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.addWidget(self.title)
@@ -69,7 +73,10 @@ class EdgePanel(QtWidgets.QWidget):
         lay.addLayout(row)
         lay.addWidget(self.plot, 1)
         lay.addWidget(self.summary)
-        lay.addWidget(self.export_btn)
+        brow = QtWidgets.QHBoxLayout()
+        brow.addWidget(self.export_btn)
+        brow.addWidget(self.save_btn)
+        lay.addLayout(brow)
 
     # -- public ----------------------------------------------------------
     def set_cell(self, cell_id, labels, um_per_px=None, dt_min=None):
@@ -86,15 +93,20 @@ class EdgePanel(QtWidgets.QWidget):
         self._half = (float(np.nanmax(self._rad)) / (um_per_px or 1.0)
                       if self._rad.size and np.isfinite(self._rad).any() else None)
         s = edge_dynamics.edge_summary(self._vel)
+        ev = edge_dynamics.edge_events(self._vel, dt_min)
         vu = "µm/min" if (um_per_px and dt_min) else ("µm/frame" if um_per_px
                                                       else "px/step")
+        tu = "min" if dt_min else "frames"
         self.title.setText(f"Cell {self.cell_id} — edge dynamics")
         self.summary.setText(
             f"protrusion: {s['mean_protrusion_velocity']:.3f} {vu}    "
             f"retraction: {s['mean_retraction_velocity']:.3f} {vu}<br>"
             f"net: {s['net_velocity']:.3f} {vu}    "
             f"protruding fraction: {s['protrusion_fraction']:.2f}<br>"
-            f"ruffling (edge activity): {s['ruffling']:.3f} {vu}")
+            f"ruffling (edge activity): {s['ruffling']:.3f} {vu}<br>"
+            f"events: {ev['n_protrusions']} protr / {ev['n_retractions']} retr"
+            f"  ·  mean dur {ev['mean_protrusion_duration']:.1f} / "
+            f"{ev['mean_retraction_duration']:.1f} {tu}")
         self.export_btn.setEnabled(True)
         self._replot()
 

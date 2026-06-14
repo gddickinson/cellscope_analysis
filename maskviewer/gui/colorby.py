@@ -49,6 +49,26 @@ def _continuous(vals, mx, cmap, label):
     return scalar_label_lut(vals, mx, cmap), (lo, hi, cmap, label)
 
 
+def _column_for(mode, um):
+    suffixed = {"area": ("area_um2", "area_px"),
+                "perimeter": ("perimeter_um", "perimeter_px"),
+                "nn_dist": ("nn_dist_um", "nn_dist_px")}
+    if mode in suffixed:
+        return suffixed[mode][0 if um else 1]
+    return mode
+
+
+def _fixed_range(win, mode, um):
+    """Global (lo, hi) for a per-frame metric from the cached population table."""
+    df = win._population_table()
+    col = _column_for(mode, um)
+    if df is None or col not in getattr(df, "columns", []):
+        return None
+    s = df[col].to_numpy(float)
+    s = s[np.isfinite(s)]
+    return (float(s.min()), float(s.max())) if s.size else None
+
+
 def overlay_lut(win, lab):
     if lab is None:
         return None, None
@@ -96,4 +116,10 @@ def overlay_lut(win, lab):
                "perimeter": "perimeter_um" if um else "perimeter_px"
                }.get(mode, mode)
         vals = {cid: props[cid][key] for cid in props if key in props[cid]}
-    return _continuous(vals, mx, CMAP.get(mode, "viridis"), _label(mode, um, dt))
+    cmap, label = CMAP.get(mode, "viridis"), _label(mode, um, dt)
+    if win.display.fixed_scale_on():
+        gr = _fixed_range(win, mode, um)
+        if gr:
+            return (scalar_label_lut(vals, mx, cmap, vmin=gr[0], vmax=gr[1]),
+                    (gr[0], gr[1], cmap, label))
+    return _continuous(vals, mx, cmap, label)

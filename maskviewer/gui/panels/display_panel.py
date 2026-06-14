@@ -21,7 +21,7 @@ COLOR_BY = [
 ]
 OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
             ("ids", "Cell IDs", False), ("trails", "Track trails", False),
-            ("colorbar", "Colour bar", True)]
+            ("colorbar", "Colour bar", True), ("divisions", "Divisions", False)]
 
 
 class DisplayPanel(QtWidgets.QWidget):
@@ -84,10 +84,16 @@ class DisplayPanel(QtWidgets.QWidget):
                 self.color_by.setItemData(i, tip, QtCore.Qt.ToolTipRole)
         self.color_by.currentIndexChanged.connect(
             lambda i: self.colorByChanged.emit(COLOR_BY[i][1]))
+        self.fixed_scale = QtWidgets.QCheckBox("Fixed colour scale")
+        self.fixed_scale.setToolTip("Lock the colour-by scale across all frames "
+                                    "(comparable colours over time) instead of "
+                                    "per-frame auto-scaling")
+        self.fixed_scale.toggled.connect(self.maskOptionsChanged)
         mf.addRow(self.show_masks)
         mf.addRow(self.outline)
         mf.addRow("Opacity", self.opacity)
         mf.addRow("Colour by", self.color_by)
+        mf.addRow(self.fixed_scale)
         outer.addWidget(mask_box)
 
         ov_box = QtWidgets.QGroupBox("Overlays")
@@ -135,6 +141,9 @@ class DisplayPanel(QtWidgets.QWidget):
 
     def composite_on(self) -> bool:
         return self.composite.isChecked()
+
+    def fixed_scale_on(self) -> bool:
+        return self.fixed_scale.isChecked()
 
     def visible_channels(self) -> list:
         on = [i for i, cb in enumerate(self._chan_checks) if cb.isChecked()]

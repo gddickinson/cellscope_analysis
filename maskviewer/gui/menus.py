@@ -66,6 +66,9 @@ def build_menubar(win):
     for dock in win.docks.values():
         w.addAction(dock.toggleViewAction())
     w.addSeparator()
+    w.addAction(_act(win, "Show &All Panels", win.show_all_panels))
+    w.addAction(_act(win, "&Save Current Layout", win.save_layout_default,
+                     tip="Make the current layout the one Reset Layout restores"))
     w.addAction(_act(win, "&Reset Layout", win.reset_layout))
 
     h = mb.addMenu("&Help")

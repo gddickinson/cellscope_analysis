@@ -5,6 +5,37 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Single-recording push (part 1): lineage, correlation/autocorr, edge events, cell table, save-plots, click-select, fixed scale, layout
+
+Eight requested single-recording / UX items:
+- **Cell division & lineage** (A1): load `divisions.json` (io/divisions.py),
+  `analysis/lineage.py` (track spans, lineage rows, division counts, relatives);
+  Population gains **Lineage tree** + **Division timeline** plots; Cell-Info
+  shows parent/daughter; a **Divisions** overlay marks dividing cells.
+- **Correlation & autocorrelation** (A2): Population **Scatter (X vs Y)**
+  (per-cell, click a point → select); Cell-Info **Direction-autocorrelation**
+  curve.
+- **Per-protrusion edge events** (A3): `edge_dynamics.edge_events` (sustained
+  protrusion/retraction runs → counts, rates, durations, strengths) shown in the
+  edge panel + per_cell `with_edge` export.
+- **Sortable per-cell table** (A4): new Cell-Table dock (sortable, row→select,
+  CSV export).
+- **Save plots** (U1): PNG/SVG buttons on cell-info, edge, shape, population
+  (gui/plot_export.py).
+- **Click-to-select linking** (U2): `ViewerWindow.select_cell` centralises
+  selection; table rows + scatter points select the cell everywhere.
+- **Fixed colour scale** (U3): Display toggle; `colorby` uses a cached global
+  metric range (scalar_label_lut gained vmin/vmax).
+- **Layout presets & polish** (U4): Window ▸ Show All Panels / Save Current
+  Layout; sensible default dock width. Menu-action methods split into
+  `gui/window_actions.py` (file-size).
+
+`pytest` 23 passed; headless smoke covered every item; lineage verified on a
+real recording (5 divisions). All files < 500 lines. Part 2 (next): the
+CellScope analysis audit gaps.
+
+---
+
 ## 2026-06-13 — Colour bar, metrics reference + tooltips, Population tab
 
 - **Units colour bar** for the main display: a `ColorBarItem` on the canvas shows

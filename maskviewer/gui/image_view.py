@@ -35,23 +35,25 @@ def make_label_lut(n: int, seed: int = 1) -> np.ndarray:
     return lut
 
 
-def scalar_label_lut(value_by_id: dict, max_label: int,
-                     cmap: str = "viridis") -> np.ndarray:
+def scalar_label_lut(value_by_id: dict, max_label: int, cmap: str = "viridis",
+                     vmin=None, vmax=None) -> np.ndarray:
     """(max_label+1, 4) LUT colouring each label by a scalar (e.g. area).
 
-    Values are min-max normalised across the supplied ids; absent labels and
-    index 0 are transparent.
+    Values are min-max normalised across the supplied ids unless an explicit
+    ``vmin``/``vmax`` is given (a fixed scale, e.g. global across the recording);
+    absent labels and index 0 are transparent.
     """
     import matplotlib
     lut = np.zeros((max(int(max_label), 1) + 1, 4), dtype=np.ubyte)
     if value_by_id:
         vals = np.array(list(value_by_id.values()), float)
-        lo, hi = np.nanmin(vals), np.nanmax(vals)
+        lo = np.nanmin(vals) if vmin is None else vmin
+        hi = np.nanmax(vals) if vmax is None else vmax
         rng = (hi - lo) or 1.0
         cm = matplotlib.colormaps[cmap]
         for cid, v in value_by_id.items():
             if 0 < cid < lut.shape[0] and np.isfinite(v):
-                r, g, b, _ = cm(float((v - lo) / rng))
+                r, g, b, _ = cm(float(np.clip((v - lo) / rng, 0, 1)))
                 lut[cid] = (int(r * 255), int(g * 255), int(b * 255), 255)
     return lut
 
