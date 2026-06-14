@@ -65,9 +65,15 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
     # -- ui --------------------------------------------------------------
     def _build_ui(self):
         self.compute_btn = QtWidgets.QPushButton("Compute")
+        self.compute_btn.setToolTip("Measure every cell in every recording "
+                                    "(threaded; result cached per project)")
         self.compute_btn.clicked.connect(self._compute)
         self.recompute = QtWidgets.QCheckBox("ignore cache")
+        self.recompute.setToolTip("Recompute from masks instead of the cached result")
         self.metric = QtWidgets.QComboBox()
+        self.metric.setToolTip("Primary metric — drives the left plots, the "
+                               "histogram, stats and data tables. _spread / "
+                               "_rounded columns are state-segmented (see Help)")
         self.metric.currentIndexChanged.connect(self._replot)
         self.metric_y = QtWidgets.QComboBox()
         self.metric_y.setToolTip("Y metric (Scatter tab)")
@@ -102,6 +108,8 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.control.currentIndexChanged.connect(self._control_changed)
         self.stat = QtWidgets.QComboBox()
         self.stat.addItems(["mean ± SEM", "median ± 95% CI"])
+        self.stat.setToolTip("Ensemble-MSD band: mean ± SEM, or median + "
+                             "bootstrap 95% CI (over recordings)")
         self.stat.currentIndexChanged.connect(self._replot)
         export = QtWidgets.QPushButton("Export…")
         export.clicked.connect(self._export)
@@ -109,6 +117,10 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.groups_btn.setToolTip("Assign recordings to groups, pick controls, "
                                    "include/exclude — applies instantly")
         self.groups_btn.clicked.connect(self._open_design_editor)
+        self.help_btn = QtWidgets.QPushButton("Help")
+        self.help_btn.setToolTip("Metrics & methods reference (what each metric "
+                                 "means + how the comparison is computed)")
+        self.help_btn.clicked.connect(self._show_help)
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
@@ -122,6 +134,7 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         bar.addWidget(self.ols)
         bar.addSeparator()
         bar.addWidget(export)
+        bar.addWidget(self.help_btn)
         self.addToolBar(bar)
 
         fbar = QtWidgets.QToolBar()          # second row: cell / recording filters
@@ -138,6 +151,9 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.tabs.currentChanged.connect(self._replot)
         self.dist_kind = QtWidgets.QComboBox()
         self.dist_kind.addItems(_DIST_KINDS)
+        self.dist_kind.setToolTip("Strip = recording points + mean±SEM · Box = "
+                                  "quartiles + Bonferroni stars · Superplot = cells "
+                                  "coloured by recording behind the recording means")
         self.dist_kind.currentIndexChanged.connect(self._replot)
         self.dist_plot = pg.PlotWidget()
         dist = QtWidgets.QWidget()
@@ -153,11 +169,22 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.tabs.addTab(dist, "Distributions")
         self.tabs.addTab(self.msd_plot, "Ensemble MSD")
         self.tabs.addTab(self.scatter_plot, "Scatter")
+        self.tabs.setTabToolTip(0, "Per-recording values by group: strip (mean±SEM) "
+                                   "/ box (+Bonferroni stars) / superplot")
+        self.tabs.setTabToolTip(1, "Ensemble MSD by condition (recording = unit) — "
+                                   "mean±SEM or median+bootstrap CI")
+        self.tabs.setTabToolTip(2, "One recording-level metric vs another (+Spearman)")
 
         self.right_tabs = QtWidgets.QTabWidget()
         self.right_tabs.addTab(self._build_stats_tab(), "Stats")
         self.right_tabs.addTab(self._build_hist_tab(), "Histogram")
         self.right_tabs.addTab(self._build_data_tab(), "Data")
+        self.right_tabs.setTabToolTip(0, "Per-contrast tests (recording = unit): "
+                                         "KW + Bonferroni MWU vs control + Cohen d + OLS")
+        self.right_tabs.setTabToolTip(1, "Per-cell distribution of the chosen metric, "
+                                         "one curve per group")
+        self.right_tabs.setTabToolTip(2, "Per-recording + per-group tables for the "
+                                         "chosen metric (unit-tagged, exportable)")
 
         split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         split.addWidget(self.tabs)
@@ -271,6 +298,19 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self._design_editor.show()
         self._design_editor.raise_()
 
+    def _show_help(self):
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Metrics & methods reference")
+        dlg.resize(680, 680)
+        lay = QtWidgets.QVBoxLayout(dlg)
+        br = QtWidgets.QTextBrowser()
+        br.setHtml(metric_docs.as_html())
+        lay.addWidget(br)
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+        btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns)
+        dlg.exec_()
+
     def _on_design_changed(self):
         """Grouping / control / include changed — remap + replot, no recompute."""
         self._refresh_control_combo()
@@ -337,10 +377,8 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
             combo.clear()
             combo.addItems(cols)
             for i, c in enumerate(cols):
-                base = c.replace("mean_", "").replace("median_", "")
-                tip = metric_docs.tooltip(base.rsplit("_um", 1)[0].rsplit("_px", 1)[0])
-                if tip:
-                    combo.setItemData(i, tip, QtCore.Qt.ToolTipRole)
+                combo.setItemData(i, metric_docs.comparison_tooltip(c),
+                                  QtCore.Qt.ToolTipRole)
             default = "mean_area_um2" if "mean_area_um2" in cols else (cols[0] if cols else "")
             combo.setCurrentText(cur if cur in cols else default)
             combo.blockSignals(False)

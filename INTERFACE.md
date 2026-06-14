@@ -146,7 +146,10 @@ Read this before opening source files. Update it when modules change.
   (per-cell distribution by group) · **Data** (per-recording + per-group tables,
   unit-tagged). Uses the project's `Design`; click a point → load that recording
   (`recordingPicked`). `set_project` re-targets it. Threaded compute reports into a
-  bottom-bar **`StatusProgress`** (per-recording progress + ETA).
+  bottom-bar **`StatusProgress`** (per-recording progress + ETA). Both whole-track
+  **and** state-segmented (`…_spread` / `…_rounded`) metrics are offered; metric
+  combos carry per-column tooltips (`metric_docs.comparison_tooltip`); a **Help**
+  button opens the Metrics & methods reference; tabs/controls are tooltipped.
 - **compare_tables.py** — `StatsTablesMixin`: fills the right-panel **Stats** +
   **Data** tables from the per-recording table + Design (`_update_stats`,
   `_fill_data`, `_set_table`); split out to keep `compare_window` small.
@@ -248,7 +251,11 @@ Read this before opening source files. Update it when modules change.
   + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips);
   plus `column_units` / `column_label` / `axis_label` — derive display units +
   a human name for an aggregated comparison column (e.g. `mean_area_um2` →
-  "mean area (µm²)"), used for plot axes + table headers.
+  "mean area (µm²)", `mean_speed_spread` → "mean speed [spread]"), used for plot
+  axes + table headers; and `comparison_doc` / `comparison_tooltip` — resolve any
+  aggregated / per-state column to its (what, how) doc + a tooltip. `as_html`
+  includes a **Cross-recording comparison** section (recording = unit, whole-track
+  vs state-segmented, filters, stats).
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
   MSD), `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
@@ -256,6 +263,15 @@ Read this before opening source files. Update it when modules change.
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
   `per_condition_summary` (per-group n / mean / SEM / median over recordings —
   the Data tab). Per-arm KW / Bonferroni reuse `feature_tables.arm_tests`.
+  `build_comparison` also merges in the **state-segmented** per-cell metrics
+  (`state_metrics`) so the GUI can reproduce the original analysis.
+- **state_metrics.py** — `per_cell_state_metrics`: per-cell metrics computed
+  **separately over rounded vs spread frames** (`mean_speed_{s}`,
+  `persistence_{s}`, `straightness_{s}`, `mean_area_um2_{s}`, …), reproducing the
+  original CellScope state-aware analysis — edge frames excluded, per-step speed
+  capped at 15 µm/min, persistence/straightness over contiguous same-state
+  segments (≥5 frames). Mirrors the original `core/motility_state.py` +
+  `core/state_analysis.py` (validated to match `compare/per_recording.csv` to 3 dp).
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
   (region props incl. perimeter/circularity/state + nearest-neighbour),
   `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +
@@ -296,8 +312,11 @@ Read this before opening source files. Update it when modules change.
 - **test_project.py** — Project/Design model (GUI-free): auto-design (IC295 +
   generic single-arm), `regroup` exclude/override, effective conditions +
   `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides.
-- **test_compare_extras.py** — `metric_docs.column_units` / `column_label` /
-  `axis_label` and `compare.per_condition_summary` (units + per-group summary).
+- **test_compare_extras.py** — `metric_docs` units / labels / per-state suffix /
+  `comparison_doc` + `compare.per_condition_summary` (units + per-group summary).
+- **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
+  straightness on synthetic straight tracks, end-to-end per-cell state metrics on
+  a moving-square stack, and the speed cap.
 
 ## Config / data
 - **config.example.json** — committed template for `config.json` (gitignored,

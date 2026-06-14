@@ -46,7 +46,10 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   used; the right panel is tabbed — **Stats** (per-contrast p / Bonferroni /
   Cohen's d / covariate-adjusted OLS + per-arm KW + vehicle) · **Histogram**
   (per-cell distribution by group) · **Data** (per-recording + per-group tables,
-  unit-tagged). Background compute + per-project cache; click a point → load that
+  unit-tagged). It offers **whole-track** metrics and **state-segmented** ones
+  (`mean_speed_spread`, `persistence_spread`, …) that reproduce the original
+  CellScope state-aware analysis. A **Help** button + per-metric tooltips explain
+  every metric. Background compute + per-project cache; click a point → load that
   recording in the viewer.
 - **Groups & Comparisons editor** (Comparison window ▸ **Groups…**) — assign
   recordings to **groups**, **include/exclude** any recording, define which groups

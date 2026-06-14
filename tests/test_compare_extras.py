@@ -37,6 +37,24 @@ def test_column_label_and_axis():
     assert metric_docs.axis_label("mean_circularity") == "mean circularity"   # no units
 
 
+def test_state_suffix_units_and_labels():
+    # per-state columns inherit the base metric's units + are flagged [state]
+    assert metric_docs.column_units("mean_area_um2_spread") == "µm²"
+    assert metric_docs.column_units("persistence_rounded") == ""
+    assert metric_docs.column_label("mean_area_um2_spread") == "mean area [spread]"
+    assert metric_docs.axis_label("mean_area_um2_rounded") == "mean area [rounded] (µm²)"
+
+
+def test_comparison_doc_resolves_base():
+    what, how = metric_docs.comparison_doc("mean_speed_spread")
+    assert what and "speed" in what.lower()
+    assert "spread" in how.lower()                 # state note present
+    # tooltip is non-empty and mentions the metric
+    assert "speed" in metric_docs.comparison_tooltip("mean_speed_spread").lower()
+    # comparison section is in the Help reference
+    assert "state-segmented" in metric_docs.as_html().lower()
+
+
 def test_per_condition_summary():
     per_rec = pd.DataFrame({
         "recording": ["a", "b", "c", "d"],

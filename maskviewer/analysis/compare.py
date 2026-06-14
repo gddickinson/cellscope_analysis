@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from . import exporters, cell_metrics, motion
+from . import exporters, cell_metrics, motion, state_metrics
 
 # arm-ordered conditions for display (IC295); others appended alphabetically
 ARM_ORDER = ["WT", "GOF", "KO", "DMSO", "Y1", "OT"]
@@ -41,12 +41,20 @@ def build_comparison(entries, progress_cb=None, with_solidity=False):
             continue
         rec = e.load_recording()
         cents = cell_metrics.centroid_history(masks.labels)   # reused below + by per_cell
+        pf = exporters.per_frame_table(masks.labels, rec.um_per_px,
+                                       rec.time_interval_min, with_solidity)
         df = exporters.per_cell_table(masks.labels, rec.um_per_px,
                                       rec.time_interval_min, with_solidity,
-                                      centroids=cents)
+                                      per_frame_df=pf, centroids=cents)
         if df.empty:
             continue
         df = df.copy()
+        # state-segmented metrics (rounded vs spread) — match the original
+        # CellScope state-aware analysis; merged alongside the whole-track ones.
+        sdf = state_metrics.per_cell_state_metrics(
+            masks.labels, rec.um_per_px, rec.time_interval_min, per_frame_df=pf)
+        if not sdf.empty:
+            df = df.merge(sdf, on="cell_id", how="left")
         df["recording"] = e.label
         df["condition"] = e.condition or "?"
         parts.append(df)

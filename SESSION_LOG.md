@@ -5,6 +5,40 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Match the original analysis (state-segmented metrics) + full metric docs
+
+Investigated why the Comparison window's numbers differed from the original
+`cellscope` project. Diagnosis (with matching controls — `n_cells` and
+`frac_spread` were identical, proving same masks/tracking/state rule): the
+original computes every motility/shape metric **per state** (rounded vs spread),
+edge-excluded, speed-capped and segment-gated, while our GUI was computing one
+**whole-track** value per cell. (The follow-up/FINDINGS analysis already matched,
+because `feature_tables` reads the original CSVs directly.)
+
+- **`analysis/state_metrics.py`** (new) — `per_cell_state_metrics`: per-cell
+  `mean_speed_{s}` / `persistence_{s}` / `straightness_{s}` / `mean_area_um2_{s}` /
+  shape means over rounded vs spread frames, mirroring the original
+  `core/motility_state.py` + `core/state_analysis.py` (edge frames excluded;
+  per-step speed at the step's start frame, edge steps dropped, capped at
+  15 µm/min; persistence/straightness over contiguous ≥5-frame segments).
+  **Validated to reproduce `compare/per_recording.csv` to 3 decimals** (Pos60/61/62
+  spread+rounded speed, persistence, straightness, area, eccentricity).
+- `compare.build_comparison` now merges these alongside the whole-track columns
+  (single shared per-frame pass), so the Comparison window offers both.
+- **Documentation pass** ("document all methods + help + tooltips"):
+  `metric_docs` gained `column_units`/`column_label` state-suffix awareness,
+  `comparison_doc` / `comparison_tooltip` (resolve any aggregated/per-state column
+  to its what+how), new entries (frac_rounded/spread, n_cells, frames_tracked),
+  and a **Cross-recording comparison** section in `as_html`. The Comparison window
+  got a **Help** button (Metrics & methods reference), per-column metric tooltips,
+  and tab/control tooltips; the main viewer's Help ▸ Metrics Reference picks up the
+  new section automatically.
+
+Tests: `pytest` **43 passed** (new `tests/test_state_metrics.py` + extended
+`test_compare_extras.py`). Both GUI smokes green. All files < 500 lines.
+
+---
+
 ## 2026-06-14 — Comparison: more filters, axis units, Histogram + Data tabs
 
 Extended the Comparison window per the request — more filtering, units on graphs,
