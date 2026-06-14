@@ -282,6 +282,51 @@ def test_population_table_and_flower():
         assert abs(rel[0, 0]) < 1e-9 and abs(rel[0, 1]) < 1e-9
 
 
+def test_compare_build_aggregate():
+    import types
+    from maskviewer.analysis import compare
+
+    def stack(cells):
+        T, H, W = 6, 80, 80
+        lab = np.zeros((T, H, W), int)
+        for cid, (cy, cx) in enumerate(cells, 1):
+            for t in range(T):
+                lab[t][_disk(H, W, cy, cx + t, 9)] = cid
+        return lab
+
+    class FE:
+        def __init__(self, label, cond, lab):
+            self.label, self.condition, self._l = label, cond, lab
+
+        def load_masks(self):
+            return types.SimpleNamespace(labels=self._l)
+
+        def load_recording(self):
+            return types.SimpleNamespace(um_per_px=0.65, time_interval_min=10.0)
+
+    entries = [FE("A1", "WT", stack([(20, 15), (50, 15)])),
+               FE("B1", "KO", stack([(20, 15), (50, 15), (35, 40)]))]
+    prog = []
+    pc, msd = compare.build_comparison(
+        entries, progress_cb=lambda i, n: prog.append(i) or True)
+    assert set(pc["recording"]) == {"A1", "B1"}
+    assert set(pc["condition"]) == {"WT", "KO"}
+    assert "frac_spread" in pc.columns
+    per_rec = compare.aggregate(pc)
+    assert len(per_rec) == 2 and "n_cells" in per_rec.columns
+    assert "mean_area_um2" in compare.metric_columns(pc)
+    assert set(compare.by_condition(per_rec, "mean_area_um2")) == {"WT", "KO"}
+    assert prog and compare.order_conditions(["KO", "WT"]) == ["WT", "KO"]
+    # ensemble MSD by condition
+    assert not msd.empty and {"recording", "condition", "tau", "msd"} <= set(msd.columns)
+    ens = compare.ensemble_by_condition(msd, stat="mean")
+    assert set(ens) == {"WT", "KO"}
+    tau, centre, lo, hi = ens["WT"]
+    assert tau.size and np.all(np.diff(tau) > 0)
+    # OLS runs (few recordings → may be skipped per arm, but must not error)
+    assert isinstance(compare.ols_adjusted(per_rec, "mean_area_um2"), list)
+
+
 def test_cell_series_and_history():
     from maskviewer.io import load_masks
     m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))

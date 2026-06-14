@@ -5,6 +5,57 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Comparison-audit gaps (ensemble MSD, state, OLS, box plots)
+
+A background agent audited CellScope's cross-recording/comparison code; added the
+high-value mask-computable gaps to the Compare dock:
+- **Ensemble MSD by condition** (`compare.build_comparison` now also returns a
+  per-recording ensemble MSD; `ensemble_by_condition` → mean±SEM or
+  median+bootstrap-CI) — the headline migration figure. (Reuses centroids via a
+  new `per_cell_table(centroids=)` param so it's not an extra pass.)
+- **Per-state composition**: `frac_rounded` / `frac_spread` per cell → comparable
+  metrics (the IC295 phenotype lives in state).
+- **Covariate-adjusted OLS** (`compare.ols_adjusted`): per-arm treatment effect
+  after frac_spread + density — disentangles migration from the state/crowding
+  confounds (central to a mechanosensor claim). Dependency-free (lstsq + t-tests),
+  surfaced via a dock checkbox.
+- **Box plots** by condition with within-arm Bonferroni significance stars; a
+  **metric-vs-metric scatter by condition** with Spearman.
+Deferred (documented, lower value / dependency-gated): cell-level LMM
+(statsmodels), van Elteren stratified test + CEM matching + residual
+normalization, violin plots, ANOVA/Welch/Shapiro options, per-condition flower
+grid / histograms, pooled cell-level stats toggle.
+
+`pytest` 28 passed (warning-free); headless smoke verified all five plot kinds +
+OLS + median MSD; screenshot refreshed. All files < 500 lines.
+
+---
+
+## 2026-06-13 — Cross-recording comparison dock
+
+The big next phase: compare a metric across recordings grouped by condition,
+**recording = experimental unit**.
+- `analysis/compare.py`: `build_comparison` (per-cell metrics over every
+  recording via each Entry's masks + `exporters.per_cell_table`, tagged with
+  recording + condition), `aggregate` (→ per-recording means), `by_condition`,
+  `order_conditions` (arm order), `metric_columns`.
+- **Compare dock** (`panels/compare_panel.py`): background compute (QThread +
+  progress + cancel) with a disk cache; pick a metric → "Recording means" (strip
+  + mean±SEM per condition) or "Superplot" (per-cell cloud coloured by recording
+  behind the per-recording means); stats = omnibus KW + per-arm Kruskal-Wallis +
+  within-arm Bonferroni vs control + WT-vs-DMSO vehicle (reusing
+  `feature_tables.arm_tests`); min-frames filter; click a point → load that
+  recording; CSV export of the per-cell + per-recording tables.
+- Wired into the window (new tabbed dock; `set_entries` on load / open-folder;
+  `recordingPicked` → select recording). README illustrated with
+  `docs/screenshots/comparison.png`.
+
+`pytest` 28 passed (added a compare test on synthetic multi-condition fakes);
+headless smoke verified both plot kinds + arm stats + click-to-load. All files
+< 500 lines. Follow-up: a comparison-analysis audit of CellScope is queued.
+
+---
+
 ## 2026-06-13 — Fix: window too large / not resizable
 
 The stacked right docks (tabbed group + Image-Adjust) forced a ~1188 px minimum
