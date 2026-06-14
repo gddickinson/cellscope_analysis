@@ -5,6 +5,31 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Per-graph plot-style options (Comparison window)
+
+Every Comparison-window graph is now customisable.
+
+- **`gui/plot_style.py`** (new): `PlotStyle` (dataclass of render options —
+  font size, marker/line size, fill opacity, grid, log X/Y, scatter fit line,
+  histogram bins/density/bars, show-points — QSettings-persisted), a non-modal
+  **`PlotStyleDialog`** live editor, and **`PlotStyleMixin`** that opens it from a
+  toolbar **Style…** button *or* **shift-right-click on any plot** (your suggested
+  UX) and replots live.
+- `compare_plots` functions all take the `PlotStyle` and apply it via a shared
+  `_axes` helper (fonts/grid/log/ticks); added a **`bars`** view (group mean ± SEM)
+  → the Distributions tab gains a **Bars (mean ± SEM)** option (bars-vs-points).
+- `compare_window`: holds the style (`PlotStyle.from_settings`), adds the Style…
+  button, installs the shift-right-click event filter on all four plots, and threads
+  the style into every draw call. `_show_help` moved to `compare_tables.show_metrics_help`
+  to keep the file < 500 lines.
+
+Tests: `pytest` **43 passed**; the compare smoke now drives the bars view, the
+style dialog (font/bins/bars/grid/fit), and the shift-right-click filter, and
+writes `docs/screenshots/comparison_style.png`. Both GUI smokes green; all files
+< 500 lines.
+
+---
+
 ## 2026-06-14 — Match the original analysis (state-segmented metrics) + full metric docs
 
 Investigated why the Comparison window's numbers differed from the original

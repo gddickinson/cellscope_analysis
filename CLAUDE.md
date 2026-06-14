@@ -126,6 +126,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   that **reproduce the original CellScope `compare/per_recording.csv`** (edge-excluded,
   speed-capped, segment-gated per rounded/spread frames). A **Help** button + per-column
   tooltips explain every metric (`metric_docs.comparison_tooltip` / `as_html`).
+  Every graph is **stylable** (`gui/plot_style.py`): a **Style…** button — or
+  **shift-right-click any plot** — opens a live editor for fonts, marker/line
+  sizes, fill opacity, grid, log axes, histogram bins, bars-vs-step (persisted via
+  QSettings); the Distributions tab adds a **Bars (mean ± SEM)** view.
   Driven by the loaded project's **Design**; click a point to load that recording
   in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
   Toolbar **Groups…** opens the **Groups & Comparisons editor**

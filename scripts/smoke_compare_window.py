@@ -18,7 +18,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt5 import QtWidgets                                    # noqa: E402
+from PyQt5 import QtWidgets, QtCore, QtGui                     # noqa: E402
 from maskviewer import project as projmod                      # noqa: E402
 from maskviewer.io.dataset import Entry                        # noqa: E402
 from maskviewer.gui.compare_window import CompareWindow        # noqa: E402
@@ -96,7 +96,29 @@ def drive(win, label):
     win.min_cells.setValue(0)
     win.min_quality.setValue(0.0)
     win.state_sel.setCurrentText("all cells")
-    print(f"  {label}: tabs+filters+units OK · stats rows={win.table.rowCount()} "
+
+    # bars-vs-points view + plot-style options
+    app = QtWidgets.QApplication.instance()
+    win.dist_kind.setCurrentText("Bars (mean ± SEM)")
+    assert win.dist_kind.currentIndex() == 3, "bars view missing"
+    win._open_style_dialog()
+    sd = win._style_dialog
+    sd._widgets["font_size"].setValue(14)
+    sd._widgets["hist_bins"].setValue(15)
+    sd._widgets["hist_bars"].setChecked(True)
+    sd._widgets["grid"].setChecked(True)
+    sd._widgets["scatter_fit"].setChecked(True)
+    app.processEvents()
+    assert win.style.font_size == 14 and win.style.hist_bins == 15 and win.style.hist_bars
+    # shift-right-click a plot opens the style dialog (event filter consumes it)
+    ev = QtGui.QMouseEvent(QtCore.QEvent.MouseButtonPress, QtCore.QPointF(5, 5),
+                           QtCore.Qt.RightButton, QtCore.Qt.RightButton,
+                           QtCore.Qt.ShiftModifier)
+    assert win.eventFilter(win.dist_plot.viewport(), ev) is True, "shift-right filter"
+    sd._reset()                                       # restore defaults
+    win.dist_kind.setCurrentText("Strip (mean ± SEM)")
+    app.processEvents()
+    print(f"  {label}: tabs+filters+units+style OK · stats rows={win.table.rowCount()} "
           f"· per-rec rows={win.rec_table.rowCount()}")
 
 
@@ -170,6 +192,12 @@ def main():
         win.grab().save(shot.replace(".png", "_histogram.png"))
         print(f"  saved screenshot → {shot.replace('.png', '_histogram.png')}")
         win.right_tabs.setCurrentIndex(0)
+        win._open_style_dialog()                      # the plot-style options
+        win._style_dialog.resize(380, 470)
+        app.processEvents()
+        win._style_dialog.grab().save(shot.replace(".png", "_style.png"))
+        win._style_dialog.close()
+        print(f"  saved screenshot → {shot.replace('.png', '_style.png')}")
 
     eshot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--editshot=")), None)
     if eshot:                                         # clean editor, before any edits

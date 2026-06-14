@@ -20,11 +20,13 @@ from PyQt5 import QtCore, QtWidgets
 from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
-from .compare_tables import StatsTablesMixin
+from .compare_tables import StatsTablesMixin, show_metrics_help
+from .plot_style import PlotStyle, PlotStyleMixin
 from ..analysis import compare, metric_docs
 from ..config import PROJECT_ROOT
 
-_DIST_KINDS = ["Strip (mean ± SEM)", "Box (+ Bonferroni)", "Superplot"]
+_DIST_KINDS = ["Strip (mean ± SEM)", "Box (+ Bonferroni)", "Superplot",
+               "Bars (mean ± SEM)"]
 
 
 class _Worker(QtCore.QObject):
@@ -46,7 +48,7 @@ class _Worker(QtCore.QObject):
         self.done.emit(res)
 
 
-class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
+class CompareWindow(StatsTablesMixin, PlotStyleMixin, QtWidgets.QMainWindow):
     recordingPicked = QtCore.pyqtSignal(str)
 
     def __init__(self, project, parent=None):
@@ -58,6 +60,9 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self._msd = None
         self._thread = self._worker = None
         self._design_editor = None
+        self._settings = QtCore.QSettings("cellscope_analysis", "compare")
+        self.style = PlotStyle.from_settings(self._settings)
+        self._style_dialog = None
 
         self._build_ui()
         self.set_project(project)
@@ -117,10 +122,15 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.groups_btn.setToolTip("Assign recordings to groups, pick controls, "
                                    "include/exclude — applies instantly")
         self.groups_btn.clicked.connect(self._open_design_editor)
+        self.style_btn = QtWidgets.QPushButton("Style…")
+        self.style_btn.setToolTip("Plot style: fonts, marker/line sizes, fill, "
+                                  "grid, log axes, histogram bins, bars-vs-points "
+                                  "(or shift-right-click any plot)")
+        self.style_btn.clicked.connect(self._open_style_dialog)
         self.help_btn = QtWidgets.QPushButton("Help")
         self.help_btn.setToolTip("Metrics & methods reference (what each metric "
                                  "means + how the comparison is computed)")
-        self.help_btn.clicked.connect(self._show_help)
+        self.help_btn.clicked.connect(lambda: show_metrics_help(self))
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
@@ -134,6 +144,7 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         bar.addWidget(self.ols)
         bar.addSeparator()
         bar.addWidget(export)
+        bar.addWidget(self.style_btn)
         bar.addWidget(self.help_btn)
         self.addToolBar(bar)
 
@@ -195,6 +206,9 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.status = self.statusBar()
         self.busy = StatusProgress()                  # bottom-bar progress + ETA
         self.status.addPermanentWidget(self.busy)
+        # shift-right-click any plot → the plot-style dialog
+        self._install_style_filters([self.dist_plot, self.msd_plot,
+                                     self.scatter_plot, self.hist_plot])
 
     # -- right-panel tabs ------------------------------------------------
     def _build_stats_tab(self):
@@ -297,19 +311,6 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
             self._design_editor.set_data(self._per_cell)
         self._design_editor.show()
         self._design_editor.raise_()
-
-    def _show_help(self):
-        dlg = QtWidgets.QDialog(self)
-        dlg.setWindowTitle("Metrics & methods reference")
-        dlg.resize(680, 680)
-        lay = QtWidgets.QVBoxLayout(dlg)
-        br = QtWidgets.QTextBrowser()
-        br.setHtml(metric_docs.as_html())
-        lay.addWidget(br)
-        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
-        btns.rejected.connect(dlg.reject)
-        lay.addWidget(btns)
-        dlg.exec_()
 
     def _on_design_changed(self):
         """Grouping / control / include changed — remap + replot, no recompute."""
@@ -434,27 +435,34 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
             msd = self._filtered_msd()
             if msd is not None and per_rec is not None:
                 msd = msd[msd["recording"].isin(set(per_rec["recording"]))]
-            compare_plots.ensemble_msd(self.msd_plot, msd, design, stat)
+            compare_plots.ensemble_msd(self.msd_plot, msd, design, stat, style=self.style)
         elif per_rec is not None and metric in per_rec.columns:
             if tab == 2:
                 self.scatter_plot.clear()
                 compare_plots.scatter(self.scatter_plot, per_rec, metric,
-                                      self.metric_y.currentText(), design, self._pick)
+                                      self.metric_y.currentText(), design, self._pick,
+                                      style=self.style)
             else:
                 self.dist_plot.clear()
                 kind = self.dist_kind.currentIndex()
                 if kind == 1:
-                    compare_plots.box(self.dist_plot, per_rec, metric, design)
+                    compare_plots.box(self.dist_plot, per_rec, metric, design,
+                                      style=self.style)
                 elif kind == 2:
-                    compare_plots.superplot(self.dist_plot, pc, per_rec, metric, design)
+                    compare_plots.superplot(self.dist_plot, pc, per_rec, metric,
+                                            design, style=self.style)
+                elif kind == 3:
+                    compare_plots.bars(self.dist_plot, per_rec, metric, design,
+                                       style=self.style)
                 else:
-                    compare_plots.strip(self.dist_plot, per_rec, metric, design, self._pick)
+                    compare_plots.strip(self.dist_plot, per_rec, metric, design,
+                                        self._pick, style=self.style)
         # right panel (stats + histogram + data) always tracks the current metric
         if per_rec is not None and metric and metric in per_rec.columns:
             self._update_stats(per_rec, metric)
             self.hist_plot.clear()
             self._hist_legend.clear()
-            compare_plots.histogram(self.hist_plot, pc, metric, design)
+            compare_plots.histogram(self.hist_plot, pc, metric, design, style=self.style)
             self._fill_data(per_rec, pc, metric)
 
     # -- misc ------------------------------------------------------------

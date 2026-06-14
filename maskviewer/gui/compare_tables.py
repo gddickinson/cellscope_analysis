@@ -15,6 +15,21 @@ _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
               "Cohen d", "OLS β", "OLS p"]
 
 
+def show_metrics_help(parent):
+    """Modal Metrics & methods reference (the comparison column docs + methods)."""
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Metrics & methods reference")
+    dlg.resize(680, 680)
+    lay = QtWidgets.QVBoxLayout(dlg)
+    br = QtWidgets.QTextBrowser()
+    br.setHtml(metric_docs.as_html())
+    lay.addWidget(br)
+    btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+    btns.rejected.connect(dlg.reject)
+    lay.addWidget(btns)
+    dlg.exec_()
+
+
 class StatsTablesMixin:
     def _update_stats(self, per_rec, metric):
         d = self.project.design

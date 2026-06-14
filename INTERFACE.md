@@ -27,10 +27,11 @@ Read this before opening source files. Update it when modules change.
   Comparison window + Project wiring: drives every tab / dist-kind / OLS / stats
   table on fake multi-arm + single-arm data, checks the editable control combo,
   exercises the **filters** (frames / quality / cells-per-rec / state), the right
-  **Stats / Histogram / Data** tabs + units, the **Groups & Comparisons editor**
-  (exclude / regroup / add-comparison / control / vehicle / reset), and verifies
-  `ViewerWindow.open_compare_window` / `set_project`. `--shot=PATH` (also writes a
-  `_histogram` variant) / `--editshot=PATH` (re)write the docs screenshots.
+  **Stats / Histogram / Data** tabs + units, the **bars view + plot-style dialog +
+  shift-right-click** filter, the **Groups & Comparisons editor** (exclude /
+  regroup / add-comparison / control / vehicle / reset), and verifies
+  `ViewerWindow.open_compare_window` / `set_project`. `--shot=PATH` (also writes
+  `_histogram` + `_style` variants) / `--editshot=PATH` (re)write the screenshots.
 - **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
   unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
   Population / Cell-table / Shape computes through the off-thread runner (asserting
@@ -149,16 +150,24 @@ Read this before opening source files. Update it when modules change.
   bottom-bar **`StatusProgress`** (per-recording progress + ETA). Both whole-track
   **and** state-segmented (`…_spread` / `…_rounded`) metrics are offered; metric
   combos carry per-column tooltips (`metric_docs.comparison_tooltip`); a **Help**
-  button opens the Metrics & methods reference; tabs/controls are tooltipped.
+  button opens the Metrics & methods reference; a **Style…** button (or
+  shift-right-click a plot) opens the `PlotStyleDialog`; tabs/controls tooltipped.
 - **compare_tables.py** — `StatsTablesMixin`: fills the right-panel **Stats** +
   **Data** tables from the per-recording table + Design (`_update_stats`,
-  `_fill_data`, `_set_table`); split out to keep `compare_window` small.
+  `_fill_data`, `_set_table`); + `show_metrics_help(parent)` (the Metrics &
+  methods reference dialog). Split out to keep `compare_window` small.
 - **compare_plots.py** — design-aware pyqtgraph drawing for `CompareWindow`
   (GUI-state-free): `strip` (mean ± SEM, clickable), `box` (+ Bonferroni stars
-  via `arm_tests`), `superplot` (cells + per-recording means), `ensemble_msd`
-  (mean±SEM / median+CI bands), `scatter` (X-vs-Y + Spearman, clickable),
-  `histogram` (per-cell distribution by group). Colours + condition order come
-  from the `Design`; axes are labelled with units via `metric_docs.axis_label`.
+  via `arm_tests`), `bars` (group mean ± SEM), `superplot` (cells + per-recording
+  means), `ensemble_msd` (mean±SEM / median+CI bands), `scatter` (X-vs-Y +
+  Spearman, clickable, optional fit line), `histogram` (per-cell distribution by
+  group). Colours + condition order come from the `Design`; axes labelled with
+  units via `metric_docs.axis_label`. Every function takes a `PlotStyle` (fonts /
+  marker+line size / fill opacity / grid / log axes / histogram bins…) applied via
+  the shared `_axes` helper.
+- **plot_style.py** — `PlotStyle` (dataclass of render options, QSettings-persisted)
+  + `PlotStyleDialog` (non-modal live editor) + `PlotStyleMixin` (opens the editor
+  from a toolbar button **or shift-right-click on any plot**, saves + replots).
 - **design_editor.py** — `DesignEditor(QDialog)`: the **Groups & Comparisons**
   editor opened from the Comparison window (toolbar ▸ Groups…). A recordings
   table (include checkbox + editable **group** combo + cell counts, with bulk
