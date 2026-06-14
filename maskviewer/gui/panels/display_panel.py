@@ -9,8 +9,14 @@ from __future__ import annotations
 
 from PyQt5 import QtCore, QtWidgets
 
-COLOR_BY = [("Cell ID", "id"), ("Cell state", "state"),
-            ("Area (per frame)", "area"), ("Track length", "track")]
+COLOR_BY = [
+    ("Cell ID", "id"), ("Cell state", "state"),
+    ("Area", "area"), ("Perimeter", "perimeter"), ("Circularity", "circularity"),
+    ("Eccentricity", "eccentricity"), ("Aspect ratio", "aspect_ratio"),
+    ("Solidity", "solidity"), ("Extent", "extent"),
+    ("Nearest-neighbour dist", "nn_dist"), ("Neighbour count", "n_neighbors"),
+    ("Mean speed", "speed"), ("Track length", "track"), ("Shape mode", "shape_mode"),
+]
 OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
             ("ids", "Cell IDs", False), ("trails", "Track trails", False)]
 

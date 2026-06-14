@@ -94,16 +94,22 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   brightness/contrast sliders, gamma, colormap LUT, invert, Auto/Reset —
   per-channel.
 - **Display** dock: recording/channel, **composite** (blend channels: DIC grey
-  + Cy5 magenta) + per-channel visibility, mask show/outline/opacity, colour-by
-  (Cell ID / **state** / area / track), overlay toggles (scale bar, frame/time,
-  cell IDs, track trails).
+  + Cy5 magenta) + per-channel visibility, mask show/outline/opacity, **colour-by
+  any calculated metric** (Cell ID / state / area / perimeter / circularity /
+  eccentricity / aspect ratio / solidity / extent / nearest-neighbour /
+  neighbour count / mean speed / track length / shape mode), overlay toggles
+  (scale bar, frame/time, cell IDs, track trails).
 - **Cell Info** dock: click a cell → summary + plot any *enabled* per-frame
   characteristic (area, perimeter, circularity, eccentricity, aspect ratio,
   solidity, axes, orientation, extent, state, speed, displacement, turning,
   consecutive IoU, area-change, **nearest-neighbour** dist/count, per-channel
-  intensity + membrane contrast) over time, or MSD (log-log, α/D fit).
-- **Edge Dynamics** dock: protrusion/retraction kymograph (angle×time) + radius
-  map + summary for the selected cell, with kymograph CSV export.
+  intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
+- **Edge Dynamics** dock: velocity/radius kymograph (angle×time) **and a
+  per-frame edge map** (the cell's boundary in the current frame coloured by
+  per-sector velocity or radius) + summary + kymograph CSV export.
+- **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
+  mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
+  per-cell plot metric.
 - **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
   + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
 - **Menus**: File (open / **Export CSV** Ctrl+E / screenshot), View (zoom),
@@ -154,16 +160,20 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
 - ✅ Overlays (scale bar, frame/time, cell IDs, track trails, selection);
   colour-by id / **state** / area / track.
 - ✅ Cell-info panel: click → summary + plot any per-frame characteristic + MSD
-  (α/D fit). The plottable set covers the full CellScope per-frame metric list
-  except VAMPIRE (see below): area, perimeter, circularity, ecc, aspect ratio,
-  solidity, axes, orientation, extent, state, speed, displacement, turning,
-  consecutive IoU, area-change, nearest-neighbour, intensity + membrane contrast.
+  (log-log **or linear**, α/D fit). The plottable set covers the **full CellScope
+  per-frame metric list**: area, perimeter, circularity, ecc, aspect ratio,
+  solidity, axes, orientation, extent, state, **shape mode**, speed,
+  displacement, turning, consecutive IoU, area-change, nearest-neighbour,
+  intensity + membrane contrast.
 - ✅ **Config ▸ Cell plot metrics** — choose which per-frame metrics are
   computed/offered (persisted, immediate recompute). `cell_frame_table(metrics=)`
   skips unselected/expensive ones.
-- ✅ **Nearest-neighbour** (`analysis/neighbors.py`) — plot + CSV.
-- ✅ **Edge / membrane dynamics**: protrusion/retraction kymograph dock +
-  summary + CSV (`analysis/edge_dynamics.py`).
+- ✅ **Nearest-neighbour** (`analysis/neighbors.py`) — plot + CSV + colour-by.
+- ✅ **Colour the main display by any calculated metric** (`_overlay_lut`).
+- ✅ **VAMPIRE shape modes** (`analysis/shape_modes.py`) — Shape Modes dock +
+  `shape_mode` plot metric + colour-by.
+- ✅ **Edge / membrane dynamics**: protrusion/retraction kymograph **+ per-frame
+  edge map** dock + summary + CSV (`analysis/edge_dynamics.py`).
 - ✅ **CSV export** (per-frame / per-cell / tracks, optional solidity + edge
   columns) for Origin — `analysis/exporters.py`, **threaded** with progress.
 - ✅ Per-frame **state** (rounded/spread, CellScope rule) — `analysis/state.py`.
@@ -177,13 +187,8 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
   recording + per-recording means; per-arm KW/PERMANOVA) — bakes the
   recording=unit stats into every figure. Reuse `feature_tables`/`multivariate`;
   this is the natural home for treatment comparisons.
-- **VAMPIRE-style shape modes** (PCA+K-means on cell contours → per-frame shape
-  mode + heterogeneity entropy) — *the only remaining CellScope per-frame
-  analysis not yet ported*; it's a recording-level population model (sklearn is
-  available), so it wants a lazy fit + a small mode-distribution/eigenshape dock,
-  with "shape_mode" then added to the configurable cell-plot metrics.
 - **Per-protrusion event detection** on the edge kymograph (retraction
-  duration/frequency/strength, à la ADAPT) — richer than the current summary.
+  duration / frequency / strength, à la ADAPT) — richer than the current summary.
 - **SiR-actin (Cy5) cortical intensity vs retraction** — correlate the per-frame
   intensity series (already exported) with edge velocity.
 - An HTTP remote-control hook (à la CellScope's `CELLSCOPE_REMOTE`) so agents

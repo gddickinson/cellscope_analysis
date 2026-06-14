@@ -236,6 +236,7 @@ def _ylabel(key: str, u: str) -> str:
             "solidity": "solidity", "perimeter": f"perimeter ({u})",
             "circularity": "circularity",
             "state_code": "state (0=unk,1=spread,2=round,3=edge)",
+            "shape_mode": "shape mode (cluster)",
             "speed": f"speed ({u}/frame)",
             "displacement_from_start": f"displacement ({u})",
             "turning_angle": "turning angle (rad)",
@@ -251,8 +252,9 @@ def _ylabel(key: str, u: str) -> str:
 BASE_FRAME_METRICS = ["area", "perimeter", "circularity", "eccentricity",
                       "aspect_ratio", "solidity", "major_axis", "minor_axis",
                       "orientation", "extent", "equiv_diameter", "state_code",
-                      "speed", "displacement_from_start", "turning_angle",
-                      "iou_prev", "area_change", "nn_dist", "n_neighbors"]
+                      "shape_mode", "speed", "displacement_from_start",
+                      "turning_angle", "iou_prev", "area_change", "nn_dist",
+                      "n_neighbors"]
 
 
 def available_frame_metrics(channel_names=None) -> list:
@@ -274,7 +276,7 @@ def metric_label(key: str, um_per_px=None) -> str:
 def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
                      dt_min=None, recording=None, with_solidity=True,
                      metrics=None, neighbor_history=None,
-                     nn_radius=_nbr.DEFAULT_RADIUS_UM) -> dict:
+                     nn_radius=_nbr.DEFAULT_RADIUS_UM, shape_model=None) -> dict:
     """Rich per-frame metrics for ONE cell (for the cell-info panel / plots).
 
     Returns {frame, time_min, series{name: (values, ylabel)}, summary}. ``series``
@@ -402,6 +404,11 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
                 cnt[i] = int((d <= nn_radius).sum())
         series["nn_dist"] = (nn, _ylabel("nn_dist", u))
         series["n_neighbors"] = (cnt, _ylabel("n_neighbors", u))
+    if shape_model is not None and (want is None or "shape_mode" in want):
+        bcf = shape_model.get("by_cell_frame", {})
+        series["shape_mode"] = (
+            np.array([bcf.get((cell_id, int(t)), np.nan) for t in fr], float),
+            "shape mode (cluster)")
     if want is not None:
         series = {k: v for k, v in series.items() if k in want}
     return {"frame": fr, "time_min": times, "series": series,

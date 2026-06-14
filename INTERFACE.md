@@ -73,29 +73,37 @@ Read this before opening source files. Update it when modules change.
   - **timeline.py** `TimelinePanel` — frame slider + play/pause/fps/loop +
     time readout (bottom bar). Emits `frameChanged`.
   - **display_panel.py** `DisplayPanel` — recording/channel pickers, composite
-    toggle + per-channel visibility, mask show/outline/opacity, colour-by
-    (id/state/area/track), overlay toggles.
+    toggle + per-channel visibility, mask show/outline/opacity, colour-by (id /
+    state / area / perimeter / circularity / eccentricity / aspect-ratio /
+    solidity / extent / nearest-neighbour / neighbour-count / mean-speed /
+    track-length / shape-mode), overlay toggles.
   - **image_adjust.py** `ImageAdjustPanel` — histogram + draggable levels,
     brightness/contrast sliders, gamma, colormap, invert, auto/reset. Emits
     `displayChanged`; `state()`/`set_state()` for per-channel persistence.
   - **cell_info.py** `CellInfoPanel` — selected-cell summary + a combo to plot
     any *enabled* per-frame characteristic (shape, perimeter, circularity, state,
     speed, displacement, turning, IoU, area-change, nearest-neighbour, intensity,
-    membrane contrast) over time + an MSD (log-log) α fit. Owns the enabled-metric
-    set (QSettings-persisted); `set_metric_enabled` recomputes immediately.
-  - **edge_panel.py** `EdgePanel` — membrane protrusion/retraction kymograph
-    (angle×time, blue=retraction/red=protrusion) + radius map + summary +
-    kymograph CSV export, for the selected cell.
+    membrane contrast) over time + MSD (log-log **or linear**) with α/D fit. Owns
+    the enabled-metric set (QSettings-persisted); `set_metric_enabled` recomputes
+    immediately.
+  - **edge_panel.py** `EdgePanel` — velocity / radius **kymograph** (angle×time,
+    blue=retraction/red=protrusion) **and a per-frame edge map** (the cell's
+    boundary in the current frame coloured by per-sector velocity or radius) +
+    summary + kymograph CSV export, for the selected cell.
+  - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
+    mode-fraction bars, heterogeneity entropy (lazy compute button).
 - **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/**Config**
   (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
 - **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
-  docks (Display + Cell-Info + Edge-Dynamics tabbed + Image-Adjust right;
-  Timeline bottom), wires panels↔canvas, split base/overlay rendering (single
-  or additive **composite** of visible channels with per-channel default LUTs),
-  colour-by id/state/area/track, click-to-select → Cell-Info + Edge dock, layout
-  save/restore (QSettings) + Reset Layout, status bar, ←/→/Space shortcuts.
+  docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes tabbed + Image-Adjust
+  right; Timeline bottom), wires panels↔canvas, split base/overlay rendering
+  (single or additive **composite** of visible channels), colour-by any
+  calculated metric (`_overlay_lut` builds the per-cell value→LUT), lazy caches
+  (centroid history / track lengths / mean speeds / shape-mode model) shared as
+  providers, click-to-select → Cell-Info + Edge dock, layout save/restore
+  (QSettings) + Reset Layout, status bar, ←/→/Space shortcuts.
 
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
@@ -123,6 +131,10 @@ Read this before opening source files. Update it when modules change.
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
   (protrusion/retraction/net/ruffling), `edge_summary_for_cell`.
+- **shape_modes.py** — VAMPIRE-style population shape clustering (sklearn):
+  `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
+  per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
+  `cell_mode_series`, `cell_heterogeneity`, `mode_contour`.
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
   (region props incl. perimeter/circularity/state + nearest-neighbour),
   `per_cell_table` (track + shape + motion + nearest-neighbour aggregates,

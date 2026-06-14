@@ -5,6 +5,34 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — VAMPIRE shape modes + edge maps + colour-by-metric + linear MSD
+
+- **VAMPIRE shape modes** (`analysis/shape_modes.py`, sklearn): each cell-frame
+  boundary → aligned, scale-normalised radial signature (reusing the edge
+  sampler) → PCA + K-means into recurrent **shape modes**; per cell-frame mode,
+  mode mean-shapes, mode fractions, Shannon-entropy heterogeneity. New **Shape
+  Modes dock** (mode shapes + fraction bars + entropy, lazy compute) and a
+  per-cell `shape_mode` series in the cell plot. (~7.5 s fit on a real 2048²
+  recording → 674 contours / 5 modes; lazy + cached.) This was the last
+  un-ported CellScope per-frame analysis.
+- **Per-frame edge map** in the Edge dock: besides the velocity/radius
+  kymographs, a view drawing the selected cell's boundary in the **current
+  frame**, each boundary point coloured by per-sector edge velocity (RdBu) or
+  radius — a spatial "where is it protruding/retracting now" view. Window feeds
+  the current frame to the dock on scrub + selection.
+- **Colour the main display by calculated metrics**: colour-by now offers area,
+  perimeter, circularity, eccentricity, aspect ratio, solidity, extent,
+  nearest-neighbour distance/count, mean speed, track length and shape mode
+  (per-frame metrics recomputed each frame via `regionprops_frame`; per-cell ones
+  lazily cached). `_overlay_lut` builds a per-cell value→colour LUT.
+- **Linear MSD** plot option alongside the log-log MSD (same α/D fit overlay).
+
+Verified headless: shape dock + shape_mode plot, all colour-by modes build LUTs,
+edge per-frame map (526 boundary points coloured), linear+log MSD. `pytest` 21
+passed. All files < 500 lines.
+
+---
+
 ## 2026-06-13 — Configurable cell-plot metrics + nearest-neighbour + full CellScope per-frame set
 
 - **Config menu** (`Config ▸ Cell plot metrics`): a checkable item per available

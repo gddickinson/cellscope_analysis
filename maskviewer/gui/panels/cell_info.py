@@ -20,6 +20,7 @@ from PyQt5 import QtCore, QtWidgets
 from ...analysis import cell_metrics, motion
 
 _MSD = "MSD (log-log)"
+_MSD_LIN = "MSD (linear)"
 _NN = {"nn_dist", "n_neighbors"}
 
 
@@ -32,6 +33,7 @@ class CellInfoPanel(QtWidgets.QWidget):
         self._ctx = None                       # (labels, um, dt, recording)
         self.available = []                    # selectable metric keys
         self.neighbor_provider = None          # callable -> {cid:(T,2)} | None
+        self.shape_mode_provider = None        # callable -> shape-mode model | None
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
         dis = self._settings.value("cell_metrics_disabled", [])
         if isinstance(dis, str):                       # QSettings may unwrap a 1-list
@@ -99,9 +101,11 @@ class CellInfoPanel(QtWidgets.QWidget):
         want = self.enabled()
         nh = self.neighbor_provider() if (self.neighbor_provider
                                           and _NN & set(want)) else None
+        sm = self.shape_mode_provider() if (self.shape_mode_provider
+                                            and "shape_mode" in want) else None
         self._cft = cell_metrics.cell_frame_table(
             labels, self.cell_id, um, dt, recording=rec, metrics=want,
-            neighbor_history=nh)
+            neighbor_history=nh, shape_model=sm)
         self.title.setText(f"Cell {self.cell_id}")
         self._update_info()
         self._rebuild_combo()
@@ -130,7 +134,7 @@ class CellInfoPanel(QtWidgets.QWidget):
     def _rebuild_combo(self):
         cur = self.metric.currentText()
         s = self._cft.get("series", {})
-        items = sorted(s) + [_MSD]
+        items = sorted(s) + [_MSD, _MSD_LIN]
         self.metric.blockSignals(True)
         self.metric.clear()
         self.metric.addItems(items)
@@ -155,8 +159,8 @@ class CellInfoPanel(QtWidgets.QWidget):
     def _replot(self):
         key = self.metric.currentText()
         self.fit.setData([], [])
-        if key == _MSD:
-            return self._plot_msd()
+        if key in (_MSD, _MSD_LIN):
+            return self._plot_msd(log=(key == _MSD))
         self.plot.setLogMode(x=False, y=False)
         self.marker.show()
         series = self._cft.get("series", {})
@@ -168,14 +172,14 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.plot.setLabel("left", ylabel)
         self.plot.setLabel("bottom", "time (min)" if self._dt else "frame")
 
-    def _plot_msd(self):
+    def _plot_msd(self, log=True):
         cen = self._cft.get("centroid_um")
         if cen is None:
             self.curve.setData([], [])
             return
         tau, vals = motion.msd(cen, self._dt)
         self.marker.hide()
-        self.plot.setLogMode(x=True, y=True)
+        self.plot.setLogMode(x=log, y=log)
         self.curve.setData(np.asarray(tau), np.asarray(vals))
         fit = motion.fit_msd(tau, vals)
         if np.isfinite(fit["alpha"]) and len(tau):

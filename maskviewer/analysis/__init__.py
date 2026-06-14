@@ -10,6 +10,8 @@
   neighbors.py    frame_nn — per-cell nearest-neighbour distance + count.
   edge_dynamics.py edge_velocity_kymograph / radius_kymograph / edge_summary —
                   radial protrusion/retraction membrane dynamics (no cv2).
+  shape_modes.py  fit_shape_modes / cell_mode_series / mode_contour — VAMPIRE-
+                  style population shape-mode clustering (PCA + K-means, sklearn).
   exporters.py    per_frame_table / per_cell_table / track_table / export_all —
                   tidy DataFrames + CSV writers for Origin etc.
 
@@ -20,8 +22,9 @@ alongside but couples to those result artifacts.
 from .label_stats import (
     n_cells_per_frame, cell_ids, cell_areas_px, track_lengths, centroids,
     summary)
-from . import cell_metrics, motion, state, neighbors, edge_dynamics, exporters
+from . import (cell_metrics, motion, state, neighbors, edge_dynamics,
+               shape_modes, exporters)
 
 __all__ = ["n_cells_per_frame", "cell_ids", "cell_areas_px", "track_lengths",
            "centroids", "summary", "cell_metrics", "motion", "state",
-           "neighbors", "edge_dynamics", "exporters"]
+           "neighbors", "edge_dynamics", "shape_modes", "exporters"]

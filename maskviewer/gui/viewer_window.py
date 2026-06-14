@@ -19,13 +19,14 @@ import os
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from .image_view import ImageCanvas, scalar_label_lut
+from .image_view import ImageCanvas
 from .panels import (TimelinePanel, DisplayPanel, ImageAdjustPanel,
-                     CellInfoPanel, EdgePanel)
+                     CellInfoPanel, EdgePanel, ShapeModesPanel)
 from .luts import DisplayState
 from .menus import build_menubar
 from .export_dialog import CSVExportDialog
-from ..analysis import label_stats, cell_metrics, state as cell_state
+from . import colorby
+from ..analysis import label_stats, cell_metrics, shape_modes
 from ..io.dataset import discover, Entry
 from ..config import PROJECT_ROOT
 
@@ -44,8 +45,10 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.selected = 0
         self._hover = 0
         self._display = {}              # channel -> luts.DisplayState
-        self._cent_hist = None          # lazy {cid: (T,2)} for trails
+        self._cent_hist = None          # lazy {cid: (T,2)} for trails / NN
         self._track_len = None          # lazy {cid: int} for colour-by track
+        self._mean_speed = None         # lazy {cid: float} for colour-by speed
+        self._shape_model = None        # lazy VAMPIRE shape-mode model
         self._cur_lab = None
         self._cur_ncells = 0
 
@@ -61,15 +64,17 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.adjust = ImageAdjustPanel()
         self.cell_info = CellInfoPanel()
         self.edge = EdgePanel()
+        self.shape = ShapeModesPanel()
         self.timeline = TimelinePanel()
         self.docks = {}
         self._add_dock("Display", self.display, _RIGHT)
         self._add_dock("Image Adjust", self.adjust, _RIGHT)
         self._add_dock("Cell Info", self.cell_info, _RIGHT)
         self._add_dock("Edge Dynamics", self.edge, _RIGHT)
+        self._add_dock("Shape Modes", self.shape, _RIGHT)
         self._add_dock("Timeline", self.timeline, _BOTTOM)
-        self.tabifyDockWidget(self.docks["Display"], self.docks["Cell Info"])
-        self.tabifyDockWidget(self.docks["Cell Info"], self.docks["Edge Dynamics"])
+        for name in ("Cell Info", "Edge Dynamics", "Shape Modes"):
+            self.tabifyDockWidget(self.docks["Display"], self.docks[name])
         self.docks["Display"].raise_()
         self.status = self.statusBar()
 
@@ -107,6 +112,8 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.canvas.cellHovered.connect(self._on_hover)
         self.canvas.cellClicked.connect(self._on_click)
         self.cell_info.neighbor_provider = self._centroid_history
+        self.cell_info.shape_mode_provider = self._shape_modes_model
+        self.shape.set_provider(self._shape_modes_model)
         for key, step in ((QtCore.Qt.Key_Left, -1), (QtCore.Qt.Key_Right, 1)):
             QtWidgets.QShortcut(QtGui.QKeySequence(key), self,
                                 activated=lambda s=step: self.timeline.step(s))
@@ -127,9 +134,11 @@ class ViewerWindow(QtWidgets.QMainWindow):
             return
         self._display = {}
         self.selected = 0
-        self._cent_hist = self._track_len = None
+        self._cent_hist = self._track_len = self._mean_speed = None
+        self._shape_model = None
         self.cell_info.clear_cell()
         self.edge.clear_cell()
+        self.shape.clear_model()
         self.canvas.overlays.set_scale(self.recording.um_per_px)
         self.display.set_channels(self.recording.channel_names)
         self.cell_info.set_available(self.recording.channel_names,
@@ -169,6 +178,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self._render_base()
         self._render_overlay()
         self.cell_info.set_frame_marker(t)
+        self.edge.set_frame(t)
 
     def _on_display_changed(self):
         if self.recording is None:
@@ -229,30 +239,9 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.canvas.set_overlay(lab, opacity=self.display.opacity_value,
                                 outline=self.display.outline.isChecked(),
                                 visible=self.display.show_masks.isChecked(),
-                                lut=self._overlay_lut(lab))
+                                lut=colorby.overlay_lut(self, lab))
         self._update_overlays(t, lab)
         self._update_status()
-
-    def _overlay_lut(self, lab):
-        if lab is None:
-            return None
-        mode = self.display.color_by_mode()
-        if mode == "state":
-            props = cell_metrics.regionprops_frame(lab, self.recording.um_per_px)
-            lut = np.zeros((self.masks.max_label + 1, 4), dtype=np.ubyte)
-            for cid, r in props.items():
-                if 0 < cid < lut.shape[0]:
-                    col = cell_state.STATE_COLOR.get(r["state"], (130, 130, 130))
-                    lut[cid] = (*col, 255)
-            return lut
-        if mode == "area":
-            ids, counts = np.unique(lab, return_counts=True)
-            vals = {int(i): int(c) for i, c in zip(ids, counts) if i > 0}
-            return scalar_label_lut(vals, self.masks.max_label, "viridis")
-        if mode == "track":
-            self._ensure_track_len()
-            return scalar_label_lut(self._track_len, self.masks.max_label, "magma")
-        return None                                     # "id" → canvas default
 
     def _centroid_history(self):
         """All cells' centroid tracks (lazy + cached) — for trails + nearest
@@ -260,6 +249,16 @@ class ViewerWindow(QtWidgets.QMainWindow):
         if self._cent_hist is None and self.masks is not None:
             self._cent_hist = cell_metrics.centroid_history(self.masks.labels)
         return self._cent_hist
+
+    def _shape_modes_model(self):
+        """VAMPIRE shape-mode model for the recording (lazy + cached)."""
+        if self._shape_model is None and self.masks is not None:
+            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+            try:
+                self._shape_model = shape_modes.fit_shape_modes(self.masks.labels)
+            finally:
+                QtWidgets.QApplication.restoreOverrideCursor()
+        return self._shape_model
 
     def _rebuild_metrics_menu(self):
         """Populate Config ▸ Cell plot metrics with a checkable item per
@@ -330,6 +329,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
             self.cell_info.set_frame_marker(self.timeline.value())
             self.edge.set_cell(cid, self.masks.labels, self.recording.um_per_px,
                                self.recording.time_interval_min)
+            self.edge.set_frame(self.timeline.value())
             self.docks["Cell Info"].raise_()
         else:
             self.cell_info.clear_cell()

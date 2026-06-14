@@ -206,6 +206,27 @@ def test_available_metrics_and_gating():
     assert set(sub["series"]) == {"circularity", "nn_dist"}   # only requested
 
 
+def test_shape_modes_cluster():
+    from maskviewer.analysis import shape_modes
+    T, H, W = 4, 90, 90
+    labels = np.zeros((T, H, W), int)
+    for t in range(T):
+        labels[t][_disk(H, W, 22, 22, 12)] = 1          # round
+        labels[t][_disk(H, W, 22, 60, 12)] = 2          # round
+        labels[t][16:28, 45:82] = 3                      # elongated bar
+        labels[t][45:82, 16:28] = 4                      # elongated bar
+        labels[t][_disk(H, W, 65, 65, 11)] = 5           # round
+    model = shape_modes.fit_shape_modes(labels, n_modes=2)
+    assert model is not None and model["n_modes"] == 2
+    assert 0.0 <= model["entropy"] <= 1.0                # 2 modes → ≤1 bit
+    fr, md = shape_modes.cell_mode_series(model, 3)
+    assert fr.size == T
+    x, y = shape_modes.mode_contour(model["mode_signatures"][0])
+    assert x.size == shape_modes.N_POINTS + 1
+    # round vs elongated land in different modes
+    assert model["by_cell_frame"][(1, 0)] != model["by_cell_frame"][(3, 0)]
+
+
 def test_cell_series_and_history():
     from maskviewer.io import load_masks
     m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))
