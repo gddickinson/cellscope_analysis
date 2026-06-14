@@ -56,21 +56,68 @@ Read this before opening source files. Update it when modules change.
   / masks lazily. A folder qualifies if it has a `*.ome.tif` + (ideally)
   `pipeline_results/masks.npz`.
 
-### maskviewer/gui/  — PyQt5 + pyqtgraph
-- **image_view.py** — `ImageCanvas`: base grayscale `ImageItem` + label
-  overlay `ImageItem` in one locked-aspect viewbox. `make_label_lut`
-  (stable per-ID colours), `label_boundaries` (outline mode), `set_base`,
-  `set_overlay`, emits `cellHovered(int)`.
-- **controls.py** — `ControlPanel`: recording / channel combos, frame
-  slider+spinbox, show-masks + outline checkboxes, opacity slider. Emits
-  `recordingChanged / channelChanged / frameChanged / overlayChanged`.
-- **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, wires
-  controls↔canvas, caches per-channel contrast levels, status bar
-  (frame/time/scale/cell-count/hover), ←/→ frame stepping.
+### maskviewer/gui/  — PyQt5 + pyqtgraph (dockable workbench)
+- **image_view.py** — `ImageCanvas`: base grayscale `ImageItem` (user LUT +
+  display levels) + label overlay `ImageItem` + an `Overlays` layer, in one
+  locked-aspect viewbox. `make_label_lut` (stable per-ID colours),
+  `scalar_label_lut` (colour-by-feature), `label_boundaries` (outline mode),
+  `set_base(img, levels, lut)`, `set_base_layers([...])` (additive composite of
+  several channels), `set_overlay(...)`, emits `cellHovered(int)` +
+  `cellClicked(int)`, `zoom`/`autorange`.
+- **overlays.py** — `Overlays`: scale bar, frame/time text, cell-ID labels,
+  track trails, selected-cell highlight; corner items re-anchor on pan/zoom.
+- **luts.py** — `build_lut(colormap, gamma, invert)` → RGBA LUT, `PRESETS`,
+  and `DisplayState` (the per-channel levels/colormap/gamma/invert record).
+  No Qt import (testable headless).
+- **panels/** — each a signal-only `QWidget` dock:
+  - **timeline.py** `TimelinePanel` — frame slider + play/pause/fps/loop +
+    time readout (bottom bar). Emits `frameChanged`.
+  - **display_panel.py** `DisplayPanel` — recording/channel pickers, composite
+    toggle + per-channel visibility, mask show/outline/opacity, colour-by
+    (id/state/area/track), overlay toggles.
+  - **image_adjust.py** `ImageAdjustPanel` — histogram + draggable levels,
+    brightness/contrast sliders, gamma, colormap, invert, auto/reset. Emits
+    `displayChanged`; `state()`/`set_state()` for per-channel persistence.
+  - **cell_info.py** `CellInfoPanel` — selected-cell summary + a combo to plot
+    ANY per-frame characteristic (shape, state, speed, displacement, turning,
+    per-channel intensity) over time, plus an MSD (log-log) view with α fit.
+  - **edge_panel.py** `EdgePanel` — membrane protrusion/retraction kymograph
+    (angle×time, blue=retraction/red=protrusion) + radius map + summary +
+    kymograph CSV export, for the selected cell.
+- **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/Window/Help.
+- **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
+  a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
+- **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
+  docks (Display + Cell-Info + Edge-Dynamics tabbed + Image-Adjust right;
+  Timeline bottom), wires panels↔canvas, split base/overlay rendering (single
+  or additive **composite** of visible channels with per-channel default LUTs),
+  colour-by id/state/area/track, click-to-select → Cell-Info + Edge dock, layout
+  save/restore (QSettings) + Reset Layout, status bar, ←/→/Space shortcuts.
 
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
   `track_lengths`, `centroids`, `summary(labels, um_per_px)`. No GUI/IO deps.
+- **cell_metrics.py** — moment-based morphometry (no skimage): `regionprops_frame`
+  (area, centroid, bbox, axes, eccentricity, aspect ratio, orientation, extent,
+  optional solidity, + `edge` flag and per-frame `state`), `per_frame_records`
+  (with `progress_cb`), `centroid_history` (fast trails), `cell_series`, and
+  `cell_frame_table` (ALL per-frame metrics for one cell — shape, state_code,
+  speed, displacement, turning angle, per-channel intensity — for the cell panel).
+- **motion.py** — centroid-track motion: `instantaneous_speed`,
+  `displacement_metrics` (net/path/straightness/speed), `direction_autocorrelation`
+  + `persistence` (lag-1, speed-unbiased), `msd` + `fit_msd` (D, α exponent),
+  `turning_angles`, `motion_summary`.
+- **state.py** — `classify_state` → rounded/spread/edge/unknown per cell-frame
+  (CellScope IC295 rule: area ≤ 960 µm² AND ecc ≤ 0.85 → rounded), `STATE_CODE`,
+  `STATE_COLOR`.
+- **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
+  `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
+  mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
+  (protrusion/retraction/net/ruffling), `edge_summary_for_cell`.
+- **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
+  (region props + state), `per_cell_table` (track + shape + motion, optional
+  `with_edge` protrusion/retraction columns), `track_table` (trajectories),
+  `export_all` (single shared per-frame pass + `progress_cb`). Needs pandas.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the
   CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,
   `tracks()`) + the experimental design (`ARMS`, `VEHICLE`) +
@@ -97,6 +144,9 @@ Read this before opening source files. Update it when modules change.
 ## tests/
 - **test_io.py** — smoke tests (discover / load / summary) against the
   synthetic sample; regenerates it if missing. Needs `pytest`.
+- **test_analysis.py** — cell_metrics / motion / exporters (known-answer
+  synthetic arrays + the sample): shape morphometry, persistence vs
+  straightness, CSV table shapes + writing.
 
 ## Config / data
 - **config.example.json** — committed template for `config.json` (gitignored,

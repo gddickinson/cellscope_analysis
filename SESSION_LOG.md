@@ -5,6 +5,93 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Membrane dynamics, composite, threaded export, rich cell plots
+
+Second workbench pass (options 2–4 + richer cell info), informed by a deep read
+of CellScope's analysis code (radial edge kymograph; the rounded/spread state
+rule — replicated so values stay comparable to docs/FINDINGS_followup).
+
+- **Edge / membrane dynamics** (`analysis/edge_dynamics.py`, no cv2): radial
+  edge-velocity kymograph — boundary sampled into 72 angular sectors about the
+  **mid-centroid** (removes whole-cell translation), median radius/sector,
+  velocity = Δr·µm/dt (+protrusion/−retraction), angular Savitzky-Golay +
+  temporal Gaussian smoothing; `edge_summary` (protrusion/retraction/net/
+  ruffling). New **Edge Dynamics dock** (`panels/edge_panel.py`) shows the
+  kymograph (angle×time, RdBu) / radius map + summary + CSV export for the
+  selected cell. Verified on a real cell: clear protrusion/retraction waves.
+- **Composite multi-channel view**: `ImageCanvas.set_base_layers` blends
+  channels additively (DIC grey + SiR-actin Cy5 magenta); `DisplayPanel` gains a
+  Composite toggle + per-channel visibility; window assigns sensible default
+  LUTs per channel (Cy5→magenta, DIC→grey, …) and orders grey channels at the
+  bottom.
+- **Threaded CSV export**: export now runs on a worker `QThread` with a progress
+  bar + Cancel (UI stays responsive). `export_all` shares ONE per-frame
+  regionprops pass between the per_frame + per_cell tables; optional
+  edge-dynamics columns in per_cell.
+- **Per-frame state + richer cell info**: `analysis/state.py` classifies each
+  cell-frame rounded/spread/edge/unknown (CellScope IC295 rule, area+ecc);
+  `regionprops_frame` now carries `edge`+`state`; new colour-by **Cell state**.
+  `cell_metrics.cell_frame_table` returns ALL per-frame series for one cell
+  (shape, state, speed, displacement, turning angle, per-channel intensity); the
+  Cell-Info panel plots any of them + an **MSD log-log view with α/D fit**
+  (`motion.fit_msd`, `motion.turning_angles`).
+
+Verified headless (`QT_QPA_PLATFORM=offscreen`): 5 docks, composite blend, state
+colour-by, 16-metric cell plot combo, edge kymograph, edge-included export, all
+OK. `pytest` 18 passed (added edge/state/cell_frame_table/MSD-fit tests). Every
+file < 500 lines. Next: cross-recording comparison/superplot dock; VAMPIRE-style
+shape modes; per-protrusion event detection.
+
+---
+
+## 2026-06-13 — Viewer UX overhaul → dockable workbench + CSV export
+
+Reworked the GUI from a fixed splitter into a **dockable workbench** and added
+the analysis-export foundation. Motivated by: this app is now the analysis
+bench (CellScope does mask *creation*); research confirmed the science is
+**PIEZO1** (YODA1 = agonist; GOF/KO = PIEZO1 variants; OT = Otenabant, a CB1
+antagonist — user-confirmed), pointing the metric set at shape + motion.
+
+**GUI (PyQt5 + pyqtgraph), all panels detachable/resizable QDockWidgets:**
+- **Timeline moved below the view** (full-width bottom dock) with play/pause,
+  fps, loop, frame/time readout (`panels/timeline.py`).
+- **Image controls** (`panels/image_adjust.py`): histogram + draggable min/max
+  levels, brightness/contrast sliders (synced to the levels), gamma, colormap
+  LUT (grey/red/green/blue/magenta/cyan + matplotlib maps), invert, Auto
+  (1–99 pct) + Reset — **per-channel** (cached as `luts.DisplayState`).
+- **Display panel** (`panels/display_panel.py`): recording/channel, mask
+  show/outline/opacity, **colour-by** (Cell ID / per-frame area / track
+  length), overlay toggles.
+- **Overlays** (`overlays.py`): scale bar, frame/time text, cell-ID labels,
+  track trails, selected-cell highlight (corner items re-anchor on pan/zoom).
+- **Cell-info panel** (`panels/cell_info.py`): click a cell → metrics + an
+  area/speed-over-time plot with a current-frame marker.
+- **Menus** (`menus.py`): File/View/Image/Analysis/Window/Help (Window lists
+  dock toggles + Reset Layout); QSettings layout persistence.
+- `ImageCanvas` extended for user LUT+levels, `cellClicked`, colour-by LUTs,
+  zoom; replaced the old `ControlPanel` (controls.py removed).
+
+**Analysis + CSV export (pure, GUI-free, skimage-free):**
+- `analysis/cell_metrics.py` — moment-based morphometry matching skimage
+  (eccentricity/axes via central moments + 1/12; convex-hull solidity).
+- `analysis/motion.py` — speed, net/path/straightness, **direction
+  autocorrelation** (`persistence`, the speed-unbiased measure — straightness
+  is reported but flagged speed-biased per Gorelik & Gautreau 2014), MSD.
+- `analysis/exporters.py` — `per_frame_table` (region props = "masks as CSV"),
+  `per_cell_table` (track+shape+motion), `track_table` (trajectories),
+  `export_all`; tidy, unit-tagged headers for Origin. GUI dialog =
+  `gui/export_dialog.py` (Ctrl+E). On a real 2048²×97 recording: load 4.4s,
+  per-cell+tracks export ~12s (synchronous, wait-cursor — thread it later if
+  dense fields feel slow).
+
+Verified headless (`QT_QPA_PLATFORM=offscreen`): 4 docks, timeline at bottom,
+scrub/channel/auto/gamma/colormap/colour-by/overlays/select/reset all OK.
+`pytest` 12 passed (added `tests/test_analysis.py`). Next: comparison/superplot
+dock across recordings, edge-velocity/retraction (kymographs), composite
+multi-channel, MSD/turning-angle plots — see CLAUDE.md roadmap.
+
+---
+
 ## 2026-06-13 — Edge-truncated cells: verified + dynamics now skip them
 
 Checked whether edge cells (masks cut by the border → unreliable shape +
