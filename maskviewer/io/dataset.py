@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from .recording import load_recording, Recording
 from .masks import load_masks, Masks
+from .divisions import load_divisions, divisions_path_for
 
 
 @dataclass
@@ -34,6 +35,11 @@ class Entry:
 
     def load_masks(self) -> Masks | None:
         return load_masks(self.mask_path) if self.mask_path else None
+
+    def load_divisions(self) -> list:
+        """Division events (parent→daughter, frame) from the sibling
+        divisions.json, or [] if none."""
+        return load_divisions(divisions_path_for(self.mask_path))
 
 
 def _first_tif(folder: str) -> str | None:

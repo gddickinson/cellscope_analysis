@@ -37,6 +37,16 @@ Six treatment conditions in **two independent experiments + a vehicle check**
 
 n = 8 recordings per condition.
 
+**What the conditions are (the biology).** This is a **PIEZO1** mechanosensitive
+ion-channel study. The genetic arm is PIEZO1 **WT / GOF (gain-of-function) /
+KO (knockout)**; the drug arm is **DMSO** (vehicle) / **Y1 = YODA1** (the
+canonical PIEZO1 *agonist*) / **OT = Otenabant** (a CB1 cannabinoid-receptor
+antagonist/inverse agonist — note this is *not* a PIEZO1 compound). PIEZO1 acts
+as a brake on keratinocyte migration: KO tends to migrate faster/straighter,
+while GOF and YODA1 slow migration and increase rear retraction (Holt et al.
+2021 *eLife* 65415; Ravichandran et al. 2024 *PLOS Comp Biol*). The Cy5 channel
+is SiR-actin, which labels cortical/stress-fibre actin (not fresh lamellipodia).
+
 ---
 
 ## `data/` layout

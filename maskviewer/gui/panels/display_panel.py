@@ -1,0 +1,164 @@
+"""Display panel — recording / channel pickers + mask & overlay options.
+
+A signal-only QWidget (no data/array logic) so it stays small and reusable. The
+viewer owns the data and reacts: recording/channel selection, mask show /
+outline / opacity, colour-by mode (Cell ID, per-frame area, track length) and
+the overlay toggles (scale bar, info text, cell-ID labels, track trails).
+"""
+from __future__ import annotations
+
+from PyQt5 import QtCore, QtWidgets
+
+from ...analysis import metric_docs
+
+COLOR_BY = [
+    ("Cell ID", "id"), ("Cell state", "state"),
+    ("Area", "area"), ("Perimeter", "perimeter"), ("Circularity", "circularity"),
+    ("Eccentricity", "eccentricity"), ("Aspect ratio", "aspect_ratio"),
+    ("Solidity", "solidity"), ("Extent", "extent"),
+    ("Nearest-neighbour dist", "nn_dist"), ("Neighbour count", "n_neighbors"),
+    ("Mean speed", "speed"), ("Track length", "track"), ("Shape mode", "shape_mode"),
+]
+OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
+            ("ids", "Cell IDs", False), ("trails", "Track trails", False),
+            ("colorbar", "Colour bar", True), ("divisions", "Divisions", False)]
+
+
+class DisplayPanel(QtWidgets.QWidget):
+    recordingChanged = QtCore.pyqtSignal(int)
+    channelChanged = QtCore.pyqtSignal(int)
+    maskOptionsChanged = QtCore.pyqtSignal()
+    colorByChanged = QtCore.pyqtSignal(str)
+    overlayToggled = QtCore.pyqtSignal(str, bool)
+    displayModeChanged = QtCore.pyqtSignal()        # composite on/off or channels
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        outer = QtWidgets.QVBoxLayout(self)
+
+        rec_box = QtWidgets.QGroupBox("Recording")
+        rf = QtWidgets.QFormLayout(rec_box)
+        self.recording = QtWidgets.QComboBox()
+        self.recording.setToolTip("Recording to view")
+        self.recording.currentIndexChanged.connect(self.recordingChanged)
+        self.channel = QtWidgets.QComboBox()
+        self.channel.setToolTip("Channel shown (and the one Image Adjust edits)")
+        self.channel.currentIndexChanged.connect(self.channelChanged)
+        rf.addRow("Recording", self.recording)
+        rf.addRow("Channel", self.channel)
+        self.composite = QtWidgets.QCheckBox("Composite (blend channels)")
+        self.composite.setToolTip("Additively blend the ticked channels "
+                                  "(e.g. DIC grey + Cy5 magenta)")
+        self.composite.toggled.connect(self._composite_toggled)
+        rf.addRow(self.composite)
+        outer.addWidget(rec_box)
+
+        self.comp_box = QtWidgets.QGroupBox("Composite channels")
+        self.comp_box.setEnabled(False)
+        self._comp_layout = QtWidgets.QVBoxLayout(self.comp_box)
+        self._chan_checks = []
+        outer.addWidget(self.comp_box)
+
+        mask_box = QtWidgets.QGroupBox("Masks")
+        mf = QtWidgets.QFormLayout(mask_box)
+        self.show_masks = QtWidgets.QCheckBox("Show masks")
+        self.show_masks.setChecked(True)
+        self.show_masks.setToolTip("Show the segmentation/tracking mask overlay")
+        self.show_masks.toggled.connect(self.maskOptionsChanged)
+        self.outline = QtWidgets.QCheckBox("Outlines only")
+        self.outline.setToolTip("Draw mask outlines instead of filled regions")
+        self.outline.toggled.connect(self.maskOptionsChanged)
+        self.opacity = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.opacity.setRange(0, 100)
+        self.opacity.setValue(50)
+        self.opacity.setToolTip("Mask overlay opacity")
+        self.opacity.valueChanged.connect(self.maskOptionsChanged)
+        self.color_by = QtWidgets.QComboBox()
+        self.color_by.setToolTip("Colour cells by a calculated metric "
+                                 "(the colour bar shows its units)")
+        _tipkey = {"state": "state_code"}
+        for i, (label, key) in enumerate(COLOR_BY):
+            self.color_by.addItem(label)
+            tip = metric_docs.tooltip(_tipkey.get(key, key))
+            if tip:
+                self.color_by.setItemData(i, tip, QtCore.Qt.ToolTipRole)
+        self.color_by.currentIndexChanged.connect(
+            lambda i: self.colorByChanged.emit(COLOR_BY[i][1]))
+        self.fixed_scale = QtWidgets.QCheckBox("Fixed colour scale")
+        self.fixed_scale.setToolTip("Lock the colour-by scale across all frames "
+                                    "(comparable colours over time) instead of "
+                                    "per-frame auto-scaling")
+        self.fixed_scale.toggled.connect(self.maskOptionsChanged)
+        mf.addRow(self.show_masks)
+        mf.addRow(self.outline)
+        mf.addRow("Opacity", self.opacity)
+        mf.addRow("Colour by", self.color_by)
+        mf.addRow(self.fixed_scale)
+        outer.addWidget(mask_box)
+
+        ov_box = QtWidgets.QGroupBox("Overlays")
+        ovl = QtWidgets.QVBoxLayout(ov_box)
+        self.ov = {}
+        for key, label, default in OVERLAYS:
+            cb = QtWidgets.QCheckBox(label)
+            cb.setChecked(default)
+            cb.toggled.connect(lambda on, k=key: self.overlayToggled.emit(k, on))
+            self.ov[key] = cb
+            ovl.addWidget(cb)
+        outer.addWidget(ov_box)
+        outer.addStretch(1)
+
+    # -- populate / accessors -------------------------------------------
+    def set_recordings(self, entries):
+        self.recording.blockSignals(True)
+        self.recording.clear()
+        for e in entries:
+            tag = f"{e.condition}/{e.label}" if e.condition else e.label
+            self.recording.addItem(tag)
+        self.recording.blockSignals(False)
+
+    def set_channels(self, names):
+        self.channel.blockSignals(True)
+        self.channel.clear()
+        self.channel.addItems(list(names))
+        self.channel.blockSignals(False)
+        for cb in self._chan_checks:
+            cb.setParent(None)
+            cb.deleteLater()
+        self._chan_checks = []
+        for i, n in enumerate(names):
+            cb = QtWidgets.QCheckBox(n or f"ch{i}")
+            cb.setChecked((n or "").strip().lower() not in ("none", ""))
+            cb.toggled.connect(self.displayModeChanged)
+            self._comp_layout.addWidget(cb)
+            self._chan_checks.append(cb)
+
+    def current_channel(self) -> int:
+        return max(self.channel.currentIndex(), 0)
+
+    def color_by_mode(self) -> str:
+        return COLOR_BY[max(self.color_by.currentIndex(), 0)][1]
+
+    def set_color_by(self, key):
+        for i, (_label, k) in enumerate(COLOR_BY):
+            if k == key:
+                self.color_by.setCurrentIndex(i)
+                return
+
+    def composite_on(self) -> bool:
+        return self.composite.isChecked()
+
+    def fixed_scale_on(self) -> bool:
+        return self.fixed_scale.isChecked()
+
+    def visible_channels(self) -> list:
+        on = [i for i, cb in enumerate(self._chan_checks) if cb.isChecked()]
+        return on or [self.current_channel()]
+
+    def _composite_toggled(self, on):
+        self.comp_box.setEnabled(on)
+        self.displayModeChanged.emit()
+
+    @property
+    def opacity_value(self) -> float:
+        return self.opacity.value() / 100.0

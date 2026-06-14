@@ -1,85 +1,115 @@
 # cellscope_analysis
 
-View and analyse **CellScope detection results** — microscopy recordings
-(`.ome.tif`) with their segmentation/tracking masks (`masks.npz`) — in a
-lightweight PyQt5 + pyqtgraph GUI, plus a GUI-free analysis package to build
-on.
+A **viewer + analysis workbench** for [CellScope](https://github.com/gddickinson/cellscope)
+detection results — microscopy recordings (`.ome.tif`) with their
+segmentation/tracking masks (`masks.npz`). CellScope *produces and edits* the
+masks; this app is the **bench for analysing them**: view recordings with mask
+overlays, inspect individual tracked cells, quantify shape / motility / membrane
+dynamics, compare all cells in a recording, and export everything as CSV.
 
-This is a companion to the [CellScope](https://github.com/gddickinson/cellscope)
-pipeline: CellScope *produces* the masks; this project *views and analyses*
-them. It is intentionally small and modular, meant to grow.
+CPU-only (no GPU/torch). PyQt5 + pyqtgraph GUI; a pure, GUI-free `maskviewer/analysis`
+package does the maths. Built for a **PIEZO1** keratinocyte-migration study
+(see `docs/DATA.md`), but general to any CellScope recording.
 
-![recording with mask overlay (synthetic sample)](docs/preview.png)
+![overview — masks coloured by a metric with a units colour bar](docs/screenshots/overview.png)
+
+## Highlights
+
+- **Dockable workbench** — every panel detaches/resizes; layout persists. The
+  time bar sits below the view (play/pause, fps, loop).
+- **Full image controls** — histogram + draggable levels, brightness/contrast,
+  gamma, colormap (LUT), invert, auto; per channel; **composite** multi-channel
+  blend (DIC grey + SiR-actin Cy5 magenta).
+- **Colour cells by any metric** with a **units colour bar** (area, circularity,
+  speed, nearest-neighbour, shape mode, …); per-frame state colouring.
+- **Per-cell inspection** — click a cell → metrics + plot of *any* per-frame
+  characteristic (shape, perimeter, circularity, convexity, state, speed,
+  displacement, turning, IoU, nearest-neighbour, per-channel intensity / membrane
+  metrics) + MSD (log/linear, α/D + Fürth persistence-time) + direction
+  autocorrelation.
+- **Membrane dynamics** — protrusion/retraction **kymograph** + a per-frame edge
+  map coloured by edge velocity, with event detection.
+- **Shape modes** — VAMPIRE-style clustering (mode shapes, fractions, entropy,
+  eigenshapes).
+- **Population** — all cells at once: time series, mean ± SEM/SD, histogram,
+  scatter, **flower plot**, lineage tree + division timeline; with filtering.
+- **Sortable per-cell table**, **CSV export** (per-frame / per-cell / tracks,
+  for Origin/Prism), **save any plot** (PNG/SVG), and a **Help ▸ Metrics
+  Reference** documenting every metric + tooltips throughout.
+
+| Cell inspection | Population (flower) | Shape modes |
+|---|---|---|
+| ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
+
+*(Screenshots use the bundled synthetic sample — no real data is committed.)*
 
 ## Environment
 
-**CPU-only — no GPU, no torch/cellpose.** It only views/analyses
-pre-computed masks. Create the dedicated env once:
-
 ```bash
-conda env create -f environment.yml      # python, numpy, tifffile, pyqtgraph, PyQt5, matplotlib, pytest
-conda activate cellscope_analysis
+conda env create -f environment.yml      # python, numpy, scipy, pandas, sklearn,
+conda activate cellscope_analysis        # tifffile, pyqtgraph, PyQt5, matplotlib, pytest
 ```
-
-(The CellScope `cellpose4` env also has these deps if you'd rather reuse it.)
 
 ## Quick start
 
 ```bash
-# 1) (optional) make the bundled synthetic sample so it runs with no setup
-python scripts/make_sample_data.py
-
-# 2) launch — discovers recordings from config.json, else the sample
-python main_viewer.py
-
-# point at your own results instead:
+python scripts/make_sample_data.py        # (optional) write the synthetic sample
+python main_viewer.py                      # discovers from config.json, else the sample
 python main_viewer.py --data-root /path/to/results/by_condition
-# or open one recording directly:
 python main_viewer.py --recording R.ome.tif --masks R/pipeline_results/masks.npz
 ```
 
-In the GUI: pick a recording, choose a channel, scrub frames (slider or
-**←/→**), toggle **Show masks** / **Outlines only**, set overlay **opacity**.
-The status bar shows frame, time, µm/px, cell count, and the cell ID under
-the cursor.
+In the GUI: pick a recording + channel, scrub frames (slider or **←/→**, Space =
+play), toggle masks/overlays, set **Colour by** a metric, and click a cell to
+inspect it. Heavier analyses (Population, Shape Modes, Cell Table) have a
+**Compute** button.
+
+## Self-drive (headless remote control)
+
+For automated testing / agent workflows, set `MASKVIEWER_REMOTE=<port>` to expose
+a localhost HTTP API that drives the GUI on its own thread:
+
+```bash
+MASKVIEWER_REMOTE=8765 python main_viewer.py
+curl 'http://127.0.0.1:8765/state'
+curl 'http://127.0.0.1:8765/set?recording=0&frame=5&color_by=area'
+curl 'http://127.0.0.1:8765/cmd?action=compute_population'
+curl 'http://127.0.0.1:8765/screenshot?path=/tmp/v.png&what=window'
+```
+
+GUI changes can also be verified headless with `QT_QPA_PLATFORM=offscreen` (see
+`SESSION_LOG.md`). File ▸ **Save View Image / Save Window Screenshot** grab PNGs.
 
 ## Pointing at your data
 
 Real data is **not** stored in this repo. Copy the template and edit:
 
 ```bash
-cp config.example.json config.json     # config.json is gitignored
-# set "data_roots" to your CellScope results, e.g.
-#   ".../cellscope/ic295_analysis/by_condition"
+cp config.example.json config.json     # gitignored
+# "data_roots": [".../cellscope/ic295_analysis/by_condition"]
 ```
 
-Each root is scanned recursively for recording folders (a `*.ome.tif` plus a
-`pipeline_results/masks.npz`). The bundled synthetic `sample_data/` is always
-available as a fallback.
+Each root is scanned for recording folders (`*.ome.tif` + `pipeline_results/masks.npz`).
+The bundled synthetic `sample_data/` is always available as a fallback.
 
 ## Data formats
 
 | | format |
 |---|---|
-| Recording | `*.ome.tif`, `(T, C, H, W)` uint16 + `*.ome.json` sidecar (`um_per_px`, `time_interval_min`, `channel_names`) |
-| Masks | `masks.npz`, key `labels`, `(T, H, W)` int32 — `0`=background, positive IDs are cells consistent across frames |
+| Recording | `*.ome.tif`, `(T, C, H, W)` uint16 + `*.ome.json` (`um_per_px`, `time_interval_min`, `channel_names`) |
+| Masks | `masks.npz`, key `labels`, `(T, H, W)` int32 — `0`=bg, positive IDs track-consistent |
+| Divisions | `pipeline_results/divisions.json` (optional) — parent→daughter events |
 
-**What the data is and how the masks were made** — see
-[`docs/DATA.md`](docs/DATA.md): the IC295 dataset, the `data/` folder layout,
-every per-recording file, and the CellScope detection → review → cleaning
-provenance.
+**What the data is + how masks were made** — see [`docs/DATA.md`](docs/DATA.md).
 
-## Analysis
+## Analysis package
 
-`maskviewer/analysis/label_stats.py` provides pure NumPy functions over a
-label stack — `n_cells_per_frame`, `cell_areas_px`, `track_lengths`,
-`centroids`, `summary`. Build further analysis here (see `CLAUDE.md` for
-seeds).
-
-## Layout
-
-See **INTERFACE.md** for the full map. `maskviewer/{io,gui,analysis}` +
-`main_viewer.py` + `scripts/` + `tests/`.
+Pure, GUI-free, testable functions in `maskviewer/analysis/` — morphometry
+(`cell_metrics`), motion (`motion`), state (`state`), nearest-neighbour
+(`neighbors`), edge dynamics (`edge_dynamics`), shape modes (`shape_modes`),
+membrane quality (`membrane`), population (`population`), lineage (`lineage`),
+CSV export (`exporters`), and metric docs (`metric_docs`). See **INTERFACE.md**
+for the full map.
 
 ## Tests
 

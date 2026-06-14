@@ -5,6 +5,266 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Fix: window too large / not resizable
+
+The stacked right docks (tabbed group + Image-Adjust) forced a ~1188 px minimum
+window height, so on smaller screens the window opened oversized with its resize
+edges off-screen. Fixes: (1) each dock's panel is wrapped in a resizable
+`QScrollArea` so a tall panel scrolls instead of inflating the window
+(minimumSizeHint 499×1188 → 289×443); (2) `setMinimumSize(720, 480)`;
+(3) initial size capped to the available screen; (4) `_fit_to_screen()` clamps a
+restored/oversized geometry and re-centres it on-screen at startup. Verified the
+window now shrinks to 720×480 and stays on-screen; panels reachable; tests pass.
+
+---
+
+## 2026-06-13 — Self-drive remote, screengrab, illustrated README
+
+- **Self-drive remote** (`gui/remote.py`, `MASKVIEWER_REMOTE=<port>`): a
+  localhost HTTP server (off by default) that drives the GUI for headless/agent
+  workflows — `/state`, `/set` (recording/frame/channel/colour-by/selected),
+  `/cmd` (compute_population/shape/table, raise dock, overlay…), `/screenshot`.
+  Commands marshal to the GUI thread via a queue drained by a QTimer.
+  `remote_*` handlers live on `WindowActionsMixin`. Verified end-to-end (HTTP →
+  GUI thread → grab → PNG).
+- **Screengrab**: File ▸ Save View Image (canvas) / Save Window Screenshot.
+- **Illustrated README**: drove the GUI headless on the synthetic sample and
+  captured `docs/screenshots/{overview,cell_info,population,shape_modes,
+  edge_dynamics}.png`; rewrote README around the workbench + embedded them +
+  documented the remote hook. (Synthetic sample only — public-repo data policy.)
+- Docs: INTERFACE (remote/plot_export/window_actions/cell_table), CLAUDE
+  (run + Done + roadmap) updated.
+
+`pytest` 27 passed; default (no-remote) build unaffected; all files < 500 lines.
+
+---
+
+## 2026-06-13 — Single-recording push (part 2): CellScope analysis-audit gaps
+
+A background agent audited every CellScope analysis file; implemented the
+mask/image-computable per-recording gaps it found:
+- **convexity** (hull-perim/perim — perimeter-based ruffling) + **rel_area**
+  (area / cell's 90th-pct, scale-free footprint collapse) — per-frame metrics.
+- **membrane.py**: `boundary_confidence` (gradient along contour),
+  `intensity_contrast`, `texture_contrast`, `membrane_score` — per-channel in the
+  cell plot (boundary_grad_/membrane_score_ + existing intensity/membrane_contrast).
+- **Fürth/PRW MSD fit** (`motion.fit_furth` → D + persistence-time P) — shown in
+  the Cell-Info MSD title + per_cell export.
+- **per_cell QC + contact**: density-stratified speed (isolated vs crowded) +
+  frac_isolated, area-stability (CV / max-min / large-jumps), composite
+  **track_quality** score.
+- **VAMPIRE eigenshapes** (PCA components ± mean) + per-PC variance + normalised
+  entropy, drawn in the Shape-Modes dock.
+All surface automatically in the configurable cell-plot / colour-by / Config menu
+(30 metrics now). Consciously deferred (documented): per-state segment
+MSD/straightness suite, Sarle bimodality, shape min/max, small-τ MSD option —
+low marginal value or CellScope-specific. `pytest` 27 passed; all files < 500.
+
+---
+
+## 2026-06-13 — Single-recording push (part 1): lineage, correlation/autocorr, edge events, cell table, save-plots, click-select, fixed scale, layout
+
+Eight requested single-recording / UX items:
+- **Cell division & lineage** (A1): load `divisions.json` (io/divisions.py),
+  `analysis/lineage.py` (track spans, lineage rows, division counts, relatives);
+  Population gains **Lineage tree** + **Division timeline** plots; Cell-Info
+  shows parent/daughter; a **Divisions** overlay marks dividing cells.
+- **Correlation & autocorrelation** (A2): Population **Scatter (X vs Y)**
+  (per-cell, click a point → select); Cell-Info **Direction-autocorrelation**
+  curve.
+- **Per-protrusion edge events** (A3): `edge_dynamics.edge_events` (sustained
+  protrusion/retraction runs → counts, rates, durations, strengths) shown in the
+  edge panel + per_cell `with_edge` export.
+- **Sortable per-cell table** (A4): new Cell-Table dock (sortable, row→select,
+  CSV export).
+- **Save plots** (U1): PNG/SVG buttons on cell-info, edge, shape, population
+  (gui/plot_export.py).
+- **Click-to-select linking** (U2): `ViewerWindow.select_cell` centralises
+  selection; table rows + scatter points select the cell everywhere.
+- **Fixed colour scale** (U3): Display toggle; `colorby` uses a cached global
+  metric range (scalar_label_lut gained vmin/vmax).
+- **Layout presets & polish** (U4): Window ▸ Show All Panels / Save Current
+  Layout; sensible default dock width. Menu-action methods split into
+  `gui/window_actions.py` (file-size).
+
+`pytest` 23 passed; headless smoke covered every item; lineage verified on a
+real recording (5 divisions). All files < 500 lines. Part 2 (next): the
+CellScope analysis audit gaps.
+
+---
+
+## 2026-06-13 — Colour bar, metrics reference + tooltips, Population tab
+
+- **Units colour bar** for the main display: a `ColorBarItem` on the canvas shows
+  the value range + units of the current colour-by metric (hidden for
+  categorical id/state/shape-mode); Display ▸ "Colour bar" toggle. `colorby`
+  now returns `(lut, legend)`; the bar's colormap is built from matplotlib
+  (pyqtgraph's `colormap.get` crashes on non-builtin names).
+- **Metrics reference + tooltips**: `analysis/metric_docs.py` is one source of
+  what-each-metric-indicates + how-it's-calculated. Help ▸ **Metrics Reference…**
+  opens an HTML dialog; tooltips added to the Config metric menu, the cell-plot
+  and colour-by combos (per item), and the main controls (timeline, image
+  adjust, display, edge).
+- **Edge "this frame" crop**: the per-frame edge map now auto-crops to the
+  cell's max radius and centres on it (stable view as you scrub).
+- **Population tab** (`analysis/population.py` + `panels/population_panel.py`):
+  plot any metric across ALL cells of the recording — every-cell time series,
+  **mean ± SEM/SD** error band (with optional individual curves), **histogram**,
+  and a **flower plot** (origin-centred trajectories). Filters: min track
+  length, cell state, exclude edge. Lazy compute + cache (one regionprops pass +
+  per-frame speed). Inspired by CellScope's flower/comparison plots.
+
+Verified headless + screenshots (flower, mean±error). `pytest` 23 passed (added
+population + colour-bar/docs coverage). All files < 500 lines (colour-by logic
+split into `gui/colorby.py`). Next big item: cross-recording / treatment
+comparison (superplots across conditions).
+
+---
+
+## 2026-06-13 — VAMPIRE shape modes + edge maps + colour-by-metric + linear MSD
+
+- **VAMPIRE shape modes** (`analysis/shape_modes.py`, sklearn): each cell-frame
+  boundary → aligned, scale-normalised radial signature (reusing the edge
+  sampler) → PCA + K-means into recurrent **shape modes**; per cell-frame mode,
+  mode mean-shapes, mode fractions, Shannon-entropy heterogeneity. New **Shape
+  Modes dock** (mode shapes + fraction bars + entropy, lazy compute) and a
+  per-cell `shape_mode` series in the cell plot. (~7.5 s fit on a real 2048²
+  recording → 674 contours / 5 modes; lazy + cached.) This was the last
+  un-ported CellScope per-frame analysis.
+- **Per-frame edge map** in the Edge dock: besides the velocity/radius
+  kymographs, a view drawing the selected cell's boundary in the **current
+  frame**, each boundary point coloured by per-sector edge velocity (RdBu) or
+  radius — a spatial "where is it protruding/retracting now" view. Window feeds
+  the current frame to the dock on scrub + selection.
+- **Colour the main display by calculated metrics**: colour-by now offers area,
+  perimeter, circularity, eccentricity, aspect ratio, solidity, extent,
+  nearest-neighbour distance/count, mean speed, track length and shape mode
+  (per-frame metrics recomputed each frame via `regionprops_frame`; per-cell ones
+  lazily cached). `_overlay_lut` builds a per-cell value→colour LUT.
+- **Linear MSD** plot option alongside the log-log MSD (same α/D fit overlay).
+
+Verified headless: shape dock + shape_mode plot, all colour-by modes build LUTs,
+edge per-frame map (526 boundary points coloured), linear+log MSD. `pytest` 21
+passed. All files < 500 lines.
+
+---
+
+## 2026-06-13 — Configurable cell-plot metrics + nearest-neighbour + full CellScope per-frame set
+
+- **Config menu** (`Config ▸ Cell plot metrics`): a checkable item per available
+  per-frame metric; toggling recomputes the selected cell and updates the plot
+  combo **immediately**. The panel owns the enabled set (QSettings-persisted);
+  `cell_frame_table(metrics=…)` computes only the selected series, so expensive
+  ones (solidity, perimeter, intensity, membrane contrast, nearest-neighbour)
+  are skipped when off. Menu rebuilt per recording (intensity/membrane keys
+  depend on channels).
+- **Nearest-neighbour** (`analysis/neighbors.py`): per-cell NN distance + count
+  within a radius (centroid-to-centroid). Added to the cell plot, the per-frame
+  CSV (`nn_dist_*`, `n_neighbors`) and per-cell aggregates. The window provides
+  the cached centroid history to the panel as a lazy neighbour provider.
+- **Completed the CellScope per-frame metric set** so all are plottable:
+  added **perimeter** (Crofton estimate matching skimage) + **circularity**
+  (in `regionprops_frame`/exports too), **consecutive IoU**, **relative
+  area-change**, and **membrane contrast** (inside-vs-outside ring intensity per
+  channel — a boundary/membrane-quality proxy). With the existing area, ecc,
+  aspect ratio, solidity, axes, orientation, extent, state, speed, displacement,
+  turning, MSD and per-channel intensity, the only CellScope analysis not yet
+  ported is **VAMPIRE shape-mode** classification (a population PCA+K-means model
+  — its own recording-level feature; flagged for next).
+
+Verified headless: 23 configurable metrics, immediate toggle on/off, NN +
+membrane + circularity plots, composite + edge unaffected. `pytest` 21 passed
+(added NN / perimeter-circularity / metric-gating tests). All files < 500 lines.
+
+---
+
+## 2026-06-13 — Membrane dynamics, composite, threaded export, rich cell plots
+
+Second workbench pass (options 2–4 + richer cell info), informed by a deep read
+of CellScope's analysis code (radial edge kymograph; the rounded/spread state
+rule — replicated so values stay comparable to docs/FINDINGS_followup).
+
+- **Edge / membrane dynamics** (`analysis/edge_dynamics.py`, no cv2): radial
+  edge-velocity kymograph — boundary sampled into 72 angular sectors about the
+  **mid-centroid** (removes whole-cell translation), median radius/sector,
+  velocity = Δr·µm/dt (+protrusion/−retraction), angular Savitzky-Golay +
+  temporal Gaussian smoothing; `edge_summary` (protrusion/retraction/net/
+  ruffling). New **Edge Dynamics dock** (`panels/edge_panel.py`) shows the
+  kymograph (angle×time, RdBu) / radius map + summary + CSV export for the
+  selected cell. Verified on a real cell: clear protrusion/retraction waves.
+- **Composite multi-channel view**: `ImageCanvas.set_base_layers` blends
+  channels additively (DIC grey + SiR-actin Cy5 magenta); `DisplayPanel` gains a
+  Composite toggle + per-channel visibility; window assigns sensible default
+  LUTs per channel (Cy5→magenta, DIC→grey, …) and orders grey channels at the
+  bottom.
+- **Threaded CSV export**: export now runs on a worker `QThread` with a progress
+  bar + Cancel (UI stays responsive). `export_all` shares ONE per-frame
+  regionprops pass between the per_frame + per_cell tables; optional
+  edge-dynamics columns in per_cell.
+- **Per-frame state + richer cell info**: `analysis/state.py` classifies each
+  cell-frame rounded/spread/edge/unknown (CellScope IC295 rule, area+ecc);
+  `regionprops_frame` now carries `edge`+`state`; new colour-by **Cell state**.
+  `cell_metrics.cell_frame_table` returns ALL per-frame series for one cell
+  (shape, state, speed, displacement, turning angle, per-channel intensity); the
+  Cell-Info panel plots any of them + an **MSD log-log view with α/D fit**
+  (`motion.fit_msd`, `motion.turning_angles`).
+
+Verified headless (`QT_QPA_PLATFORM=offscreen`): 5 docks, composite blend, state
+colour-by, 16-metric cell plot combo, edge kymograph, edge-included export, all
+OK. `pytest` 18 passed (added edge/state/cell_frame_table/MSD-fit tests). Every
+file < 500 lines. Next: cross-recording comparison/superplot dock; VAMPIRE-style
+shape modes; per-protrusion event detection.
+
+---
+
+## 2026-06-13 — Viewer UX overhaul → dockable workbench + CSV export
+
+Reworked the GUI from a fixed splitter into a **dockable workbench** and added
+the analysis-export foundation. Motivated by: this app is now the analysis
+bench (CellScope does mask *creation*); research confirmed the science is
+**PIEZO1** (YODA1 = agonist; GOF/KO = PIEZO1 variants; OT = Otenabant, a CB1
+antagonist — user-confirmed), pointing the metric set at shape + motion.
+
+**GUI (PyQt5 + pyqtgraph), all panels detachable/resizable QDockWidgets:**
+- **Timeline moved below the view** (full-width bottom dock) with play/pause,
+  fps, loop, frame/time readout (`panels/timeline.py`).
+- **Image controls** (`panels/image_adjust.py`): histogram + draggable min/max
+  levels, brightness/contrast sliders (synced to the levels), gamma, colormap
+  LUT (grey/red/green/blue/magenta/cyan + matplotlib maps), invert, Auto
+  (1–99 pct) + Reset — **per-channel** (cached as `luts.DisplayState`).
+- **Display panel** (`panels/display_panel.py`): recording/channel, mask
+  show/outline/opacity, **colour-by** (Cell ID / per-frame area / track
+  length), overlay toggles.
+- **Overlays** (`overlays.py`): scale bar, frame/time text, cell-ID labels,
+  track trails, selected-cell highlight (corner items re-anchor on pan/zoom).
+- **Cell-info panel** (`panels/cell_info.py`): click a cell → metrics + an
+  area/speed-over-time plot with a current-frame marker.
+- **Menus** (`menus.py`): File/View/Image/Analysis/Window/Help (Window lists
+  dock toggles + Reset Layout); QSettings layout persistence.
+- `ImageCanvas` extended for user LUT+levels, `cellClicked`, colour-by LUTs,
+  zoom; replaced the old `ControlPanel` (controls.py removed).
+
+**Analysis + CSV export (pure, GUI-free, skimage-free):**
+- `analysis/cell_metrics.py` — moment-based morphometry matching skimage
+  (eccentricity/axes via central moments + 1/12; convex-hull solidity).
+- `analysis/motion.py` — speed, net/path/straightness, **direction
+  autocorrelation** (`persistence`, the speed-unbiased measure — straightness
+  is reported but flagged speed-biased per Gorelik & Gautreau 2014), MSD.
+- `analysis/exporters.py` — `per_frame_table` (region props = "masks as CSV"),
+  `per_cell_table` (track+shape+motion), `track_table` (trajectories),
+  `export_all`; tidy, unit-tagged headers for Origin. GUI dialog =
+  `gui/export_dialog.py` (Ctrl+E). On a real 2048²×97 recording: load 4.4s,
+  per-cell+tracks export ~12s (synchronous, wait-cursor — thread it later if
+  dense fields feel slow).
+
+Verified headless (`QT_QPA_PLATFORM=offscreen`): 4 docks, timeline at bottom,
+scrub/channel/auto/gamma/colormap/colour-by/overlays/select/reset all OK.
+`pytest` 12 passed (added `tests/test_analysis.py`). Next: comparison/superplot
+dock across recordings, edge-velocity/retraction (kymographs), composite
+multi-channel, MSD/turning-angle plots — see CLAUDE.md roadmap.
+
+---
+
 ## 2026-06-13 — Edge-truncated cells: verified + dynamics now skip them
 
 Checked whether edge cells (masks cut by the border → unreliable shape +

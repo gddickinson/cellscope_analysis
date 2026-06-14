@@ -56,21 +56,119 @@ Read this before opening source files. Update it when modules change.
   / masks lazily. A folder qualifies if it has a `*.ome.tif` + (ideally)
   `pipeline_results/masks.npz`.
 
-### maskviewer/gui/  — PyQt5 + pyqtgraph
-- **image_view.py** — `ImageCanvas`: base grayscale `ImageItem` + label
-  overlay `ImageItem` in one locked-aspect viewbox. `make_label_lut`
-  (stable per-ID colours), `label_boundaries` (outline mode), `set_base`,
-  `set_overlay`, emits `cellHovered(int)`.
-- **controls.py** — `ControlPanel`: recording / channel combos, frame
-  slider+spinbox, show-masks + outline checkboxes, opacity slider. Emits
-  `recordingChanged / channelChanged / frameChanged / overlayChanged`.
-- **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, wires
-  controls↔canvas, caches per-channel contrast levels, status bar
-  (frame/time/scale/cell-count/hover), ←/→ frame stepping.
+### maskviewer/gui/  — PyQt5 + pyqtgraph (dockable workbench)
+- **image_view.py** — `ImageCanvas`: base grayscale `ImageItem` (user LUT +
+  display levels) + label overlay `ImageItem` + an `Overlays` layer, in one
+  locked-aspect viewbox. `make_label_lut` (stable per-ID colours),
+  `scalar_label_lut` (colour-by-feature), `label_boundaries` (outline mode),
+  `set_base(img, levels, lut)`, `set_base_layers([...])` (additive composite of
+  several channels), `set_overlay(...)`, `set_colorbar(legend)` (units colour bar
+  for colour-by, via a `ColorBarItem`), emits `cellHovered(int)` +
+  `cellClicked(int)`, `zoom`/`autorange`.
+- **colorby.py** — `overlay_lut(win, lab)` → `(label-LUT, legend)` for the
+  current colour-by metric (legend = lo/hi/cmap/units for the colour bar).
+- **overlays.py** — `Overlays`: scale bar, frame/time text, cell-ID labels,
+  track trails, selected-cell highlight; corner items re-anchor on pan/zoom.
+- **luts.py** — `build_lut(colormap, gamma, invert)` → RGBA LUT, `PRESETS`,
+  and `DisplayState` (the per-channel levels/colormap/gamma/invert record).
+  No Qt import (testable headless).
+- **panels/** — each a signal-only `QWidget` dock:
+  - **timeline.py** `TimelinePanel` — frame slider + play/pause/fps/loop +
+    time readout (bottom bar). Emits `frameChanged`.
+  - **display_panel.py** `DisplayPanel` — recording/channel pickers, composite
+    toggle + per-channel visibility, mask show/outline/opacity, colour-by (id /
+    state / area / perimeter / circularity / eccentricity / aspect-ratio /
+    solidity / extent / nearest-neighbour / neighbour-count / mean-speed /
+    track-length / shape-mode), overlay toggles.
+  - **image_adjust.py** `ImageAdjustPanel` — histogram + draggable levels,
+    brightness/contrast sliders, gamma, colormap, invert, auto/reset. Emits
+    `displayChanged`; `state()`/`set_state()` for per-channel persistence.
+  - **cell_info.py** `CellInfoPanel` — selected-cell summary + a combo to plot
+    any *enabled* per-frame characteristic (shape, perimeter, circularity, state,
+    speed, displacement, turning, IoU, area-change, nearest-neighbour, intensity,
+    membrane contrast) over time + MSD (log-log **or linear**) with α/D fit. Owns
+    the enabled-metric set (QSettings-persisted); `set_metric_enabled` recomputes
+    immediately.
+  - **edge_panel.py** `EdgePanel` — velocity / radius **kymograph** (angle×time,
+    blue=retraction/red=protrusion) **and a per-frame edge map** (the cell's
+    boundary in the current frame coloured by per-sector velocity or radius) +
+    summary + kymograph CSV export, for the selected cell.
+  - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
+    mode-fraction bars, heterogeneity entropy (lazy compute button).
+  - **population_panel.py** `PopulationPanel` — all-cells plots for the recording:
+    time series / mean ± SEM-or-SD error band / histogram / flower plot / scatter
+    (X vs Y, click→select) / lineage tree / division timeline, with filters
+    (min track length, state, exclude edge); lazy compute + cache.
+  - **cell_table.py** `CellTablePanel` — sortable per-cell metric table; row →
+    select cell; CSV export.
+- **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/**Config**
+  (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help
+  (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
+- **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
+  a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
+- **plot_export.py** — `save_plot(plot, parent)`: PNG/SVG export for any panel plot.
+- **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers +
+  the remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
+  `viewer_window` small.
+- **remote.py** — `RemoteControl`: optional localhost HTTP self-drive
+  (`MASKVIEWER_REMOTE=<port>`); marshals commands to the GUI thread; for headless
+  agent driving + screenshots.
+- **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
+  docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes + Population tabbed +
+  Image-Adjust right; Timeline bottom), wires panels↔canvas, split base/overlay
+  rendering (single or additive **composite**), colour-by any calculated metric
+  + units **colour bar** (`colorby.overlay_lut`), lazy caches (centroid history /
+  track lengths / mean speeds / shape-mode model) shared as providers,
+  click-to-select → Cell-Info + Edge dock, `show_metrics_help`, layout
+  save/restore (QSettings) + Reset Layout, status bar, ←/→/Space shortcuts.
 
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
   `track_lengths`, `centroids`, `summary(labels, um_per_px)`. No GUI/IO deps.
+- **cell_metrics.py** — morphometry (no skimage; perimeter via a Crofton
+  estimate matching skimage): `regionprops_frame` (area, centroid, bbox, axes,
+  eccentricity, aspect ratio, orientation, extent, edge flag, state, optional
+  solidity / perimeter+circularity), `per_frame_records` (+ nearest-neighbour
+  columns, `progress_cb`), `centroid_history`, `cell_series`, and
+  `cell_frame_table` (per-frame series for ONE cell — shape, perimeter,
+  circularity, **convexity**, **rel_area**, state, speed, displacement, turning,
+  consecutive IoU, area-change, nearest-neighbour, and per-channel intensity /
+  membrane-contrast / **boundary-gradient** / **membrane-score**). `metrics=`
+  selects which series to compute. `available_frame_metrics` / `metric_label` /
+  `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
+- **motion.py** — centroid-track motion: `instantaneous_speed`,
+  `displacement_metrics` (net/path/straightness/speed), `direction_autocorrelation`
+  + `persistence` (lag-1, speed-unbiased), `msd` + `fit_msd` (D, α exponent),
+  `fit_furth` (Fürth/PRW D + persistence-time), `turning_angles`, `motion_summary`.
+- **membrane.py** — boundary/membrane quality from mask + image channel:
+  `boundary_confidence` (gradient along contour), `intensity_contrast`,
+  `texture_contrast`, `membrane_score` (composite). PIEZO1-relevant.
+- **state.py** — `classify_state` → rounded/spread/edge/unknown per cell-frame
+  (CellScope IC295 rule: area ≤ 960 µm² AND ecc ≤ 0.85 → rounded), `STATE_CODE`,
+  `STATE_COLOR`.
+- **neighbors.py** — `frame_nn`: per-cell nearest-neighbour distance + count of
+  neighbours within a radius (`DEFAULT_RADIUS_UM`), centroid-to-centroid.
+- **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
+  `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
+  mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
+  (protrusion/retraction/net/ruffling), `edge_summary_for_cell`.
+- **shape_modes.py** — VAMPIRE-style population shape clustering (sklearn):
+  `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
+  per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
+  `cell_mode_series`, `cell_heterogeneity`, `mode_contour`; the model also returns
+  **eigenshapes** (PCA components) + per-PC explained variance + normalised entropy.
+- **population.py** — all-cells analysis for one recording: `population_table`
+  (per-(cell,frame) shape + nearest-neighbour + state + per-frame `speed`),
+  `metric_columns`, `flower_tracks` (origin-centred trajectories).
+- **metric_docs.py** — `doc` / `tooltip` / `as_html`: what each metric indicates
+  + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips).
+- **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
+  (region props incl. perimeter/circularity/state + nearest-neighbour),
+  `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +
+  Fürth D/persistence-time + density-stratified speed + area-stability +
+  track-quality, optional `with_edge` protrusion/retraction columns), `track_table`
+  (trajectories), `export_all` (single shared per-frame pass + `progress_cb`).
+  Needs pandas.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the
   CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,
   `tracks()`) + the experimental design (`ARMS`, `VEHICLE`) +
@@ -97,6 +195,9 @@ Read this before opening source files. Update it when modules change.
 ## tests/
 - **test_io.py** — smoke tests (discover / load / summary) against the
   synthetic sample; regenerates it if missing. Needs `pytest`.
+- **test_analysis.py** — cell_metrics / motion / exporters (known-answer
+  synthetic arrays + the sample): shape morphometry, persistence vs
+  straightness, CSV table shapes + writing.
 
 ## Config / data
 - **config.example.json** — committed template for `config.json` (gitignored,

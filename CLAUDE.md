@@ -7,11 +7,22 @@ file is the first thing to read; `@INTERFACE.md` is the navigation map.
 
 ## What this project is (and isn't)
 
-- **Is**: a GUI to view recordings with their mask overlays, plus a
+- **Is**: the **analysis workbench** for CellScope masks — a dockable PyQt5 +
+  pyqtgraph GUI to view recordings with their mask overlays (full image
+  controls, timeline, overlays, per-cell inspection, CSV export), plus a
   GUI-free `analysis/` package for stats over the label stacks. Built to be
-  **expanded** in future sessions (more analyses, exports, plots).
-- **Isn't**: the detection pipeline. Masks are produced by `cellscope`; here
-  we only *consume* them. Don't re-implement detection.
+  **expanded** (more analyses, exports, comparison plots).
+- **Isn't**: the detection pipeline / mask editor. Masks are produced + edited
+  in `cellscope` (the now-decluttered "GUI_focused"); here we only *consume*
+  them for analysis. Don't re-implement detection.
+
+The science: this is a **PIEZO1** mechanosensitive-channel study in migrating
+keratinocytes. Conditions — genetic: WT / GOF (PIEZO1 gain-of-fn) / KO; drug:
+DMSO (vehicle) / **Y1 = YODA1** (PIEZO1 agonist) / **OT = Otenabant** (a CB1
+antagonist, *not* a PIEZO1 compound). PIEZO1 is a brake on migration (KO faster/
+straighter; GOF/YODA1 slow it + ↑rear retraction). So the high-value readouts
+are **shape + shape-dynamics, edge/retraction dynamics, and direction-
+autocorrelation persistence** (not the speed-biased net/path ratio).
 
 ## Data provenance
 
@@ -70,14 +81,53 @@ python main_viewer.py                     # discover via config.json
 python main_viewer.py --data-root /path/to/by_condition
 python main_viewer.py --recording R.ome.tif --masks M.npz
 python scripts/make_sample_data.py        # (re)create the synthetic sample
+MASKVIEWER_REMOTE=8765 python main_viewer.py   # + localhost HTTP self-drive (see remote.py)
 ```
 
 The CellScope `cellpose4` env also has these deps (`conda run -n cellpose4 …`)
 if you prefer not to make a second env.
 
-GUI: pick a recording, choose a channel, scrub frames (slider or ←/→ keys),
-toggle masks / outlines-only, adjust overlay opacity; the status bar shows
-frame/time/scale/cell-count and the cell under the cursor.
+GUI (dockable workbench — every panel detachable/resizable; layout persists
+via QSettings, View ▸ Window ▸ Reset Layout to restore):
+- **Timeline** (bottom bar): frame slider, play/pause (Space), fps, loop,
+  ←/→ to step.
+- **Image Adjust** dock: histogram + draggable levels (= brightness/contrast),
+  brightness/contrast sliders, gamma, colormap LUT, invert, Auto/Reset —
+  per-channel.
+- **Display** dock: recording/channel, **composite** (blend channels: DIC grey
+  + Cy5 magenta) + per-channel visibility, mask show/outline/opacity, **colour-by
+  any calculated metric** (Cell ID / state / area / perimeter / circularity /
+  eccentricity / aspect ratio / solidity / extent / nearest-neighbour /
+  neighbour count / mean speed / track length / shape mode), overlay toggles
+  (scale bar, frame/time, cell IDs, track trails).
+- **Cell Info** dock: click a cell → summary + plot any *enabled* per-frame
+  characteristic (area, perimeter, circularity, eccentricity, aspect ratio,
+  solidity, axes, orientation, extent, state, speed, displacement, turning,
+  consecutive IoU, area-change, **nearest-neighbour** dist/count, per-channel
+  intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
+- **Edge Dynamics** dock: velocity/radius kymograph (angle×time) **and a
+  per-frame edge map** (the cell's boundary in the current frame coloured by
+  per-sector velocity or radius) + summary + kymograph CSV export.
+- **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
+  mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
+  per-cell plot metric.
+- **Population** dock: plot any metric across ALL cells of the recording —
+  every-cell time series, **mean ± SEM/SD** error band, **histogram**, and a
+  **flower plot** (origin-centred trajectories); filters (min track length,
+  state, exclude edge); lazy compute.
+- Colouring cells by a metric shows a **units colour bar** (Display ▸ Colour bar).
+- **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
+  + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
+- **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
+  throughout the GUI.
+- **Menus**: File (open / **Export CSV** Ctrl+E / screenshot), View (zoom),
+  Image (auto/reset/colormap/invert), Analysis, Window (dock toggles), Help.
+Status bar shows frame/time/scale/cell-count + hovered/selected cell.
+
+**CSV export** (File ▸ Export CSV…, Ctrl+E) writes tidy, unit-tagged tables for
+Origin/Prism: per-frame region properties ("masks as CSV"), per-cell summary
+(track + shape + motion), and centroid trajectories — via
+`analysis/exporters.py` (pure, reusable from scripts/notebooks too).
 
 ## Testing without a display
 
@@ -109,13 +159,59 @@ analyses are data-starved at the current plating density; the WT-vs-DMSO
 vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
 `data/` (couples to those formats — see `feature_tables.py`).
 
-## Good first expansions (seeds)
+## Done (workbench so far)
 
-- Per-cell / per-frame tables + CSV export from `analysis/` (areas,
-  track lengths, centroids already exist in `label_stats`).
-- Plots (areas over time, cells-per-frame, trajectories) in a new
-  `analysis/plots.py` or a GUI "Analysis" dock.
-- A per-cell info panel in the GUI (click a cell → its track/area curve).
-- An HTTP remote-control hook (à la CellScope's `CELLSCOPE_REMOTE`) so
-  agents can drive/screenshot the GUI headless — document it here if added.
+- ✅ Dockable/detachable panels; timeline moved below the view (play/fps/loop).
+- ✅ Full image controls (histogram/levels, brightness/contrast, gamma, LUT,
+  invert, auto), per-channel; **composite multi-channel** (DIC + Cy5 magenta).
+- ✅ Menus (File/View/Image/Analysis/Window/Help) + layout persistence.
+- ✅ Overlays (scale bar, frame/time, cell IDs, track trails, selection);
+  colour-by id / **state** / area / track.
+- ✅ Cell-info panel: click → summary + plot any per-frame characteristic + MSD
+  (log-log **or linear**, α/D fit). The plottable set covers the **full CellScope
+  per-frame metric list**: area, perimeter, circularity, ecc, aspect ratio,
+  solidity, axes, orientation, extent, state, **shape mode**, speed,
+  displacement, turning, consecutive IoU, area-change, nearest-neighbour,
+  intensity + membrane contrast.
+- ✅ **Config ▸ Cell plot metrics** — choose which per-frame metrics are
+  computed/offered (persisted, immediate recompute). `cell_frame_table(metrics=)`
+  skips unselected/expensive ones.
+- ✅ **Nearest-neighbour** (`analysis/neighbors.py`) — plot + CSV + colour-by.
+- ✅ **Colour the main display by any calculated metric** (`gui/colorby.py`) +
+  a **units colour bar**.
+- ✅ **Population tab** (`analysis/population.py`) — all-cells time series /
+  mean±error / **histogram** / **flower plot** + filtering.
+- ✅ **Metrics reference + tooltips** (`analysis/metric_docs.py`).
+- ✅ **VAMPIRE shape modes** (`analysis/shape_modes.py`) — Shape Modes dock +
+  `shape_mode` plot metric + colour-by.
+- ✅ **Edge / membrane dynamics**: protrusion/retraction kymograph **+ per-frame
+  edge map** dock + summary + CSV (`analysis/edge_dynamics.py`).
+- ✅ **CSV export** (per-frame / per-cell / tracks, optional solidity + edge
+  columns) for Origin — `analysis/exporters.py`, **threaded** with progress.
+- ✅ Per-frame **state** (rounded/spread, CellScope rule) — `analysis/state.py`.
+- ✅ Morphometry (`cell_metrics.py`: Crofton perimeter/circularity, convexity,
+  rel_area) + motion (`motion.py`: direction-autocorr persistence, MSD `fit_msd`
+  α/D **and Fürth `fit_furth` persistence-time**, turning angles) — pure, tested.
+- ✅ **Membrane/boundary quality** (`membrane.py`): boundary-gradient, intensity/
+  texture contrast, membrane score (per channel).
+- ✅ **Self-drive remote** (`MASKVIEWER_REMOTE=<port>` HTTP hook, `gui/remote.py`)
+  for headless agent driving + screenshots; **screengrab** (File ▸ Save View /
+  Save Window). README illustrated with screenshots (`docs/screenshots/`).
+- ✅ **CellScope analysis-audit gaps** added: convexity, rel_area, Fürth fit,
+  membrane metrics, density-stratified speed, area-stability + track-quality QC,
+  VAMPIRE eigenshapes/normalised-entropy. (Deferred, documented: per-state
+  segment MSD/straightness, Sarle bimodality — low marginal value.)
+
+## Good next expansions (evidence-weighted; PIEZO1-focused)
+
+- **Cross-recording comparison dock + superplots** (per-cell cloud coloured by
+  recording + per-recording means; per-arm KW/PERMANOVA) — bakes the
+  recording=unit stats into every figure. Reuse `feature_tables`/`multivariate`;
+  this is the natural home for treatment comparisons.
+- **Per-protrusion event detection** on the edge kymograph (retraction
+  duration / frequency / strength, à la ADAPT) — richer than the current summary.
+- **SiR-actin (Cy5) cortical intensity vs retraction** — correlate the per-frame
+  intensity series (already exported) with edge velocity.
 - Side-by-side / difference view of two mask sets (e.g. raw vs edited).
+- **Cross-recording / treatment comparison** (superplots, per-arm stats) — the
+  big next phase once single-recording analysis is signed off.
