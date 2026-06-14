@@ -5,6 +5,17 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Cell-table division indicators
+
+The Cell-Table dock now shows **parent** + **daughters** columns (label IDs) from
+the recording's divisions.json — a cell with a `parent` is a child, a cell with
+`daughters` is a parent (`lineage.relatives`). Columns appear only when the
+recording has division events; the window passes `divisions` to
+`cell_table.set_recording`. Verified on a real recording (5 divisions wired
+through) + an isolated panel test. `pytest` 28 passed.
+
+---
+
 ## 2026-06-13 — Comparison-audit gaps (ensemble MSD, state, OLS, box plots)
 
 A background agent audited CellScope's cross-recording/comparison code; added the

@@ -196,7 +196,8 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                                       self.recording.time_interval_min,
                                       divisions=self.divisions)
         self.cell_table.set_recording(labels, self.recording.um_per_px,
-                                      self.recording.time_interval_min)
+                                      self.recording.time_interval_min,
+                                      divisions=self.divisions)
         self.canvas.overlays.set_scale(self.recording.um_per_px)
         self.display.set_channels(self.recording.channel_names)
         self.cell_info.set_available(self.recording.channel_names,
