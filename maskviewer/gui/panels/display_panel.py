@@ -139,6 +139,12 @@ class DisplayPanel(QtWidgets.QWidget):
     def color_by_mode(self) -> str:
         return COLOR_BY[max(self.color_by.currentIndex(), 0)][1]
 
+    def set_color_by(self, key):
+        for i, (_label, k) in enumerate(COLOR_BY):
+            if k == key:
+                self.color_by.setCurrentIndex(i)
+                return
+
     def composite_on(self) -> bool:
         return self.composite.isChecked()
 

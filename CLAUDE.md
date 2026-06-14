@@ -81,6 +81,7 @@ python main_viewer.py                     # discover via config.json
 python main_viewer.py --data-root /path/to/by_condition
 python main_viewer.py --recording R.ome.tif --masks M.npz
 python scripts/make_sample_data.py        # (re)create the synthetic sample
+MASKVIEWER_REMOTE=8765 python main_viewer.py   # + localhost HTTP self-drive (see remote.py)
 ```
 
 The CellScope `cellpose4` env also has these deps (`conda run -n cellpose4 …`)
@@ -193,6 +194,9 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
   α/D **and Fürth `fit_furth` persistence-time**, turning angles) — pure, tested.
 - ✅ **Membrane/boundary quality** (`membrane.py`): boundary-gradient, intensity/
   texture contrast, membrane score (per channel).
+- ✅ **Self-drive remote** (`MASKVIEWER_REMOTE=<port>` HTTP hook, `gui/remote.py`)
+  for headless agent driving + screenshots; **screengrab** (File ▸ Save View /
+  Save Window). README illustrated with screenshots (`docs/screenshots/`).
 - ✅ **CellScope analysis-audit gaps** added: convexity, rel_area, Fürth fit,
   membrane metrics, density-stratified speed, area-stability + track-quality QC,
   VAMPIRE eigenshapes/normalised-entropy. (Deferred, documented: per-state
@@ -208,6 +212,6 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
   duration / frequency / strength, à la ADAPT) — richer than the current summary.
 - **SiR-actin (Cy5) cortical intensity vs retraction** — correlate the per-frame
   intensity series (already exported) with edge velocity.
-- An HTTP remote-control hook (à la CellScope's `CELLSCOPE_REMOTE`) so agents
-  can drive/screenshot the GUI headless — document here if added.
 - Side-by-side / difference view of two mask sets (e.g. raw vs edited).
+- **Cross-recording / treatment comparison** (superplots, per-arm stats) — the
+  big next phase once single-recording analysis is signed off.

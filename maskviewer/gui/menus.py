@@ -30,7 +30,10 @@ def build_menubar(win):
     f.addSeparator()
     f.addAction(_act(win, "&Export CSV…", win.export_csv, "Ctrl+E",
                      "Export tracks / masks / cell properties as CSV"))
-    f.addAction(_act(win, "Save &Screenshot…", win.save_screenshot, "Ctrl+Shift+P"))
+    f.addAction(_act(win, "Save &View Image…", win.save_screenshot, "Ctrl+Shift+P",
+                     "Save the image view (canvas) as PNG"))
+    f.addAction(_act(win, "Save &Window Screenshot…", win.save_window_screenshot,
+                     "Ctrl+Shift+W", "Save the whole window as PNG"))
     f.addSeparator()
     f.addAction(_act(win, "&Quit", win.close, "Ctrl+Q"))
 

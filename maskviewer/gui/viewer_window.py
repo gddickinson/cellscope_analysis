@@ -96,6 +96,18 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.display.set_recordings(self.entries)
         if self.entries:
             self._load_entry(0)
+        self._start_remote()
+
+    def _start_remote(self):
+        port = os.environ.get("MASKVIEWER_REMOTE")
+        if not port:
+            return
+        try:
+            from .remote import RemoteControl
+            self._remote = RemoteControl(self, port)
+            self.status.showMessage(f"Remote control on http://127.0.0.1:{port}")
+        except Exception as exc:                          # don't block the GUI
+            self.status.showMessage(f"Remote control failed: {exc}", 6000)
 
     # -- setup -----------------------------------------------------------
     def _add_dock(self, name, widget, area):

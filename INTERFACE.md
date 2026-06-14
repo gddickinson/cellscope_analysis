@@ -96,13 +96,23 @@ Read this before opening source files. Update it when modules change.
   - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
     mode-fraction bars, heterogeneity entropy (lazy compute button).
   - **population_panel.py** `PopulationPanel` — all-cells plots for the recording:
-    time series / mean ± SEM-or-SD error band / histogram / flower plot, with
-    filters (min track length, state, exclude edge); lazy compute + cache.
+    time series / mean ± SEM-or-SD error band / histogram / flower plot / scatter
+    (X vs Y, click→select) / lineage tree / division timeline, with filters
+    (min track length, state, exclude edge); lazy compute + cache.
+  - **cell_table.py** `CellTablePanel` — sortable per-cell metric table; row →
+    select cell; CSV export.
 - **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/**Config**
   (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help
   (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
+- **plot_export.py** — `save_plot(plot, parent)`: PNG/SVG export for any panel plot.
+- **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers +
+  the remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
+  `viewer_window` small.
+- **remote.py** — `RemoteControl`: optional localhost HTTP self-drive
+  (`MASKVIEWER_REMOTE=<port>`); marshals commands to the GUI thread; for headless
+  agent driving + screenshots.
 - **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
   docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes + Population tabbed +
   Image-Adjust right; Timeline bottom), wires panels↔canvas, split base/overlay

@@ -5,6 +5,27 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Self-drive remote, screengrab, illustrated README
+
+- **Self-drive remote** (`gui/remote.py`, `MASKVIEWER_REMOTE=<port>`): a
+  localhost HTTP server (off by default) that drives the GUI for headless/agent
+  workflows — `/state`, `/set` (recording/frame/channel/colour-by/selected),
+  `/cmd` (compute_population/shape/table, raise dock, overlay…), `/screenshot`.
+  Commands marshal to the GUI thread via a queue drained by a QTimer.
+  `remote_*` handlers live on `WindowActionsMixin`. Verified end-to-end (HTTP →
+  GUI thread → grab → PNG).
+- **Screengrab**: File ▸ Save View Image (canvas) / Save Window Screenshot.
+- **Illustrated README**: drove the GUI headless on the synthetic sample and
+  captured `docs/screenshots/{overview,cell_info,population,shape_modes,
+  edge_dynamics}.png`; rewrote README around the workbench + embedded them +
+  documented the remote hook. (Synthetic sample only — public-repo data policy.)
+- Docs: INTERFACE (remote/plot_export/window_actions/cell_table), CLAUDE
+  (run + Done + roadmap) updated.
+
+`pytest` 27 passed; default (no-remote) build unaffected; all files < 500 lines.
+
+---
+
 ## 2026-06-13 — Single-recording push (part 2): CellScope analysis-audit gaps
 
 A background agent audited every CellScope analysis file; implemented the

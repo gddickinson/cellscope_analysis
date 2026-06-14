@@ -61,9 +61,66 @@ class WindowActionsMixin:
 
     def save_screenshot(self):
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save screenshot", "view.png", "PNG (*.png)")
+            self, "Save image (view only)", "view.png", "PNG (*.png)")
         if fn:
             self.canvas.grab().save(fn)
+
+    def save_window_screenshot(self):
+        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save window screenshot", "window.png", "PNG (*.png)")
+        if fn:
+            self.grab().save(fn)
+
+    # -- remote control (MASKVIEWER_REMOTE) -----------------------------
+    def remote_state(self):
+        return {"recordings": len(self.entries),
+                "recording": self.display.recording.currentText(),
+                "frame": self.timeline.value(),
+                "n_frames": self.recording.n_frames if self.recording else 0,
+                "channel": self.display.channel.currentText(),
+                "color_by": self.display.color_by_mode(),
+                "selected": self.selected,
+                "n_cells": self._cur_ncells,
+                "docks": list(self.docks)}
+
+    def remote_set(self, q):
+        if "recording" in q:
+            self.display.recording.setCurrentIndex(int(q["recording"]))
+        if "channel" in q:
+            self.display.channel.setCurrentIndex(int(q["channel"]))
+        if "frame" in q:
+            self.timeline.set_value(int(q["frame"]))
+        if "color_by" in q:
+            self.display.set_color_by(q["color_by"])
+        if "composite" in q:
+            self.display.composite.setChecked(q["composite"] == "1")
+        if "selected" in q:
+            self.select_cell(int(q["selected"]))
+        return self.remote_state()
+
+    def remote_cmd(self, q):
+        action = q.get("action", "")
+        if action == "raise" and q.get("dock") in self.docks:
+            self.docks[q["dock"]].raise_()
+        elif action == "compute_population":
+            self.population._compute()
+        elif action == "population_kind":
+            self.population.kind.setCurrentText(q.get("kind", ""))
+        elif action == "compute_shape":
+            self.shape._compute()
+        elif action == "compute_table":
+            self.cell_table._compute()
+        elif action == "overlay":
+            self._on_overlay_toggle(q.get("key"), q.get("on", "1") == "1")
+        elif action == "autorange":
+            self.canvas.autorange()
+        return self.remote_state()
+
+    def remote_screenshot(self, path, what):
+        widget = self.canvas if what == "canvas" else self
+        widget.grab().save(path)
+        return {"path": path,
+                "bytes": os.path.getsize(path) if os.path.exists(path) else 0}
 
     # -- Window ---------------------------------------------------------
     def reset_layout(self):
