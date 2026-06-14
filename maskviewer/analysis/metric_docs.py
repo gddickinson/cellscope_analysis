@@ -56,6 +56,15 @@ METRICS = {
                 "frame × µm/px."),
     "n_neighbors": ("Local crowding.",
                     "Number of other cells whose centroid is within 50 µm."),
+    "frac_rounded": ("Fraction of a cell's classifiable time spent rounded.",
+                     "rounded frames / (rounded + spread frames); edge-truncated "
+                     "and undefined frames are excluded from the denominator."),
+    "frac_spread": ("Fraction of a cell's classifiable time spent spread.",
+                    "spread frames / (rounded + spread frames)."),
+    "frames_tracked": ("How many frames a cell is present (track length).",
+                       "Count of frames where the cell's mask is non-empty."),
+    "n_cells": ("Number of tracked cells in the recording.",
+                "Distinct positive label IDs present in ≥1 frame."),
 }
 
 # dynamic per-channel metric prefixes
@@ -106,6 +115,71 @@ EXTRA = {
 }
 
 
+_UNIT_SUFFIXES = ("_um2_per_min", "_px2_per_min", "_um_per_min", "_px_per_min",
+                  "_um_per_frame", "_px_per_frame", "_um2", "_px2", "_um", "_px")
+
+
+def _split_state(col: str):
+    """Peel a trailing per-state suffix → (base, 'rounded'|'spread'|None)."""
+    for s in ("_rounded", "_spread"):
+        if col.endswith(s):
+            return col[: -len(s)], s[1:]
+    return col, None
+
+
+def column_units(col: str) -> str:
+    """Display units for an aggregated comparison column (from its suffix).
+    Dimensionless (ratios/scores) → ''. State-segmented columns
+    (``…_spread`` / ``…_rounded``) use their base metric's units."""
+    c, _ = _split_state(col)
+    for per, lab in (("_per_min", "/min"), ("_per_frame", "/frame")):
+        if c.endswith(per):
+            base = c[: -len(per)]
+            if base.endswith("_um2"):
+                return "µm²" + lab
+            if base.endswith("_um"):
+                return "µm" + lab
+            if base.endswith("_px"):
+                return "px" + lab
+            return "1" + lab
+    if "area" in c and c.endswith("_px"):
+        return "px²"
+    for suf, u in (("_um2", "µm²"), ("_px2", "px²"), ("_um", "µm"), ("_px", "px")):
+        if c.endswith(suf):
+            return u
+    if c.endswith("_min") or "persistence_time" in c:
+        return "min"
+    if c.startswith("frac_") or c == "track_quality":
+        return ""                       # fraction / 0–1 score
+    if c == "n_cells" or c.startswith("n_") or "n_neighbors" in c:
+        return "count"
+    if "frames" in c:
+        return "frames"
+    return ""
+
+
+def column_label(col: str) -> str:
+    """Human-readable metric name (drops the unit suffix; underscores → spaces;
+    a per-state subset is shown as ``… [spread]`` / ``… [rounded]``)."""
+    c, st = _split_state(col)
+    for suf in _UNIT_SUFFIXES:
+        if c.endswith(suf):
+            c = c[: -len(suf)]
+            break
+    else:
+        if c.endswith("_min"):
+            c = c[:-4]
+    lab = c.replace("_", " ").strip()
+    return f"{lab} [{st}]" if st else lab
+
+
+def axis_label(col: str) -> str:
+    """`label (units)` for a plot axis / table header (units omitted if none)."""
+    u = column_units(col)
+    lab = column_label(col)
+    return f"{lab} ({u})" if u else lab
+
+
 def doc(key: str):
     """(what, how) for a metric key (handles per-channel prefixes)."""
     if key in METRICS:
@@ -121,6 +195,93 @@ def tooltip(key: str) -> str:
     return f"{what}\nHow: {how}" if what else ""
 
 
+# ---- comparison columns (aggregated + per-state) --------------------------
+_KEY_ALIASES = {
+    "speed": "speed", "mean_speed": "speed",
+    "persistence": "persistence (dir. autocorr)",
+    "persistence_dir_autocorr": "persistence (dir. autocorr)",
+    "straightness": "straightness",
+    "net_disp": "MSD", "total_path": "MSD",
+    "furth_d": "Fürth fit (D, persistence time)",
+    "persistence_time": "Fürth fit (D, persistence time)",
+    "area_cv": "area_stability", "area_max_min_ratio": "area_stability",
+    "n_large_area_jumps": "area_stability",
+    "speed_isolated": "speed_isolated / speed_crowded / frac_isolated",
+    "speed_crowded": "speed_isolated / speed_crowded / frac_isolated",
+    "frac_isolated": "speed_isolated / speed_crowded / frac_isolated",
+}
+
+
+def _metric_key(col: str) -> str:
+    """Resolve an aggregated / per-state comparison column to a doc key."""
+    base, _ = _split_state(col)
+    if base.startswith("mean_"):
+        base = base[5:]
+    elif base.startswith("median_"):
+        base = base[7:]
+    for suf in _UNIT_SUFFIXES:
+        if base.endswith(suf):
+            base = base[: -len(suf)]
+            break
+    else:
+        if base.endswith("_min"):
+            base = base[:-4]
+    base = base.strip("_").lower()
+    return _KEY_ALIASES.get(base, base)
+
+
+def comparison_doc(col: str):
+    """(what, how) for a Comparison-window column — resolves the base metric and
+    annotates the per-state subset + recording-as-unit aggregation."""
+    base, state = _split_state(col)
+    what, how = doc(_metric_key(col))
+    if not what:
+        what = column_label(col)
+    notes = []
+    if state:
+        notes.append(f"Measured over the cell's <b>{state}</b> frames only "
+                     "(state-segmented — matches the original analysis).")
+    if base.startswith("mean_"):
+        notes.append("Per-cell mean, then averaged across recordings "
+                     "(recording = unit).")
+    elif base.startswith("median_"):
+        notes.append("Per-cell median, then averaged across recordings.")
+    return what, (how + (" " + " ".join(notes) if notes else ""))
+
+
+def comparison_tooltip(col: str) -> str:
+    what, how = comparison_doc(col)
+    u = column_units(col)
+    head = f"{column_label(col)}" + (f" ({u})" if u else "")
+    return f"{head}\n{what}\nHow: {how}" if what else head
+
+
+_COMPARISON_HTML = """
+<h3>Cross-recording comparison (Comparison window)</h3>
+<p><b>Unit of analysis = the recording.</b> Cells in one recording share a field
+of view / dish, so they are not independent; every test treats the
+<i>recording</i> as the replicate. A metric's per-recording value is the mean
+over its cells; conditions are then compared recording-to-recording.</p>
+<p><b>Whole-track vs state-segmented metrics.</b> A plain metric (e.g.
+<i>mean_speed</i>, <i>mean_area_um2</i>) is averaged over a cell's whole track,
+mixing its rounded and spread phases. Columns suffixed <b>_spread</b> /
+<b>_rounded</b> are computed <i>separately over the frames in that state</i> —
+this matches the original CellScope analysis (a whole-track average conflates how
+a cell behaves in a state with how long it spends there). Speed is a per-step
+value taken at the step's start frame, with edge-touching steps dropped and a
+15&nbsp;µm/min cap; persistence and straightness use contiguous same-state
+segments (≥5 frames). Edge-truncated frames are excluded throughout.</p>
+<p><b>Filters.</b> min frames tracked, min track-quality, min cells/recording
+(drops low-N recordings), and a cell-state filter (keep cells that are mostly
+spread / rounded).</p>
+<p><b>Statistics.</b> Per arm: omnibus Kruskal–Wallis across the arm's groups,
+then Mann–Whitney U of each treatment vs the arm's control with Bonferroni
+correction; Cohen's d effect size; and an optional covariate-adjusted OLS
+(treatment effect after frac_spread + density). A vehicle/batch pair test and a
+condition ensemble MSD (mean±SEM or median+bootstrap-CI) are also reported.</p>
+"""
+
+
 def as_html() -> str:
     def section(title, items):
         out = [f"<h3>{title}</h3>"]
@@ -133,4 +294,5 @@ def as_html() -> str:
             + section("Per-channel metrics (one per image channel)",
                       [(p + "&lt;channel&gt;", v) for p, v in PREFIX.items()])
             + section("Track / motion / edge summaries", EXTRA.items())
+            + _COMPARISON_HTML
             + "</body></html>")

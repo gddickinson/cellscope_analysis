@@ -20,12 +20,11 @@ from PyQt5 import QtCore, QtWidgets
 from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
-from ..analysis import compare, metric_docs, feature_tables
+from .compare_tables import StatsTablesMixin
+from ..analysis import compare, metric_docs
 from ..config import PROJECT_ROOT
 
 _DIST_KINDS = ["Strip (mean ± SEM)", "Box (+ Bonferroni)", "Superplot"]
-_STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
-              "Cohen d", "OLS β", "OLS p"]
 
 
 class _Worker(QtCore.QObject):
@@ -47,7 +46,7 @@ class _Worker(QtCore.QObject):
         self.done.emit(res)
 
 
-class CompareWindow(QtWidgets.QMainWindow):
+class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
     recordingPicked = QtCore.pyqtSignal(str)
 
     def __init__(self, project, parent=None):
@@ -66,9 +65,15 @@ class CompareWindow(QtWidgets.QMainWindow):
     # -- ui --------------------------------------------------------------
     def _build_ui(self):
         self.compute_btn = QtWidgets.QPushButton("Compute")
+        self.compute_btn.setToolTip("Measure every cell in every recording "
+                                    "(threaded; result cached per project)")
         self.compute_btn.clicked.connect(self._compute)
         self.recompute = QtWidgets.QCheckBox("ignore cache")
+        self.recompute.setToolTip("Recompute from masks instead of the cached result")
         self.metric = QtWidgets.QComboBox()
+        self.metric.setToolTip("Primary metric — drives the left plots, the "
+                               "histogram, stats and data tables. _spread / "
+                               "_rounded columns are state-segmented (see Help)")
         self.metric.currentIndexChanged.connect(self._replot)
         self.metric_y = QtWidgets.QComboBox()
         self.metric_y.setToolTip("Y metric (Scatter tab)")
@@ -76,8 +81,25 @@ class CompareWindow(QtWidgets.QMainWindow):
         self.min_frames = QtWidgets.QSpinBox()
         self.min_frames.setRange(1, 9999)
         self.min_frames.setPrefix("≥")
-        self.min_frames.setToolTip("Min frames tracked per cell")
+        self.min_frames.setToolTip("Keep cells tracked for at least this many frames")
         self.min_frames.valueChanged.connect(self._replot)
+        self.min_quality = QtWidgets.QDoubleSpinBox()
+        self.min_quality.setRange(0.0, 1.0)
+        self.min_quality.setSingleStep(0.05)
+        self.min_quality.setPrefix("≥")
+        self.min_quality.setToolTip("Keep cells with at least this track_quality (0–1)")
+        self.min_quality.valueChanged.connect(self._replot)
+        self.min_cells = QtWidgets.QSpinBox()
+        self.min_cells.setRange(0, 99999)
+        self.min_cells.setPrefix("≥")
+        self.min_cells.setToolTip("Drop recordings with fewer than this many "
+                                  "(filtered) cells — recording = unit")
+        self.min_cells.valueChanged.connect(self._replot)
+        self.state_sel = QtWidgets.QComboBox()
+        self.state_sel.addItems(["all cells", "mostly spread", "mostly rounded"])
+        self.state_sel.setToolTip("Keep cells that spend most of their time in "
+                                  "this state (frac_spread / frac_rounded ≥ 0.5)")
+        self.state_sel.currentIndexChanged.connect(self._replot)
         self.ols = QtWidgets.QCheckBox("OLS-adjust")
         self.ols.setToolTip("Treatment effect after frac_spread + density")
         self.ols.toggled.connect(self._replot)
@@ -86,6 +108,8 @@ class CompareWindow(QtWidgets.QMainWindow):
         self.control.currentIndexChanged.connect(self._control_changed)
         self.stat = QtWidgets.QComboBox()
         self.stat.addItems(["mean ± SEM", "median ± 95% CI"])
+        self.stat.setToolTip("Ensemble-MSD band: mean ± SEM, or median + "
+                             "bootstrap 95% CI (over recordings)")
         self.stat.currentIndexChanged.connect(self._replot)
         export = QtWidgets.QPushButton("Export…")
         export.clicked.connect(self._export)
@@ -93,6 +117,10 @@ class CompareWindow(QtWidgets.QMainWindow):
         self.groups_btn.setToolTip("Assign recordings to groups, pick controls, "
                                    "include/exclude — applies instantly")
         self.groups_btn.clicked.connect(self._open_design_editor)
+        self.help_btn = QtWidgets.QPushButton("Help")
+        self.help_btn.setToolTip("Metrics & methods reference (what each metric "
+                                 "means + how the comparison is computed)")
+        self.help_btn.clicked.connect(self._show_help)
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
@@ -100,19 +128,32 @@ class CompareWindow(QtWidgets.QMainWindow):
             bar.addWidget(w)
         bar.addSeparator()
         for lbl, w in (("Metric", self.metric), ("Y", self.metric_y),
-                       ("Control", self.control), ("MSD", self.stat),
-                       ("Frames", self.min_frames)):
+                       ("Control", self.control), ("MSD", self.stat)):
             bar.addWidget(QtWidgets.QLabel(" " + lbl + " "))
             bar.addWidget(w)
         bar.addWidget(self.ols)
         bar.addSeparator()
         bar.addWidget(export)
+        bar.addWidget(self.help_btn)
         self.addToolBar(bar)
+
+        fbar = QtWidgets.QToolBar()          # second row: cell / recording filters
+        fbar.setMovable(False)
+        fbar.addWidget(QtWidgets.QLabel(" Filters: "))
+        for lbl, w in (("frames", self.min_frames), ("quality", self.min_quality),
+                       ("cells/rec", self.min_cells), ("state", self.state_sel)):
+            fbar.addWidget(QtWidgets.QLabel(" " + lbl + " "))
+            fbar.addWidget(w)
+        self.addToolBarBreak()
+        self.addToolBar(fbar)
 
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.currentChanged.connect(self._replot)
         self.dist_kind = QtWidgets.QComboBox()
         self.dist_kind.addItems(_DIST_KINDS)
+        self.dist_kind.setToolTip("Strip = recording points + mean±SEM · Box = "
+                                  "quartiles + Bonferroni stars · Superplot = cells "
+                                  "coloured by recording behind the recording means")
         self.dist_kind.currentIndexChanged.connect(self._replot)
         self.dist_plot = pg.PlotWidget()
         dist = QtWidgets.QWidget()
@@ -128,30 +169,80 @@ class CompareWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(dist, "Distributions")
         self.tabs.addTab(self.msd_plot, "Ensemble MSD")
         self.tabs.addTab(self.scatter_plot, "Scatter")
+        self.tabs.setTabToolTip(0, "Per-recording values by group: strip (mean±SEM) "
+                                   "/ box (+Bonferroni stars) / superplot")
+        self.tabs.setTabToolTip(1, "Ensemble MSD by condition (recording = unit) — "
+                                   "mean±SEM or median+bootstrap CI")
+        self.tabs.setTabToolTip(2, "One recording-level metric vs another (+Spearman)")
 
-        self.omnibus = QtWidgets.QLabel("")
-        self.omnibus.setWordWrap(True)
-        self.table = QtWidgets.QTableWidget()
-        self.table.setSortingEnabled(True)
-        self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        right = QtWidgets.QWidget()
-        rl = QtWidgets.QVBoxLayout(right)
-        rl.addWidget(QtWidgets.QLabel("<b>Per-contrast stats</b> (recording = unit)"))
-        rl.addWidget(self.omnibus)
-        rl.addWidget(self.table, 1)
-        self._save_btn = QtWidgets.QPushButton("Save plot…")
-        self._save_btn.clicked.connect(self._save_current_plot)
-        rl.addWidget(self._save_btn)
+        self.right_tabs = QtWidgets.QTabWidget()
+        self.right_tabs.addTab(self._build_stats_tab(), "Stats")
+        self.right_tabs.addTab(self._build_hist_tab(), "Histogram")
+        self.right_tabs.addTab(self._build_data_tab(), "Data")
+        self.right_tabs.setTabToolTip(0, "Per-contrast tests (recording = unit): "
+                                         "KW + Bonferroni MWU vs control + Cohen d + OLS")
+        self.right_tabs.setTabToolTip(1, "Per-cell distribution of the chosen metric, "
+                                         "one curve per group")
+        self.right_tabs.setTabToolTip(2, "Per-recording + per-group tables for the "
+                                         "chosen metric (unit-tagged, exportable)")
 
         split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         split.addWidget(self.tabs)
-        split.addWidget(right)
+        split.addWidget(self.right_tabs)
         split.setStretchFactor(0, 3)
         split.setStretchFactor(1, 2)
         self.setCentralWidget(split)
         self.status = self.statusBar()
         self.busy = StatusProgress()                  # bottom-bar progress + ETA
         self.status.addPermanentWidget(self.busy)
+
+    # -- right-panel tabs ------------------------------------------------
+    def _build_stats_tab(self):
+        w = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(w)
+        lay.addWidget(QtWidgets.QLabel("<b>Per-contrast stats</b> (recording = unit)"))
+        self.omnibus = QtWidgets.QLabel("")
+        self.omnibus.setWordWrap(True)
+        lay.addWidget(self.omnibus)
+        self.table = self._mk_table()
+        lay.addWidget(self.table, 1)
+        self._save_btn = QtWidgets.QPushButton("Save plot…")
+        self._save_btn.clicked.connect(self._save_current_plot)
+        lay.addWidget(self._save_btn)
+        return w
+
+    def _build_hist_tab(self):
+        w = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(w)
+        lay.addWidget(QtWidgets.QLabel("Per-cell distribution of the chosen metric"))
+        self.hist_plot = pg.PlotWidget()
+        self._hist_legend = self.hist_plot.addLegend(offset=(-10, 10))
+        lay.addWidget(self.hist_plot, 1)
+        b = QtWidgets.QPushButton("Save histogram…")
+        b.clicked.connect(lambda: save_plot(self.hist_plot, self, "histogram.png"))
+        lay.addWidget(b)
+        return w
+
+    def _build_data_tab(self):
+        w = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(w)
+        lay.addWidget(QtWidgets.QLabel("<b>Per recording</b> (unit) — current metric"))
+        self.rec_table = self._mk_table()
+        lay.addWidget(self.rec_table, 2)
+        lay.addWidget(QtWidgets.QLabel("<b>Per group</b> — recordings summary"))
+        self.cond_table = self._mk_table()
+        lay.addWidget(self.cond_table, 1)
+        b = QtWidgets.QPushButton("Export tables…")
+        b.clicked.connect(self._export)
+        lay.addWidget(b)
+        return w
+
+    @staticmethod
+    def _mk_table():
+        t = QtWidgets.QTableWidget()
+        t.setSortingEnabled(True)
+        t.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        return t
 
     # -- project ---------------------------------------------------------
     def set_project(self, project):
@@ -160,10 +251,11 @@ class CompareWindow(QtWidgets.QMainWindow):
         safe = "".join(c if c.isalnum() else "_" for c in project.name)[:40]
         self._cache = os.path.join(PROJECT_ROOT, "analysis_out",
                                    f"_compare_{safe}.pkl")
-        self.dist_plot.clear()
-        self.msd_plot.clear()
-        self.scatter_plot.clear()
-        self.table.setRowCount(0)
+        for p in (self.dist_plot, self.msd_plot, self.scatter_plot, self.hist_plot):
+            p.clear()
+        self._hist_legend.clear()
+        for t in (self.table, self.rec_table, self.cond_table):
+            t.setRowCount(0)
         self.omnibus.setText("")
         self._refresh_control_combo()
         if self._design_editor is not None:
@@ -205,6 +297,19 @@ class CompareWindow(QtWidgets.QMainWindow):
             self._design_editor.set_data(self._per_cell)
         self._design_editor.show()
         self._design_editor.raise_()
+
+    def _show_help(self):
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Metrics & methods reference")
+        dlg.resize(680, 680)
+        lay = QtWidgets.QVBoxLayout(dlg)
+        br = QtWidgets.QTextBrowser()
+        br.setHtml(metric_docs.as_html())
+        lay.addWidget(br)
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+        btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns)
+        dlg.exec_()
 
     def _on_design_changed(self):
         """Grouping / control / include changed — remap + replot, no recompute."""
@@ -272,10 +377,8 @@ class CompareWindow(QtWidgets.QMainWindow):
             combo.clear()
             combo.addItems(cols)
             for i, c in enumerate(cols):
-                base = c.replace("mean_", "").replace("median_", "")
-                tip = metric_docs.tooltip(base.rsplit("_um", 1)[0].rsplit("_px", 1)[0])
-                if tip:
-                    combo.setItemData(i, tip, QtCore.Qt.ToolTipRole)
+                combo.setItemData(i, metric_docs.comparison_tooltip(c),
+                                  QtCore.Qt.ToolTipRole)
             default = "mean_area_um2" if "mean_area_um2" in cols else (cols[0] if cols else "")
             combo.setCurrentText(cur if cur in cols else default)
             combo.blockSignals(False)
@@ -290,9 +393,19 @@ class CompareWindow(QtWidgets.QMainWindow):
     # -- plot / stats ----------------------------------------------------
     def _filtered(self):
         pc = self.project.regroup(self._per_cell)        # drop excluded + regroup
+        if pc is None or pc.empty:
+            return pc
         mf = self.min_frames.value()
-        if mf > 1 and pc is not None and "frames_tracked" in pc.columns:
+        if mf > 1 and "frames_tracked" in pc.columns:
             pc = pc[pc["frames_tracked"] >= mf]
+        q = self.min_quality.value()
+        if q > 0 and "track_quality" in pc.columns:
+            pc = pc[pc["track_quality"] >= q]
+        state = self.state_sel.currentText()
+        if state == "mostly spread" and "frac_spread" in pc.columns:
+            pc = pc[pc["frac_spread"] >= 0.5]
+        elif state == "mostly rounded" and "frac_rounded" in pc.columns:
+            pc = pc[pc["frac_rounded"] >= 0.5]
         return pc
 
     def _filtered_msd(self):
@@ -305,80 +418,44 @@ class CompareWindow(QtWidgets.QMainWindow):
         if self._per_cell is None or self._per_cell.empty:
             return
         design = self.project.design
+        pc = self._filtered()
+        metric = self.metric.currentText()
+        per_rec = compare.aggregate(pc) if pc is not None and not pc.empty else None
+        if (per_rec is not None and self.min_cells.value() > 0
+                and "n_cells" in per_rec.columns):           # drop low-N recordings
+            keep = set(per_rec[per_rec["n_cells"] >= self.min_cells.value()]["recording"])
+            per_rec = per_rec[per_rec["recording"].isin(keep)]
+            pc = pc[pc["recording"].isin(keep)]
         tab = self.tabs.currentIndex()
         if tab == 1:
             self.msd_plot.clear()
             self.msd_plot.setLogMode(x=False, y=False)
             stat = "median" if self.stat.currentText().startswith("median") else "mean"
-            compare_plots.ensemble_msd(self.msd_plot, self._filtered_msd(), design, stat)
-            return
-        pc = self._filtered()
-        metric = self.metric.currentText()
-        if pc.empty or not metric:
-            return
-        per_rec = compare.aggregate(pc)
-        if metric not in per_rec.columns:
-            return
-        if tab == 2:
-            self.scatter_plot.clear()
-            compare_plots.scatter(self.scatter_plot, per_rec, metric,
-                                  self.metric_y.currentText(), design, self._pick)
-        else:
-            self.dist_plot.clear()
-            kind = self.dist_kind.currentIndex()
-            if kind == 1:
-                compare_plots.box(self.dist_plot, per_rec, metric, design)
-            elif kind == 2:
-                compare_plots.superplot(self.dist_plot, pc, per_rec, metric, design)
+            msd = self._filtered_msd()
+            if msd is not None and per_rec is not None:
+                msd = msd[msd["recording"].isin(set(per_rec["recording"]))]
+            compare_plots.ensemble_msd(self.msd_plot, msd, design, stat)
+        elif per_rec is not None and metric in per_rec.columns:
+            if tab == 2:
+                self.scatter_plot.clear()
+                compare_plots.scatter(self.scatter_plot, per_rec, metric,
+                                      self.metric_y.currentText(), design, self._pick)
             else:
-                compare_plots.strip(self.dist_plot, per_rec, metric, design, self._pick)
-        self._update_stats(per_rec, metric)
-
-    def _update_stats(self, per_rec, metric):
-        d = self.project.design
-        bc = compare.by_condition(per_rec, metric)
-        kw = feature_tables._kw(list(bc.values()))
-        r = feature_tables.arm_tests(bc, arms=d.arms, vehicle=d.vehicle)
-        eff = {(e["arm"], e["contrast"]): e
-               for e in compare.effect_sizes(bc, arms=d.arms)}
-        ols = {}
-        if self.ols.isChecked():
-            for o in compare.ols_adjusted(per_rec, metric, arms=d.arms):
-                ols[(o["arm"], o["contrast"])] = o
-        veh = r.get("vehicle", {}).get("p")
-        txt = f"omnibus KW ({len(bc)} conditions): {feature_tables.stars(kw)}"
-        if d.vehicle:
-            txt += f"  ·  vehicle {d.vehicle[0]}–{d.vehicle[1]}: {feature_tables.stars(veh)}"
-        self.omnibus.setText(txt)
-        rows = []
-        for arm, spec in d.arms.items():
-            ctrl = spec["control"]
-            for t in [c for c in spec["conditions"] if c != ctrl]:
-                key = f"{t} vs {ctrl}"
-                pr = r[arm]["pairs"].get(f"{ctrl}_vs_{t}", {})
-                e = eff.get((arm, key), {})
-                o = ols.get((arm, key))
-                rows.append([arm, key, e.get("n_ctrl"), e.get("n_test"),
-                             pr.get("p"), pr.get("p_bonf"), e.get("cohen_d"),
-                             o["coef"] if o else None, o["p"] if o else None])
-        self._fill_table(rows)
-
-    def _fill_table(self, rows):
-        self.table.setSortingEnabled(False)
-        self.table.clear()
-        self.table.setColumnCount(len(_STAT_COLS))
-        self.table.setHorizontalHeaderLabels(_STAT_COLS)
-        self.table.setRowCount(len(rows))
-        for ri, row in enumerate(rows):
-            for ci, v in enumerate(row):
-                item = QtWidgets.QTableWidgetItem()
-                if isinstance(v, str) or v is None:
-                    item.setText("" if v is None else v)
+                self.dist_plot.clear()
+                kind = self.dist_kind.currentIndex()
+                if kind == 1:
+                    compare_plots.box(self.dist_plot, per_rec, metric, design)
+                elif kind == 2:
+                    compare_plots.superplot(self.dist_plot, pc, per_rec, metric, design)
                 else:
-                    item.setData(QtCore.Qt.DisplayRole, round(float(v), 4))
-                self.table.setItem(ri, ci, item)
-        self.table.setSortingEnabled(True)
-        self.table.resizeColumnsToContents()
+                    compare_plots.strip(self.dist_plot, per_rec, metric, design, self._pick)
+        # right panel (stats + histogram + data) always tracks the current metric
+        if per_rec is not None and metric and metric in per_rec.columns:
+            self._update_stats(per_rec, metric)
+            self.hist_plot.clear()
+            self._hist_legend.clear()
+            compare_plots.histogram(self.hist_plot, pc, metric, design)
+            self._fill_data(per_rec, pc, metric)
 
     # -- misc ------------------------------------------------------------
     def _current_plot(self):
@@ -393,10 +470,15 @@ class CompareWindow(QtWidgets.QMainWindow):
         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Export comparison CSVs")
         if not d:
             return
+        import pandas as pd
         pc = self._filtered()
+        per_rec = compare.aggregate(pc)
         pc.to_csv(os.path.join(d, "comparison_per_cell.csv"), index=False)
-        compare.aggregate(pc).to_csv(
-            os.path.join(d, "comparison_per_recording.csv"), index=False)
+        per_rec.to_csv(os.path.join(d, "comparison_per_recording.csv"), index=False)
+        summ = compare.per_condition_summary(per_rec, self.metric.currentText())
+        if summ:
+            pd.DataFrame(summ).to_csv(
+                os.path.join(d, "comparison_per_group_summary.csv"), index=False)
         if self._msd is not None and not self._msd.empty:
             self._msd.to_csv(os.path.join(d, "comparison_ensemble_msd.csv"),
                              index=False)

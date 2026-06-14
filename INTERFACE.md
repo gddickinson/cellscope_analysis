@@ -26,9 +26,11 @@ Read this before opening source files. Update it when modules change.
 - **scripts/smoke_compare_window.py** — headless (QT offscreen) smoke for the
   Comparison window + Project wiring: drives every tab / dist-kind / OLS / stats
   table on fake multi-arm + single-arm data, checks the editable control combo,
-  exercises the **Groups & Comparisons editor** (exclude / regroup / add-comparison
-  / control / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
-  `set_project`. `--shot=PATH` / `--editshot=PATH` (re)write the docs screenshots.
+  exercises the **filters** (frames / quality / cells-per-rec / state), the right
+  **Stats / Histogram / Data** tabs + units, the **Groups & Comparisons editor**
+  (exclude / regroup / add-comparison / control / vehicle / reset), and verifies
+  `ViewerWindow.open_compare_window` / `set_project`. `--shot=PATH` (also writes a
+  `_histogram` variant) / `--editshot=PATH` (re)write the docs screenshots.
 - **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
   unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
   Population / Cell-table / Shape computes through the off-thread runner (asserting
@@ -135,19 +137,28 @@ Read this before opening source files. Update it when modules change.
   space (Analysis ▸ Comparison window), opened on the loaded **Project**.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
   (Compute/recompute · **Groups…** (opens `DesignEditor`) · Metric · Y ·
-  **Control** (editable for single-arm designs) · MSD stat · Frames · OLS ·
-  Export); tabbed plots — **Distributions**
-  (strip / box+Bonferroni / superplot) · **Ensemble MSD** · **Scatter** — beside
-  a sortable per-contrast **stats table** (p / Bonferroni / Cohen d / OLS β,p) +
-  omnibus KW + vehicle. Uses the project's `Design`; click a point → load that
-  recording in the main viewer (`recordingPicked`). `set_project` re-targets it.
-  Threaded compute reports into a bottom-bar **`StatusProgress`** (per-recording
-  progress + ETA).
+  **Control** (editable for single-arm designs) · MSD stat · OLS · Export) + a
+  second **Filters** row (min frames · min track-quality · min cells/recording ·
+  cell-state). Left tabbed plots — **Distributions** (strip / box+Bonferroni /
+  superplot) · **Ensemble MSD** · **Scatter** (all axis-labelled with units). The
+  right panel is tabbed: **Stats** (sortable per-contrast p / Bonferroni / Cohen d
+  / OLS β,p + omnibus KW + vehicle — via `StatsTablesMixin`) · **Histogram**
+  (per-cell distribution by group) · **Data** (per-recording + per-group tables,
+  unit-tagged). Uses the project's `Design`; click a point → load that recording
+  (`recordingPicked`). `set_project` re-targets it. Threaded compute reports into a
+  bottom-bar **`StatusProgress`** (per-recording progress + ETA). Both whole-track
+  **and** state-segmented (`…_spread` / `…_rounded`) metrics are offered; metric
+  combos carry per-column tooltips (`metric_docs.comparison_tooltip`); a **Help**
+  button opens the Metrics & methods reference; tabs/controls are tooltipped.
+- **compare_tables.py** — `StatsTablesMixin`: fills the right-panel **Stats** +
+  **Data** tables from the per-recording table + Design (`_update_stats`,
+  `_fill_data`, `_set_table`); split out to keep `compare_window` small.
 - **compare_plots.py** — design-aware pyqtgraph drawing for `CompareWindow`
   (GUI-state-free): `strip` (mean ± SEM, clickable), `box` (+ Bonferroni stars
   via `arm_tests`), `superplot` (cells + per-recording means), `ensemble_msd`
-  (mean±SEM / median+CI bands), `scatter` (X-vs-Y + Spearman, clickable). Colours
-  + condition order come from the `Design`.
+  (mean±SEM / median+CI bands), `scatter` (X-vs-Y + Spearman, clickable),
+  `histogram` (per-cell distribution by group). Colours + condition order come
+  from the `Design`; axes are labelled with units via `metric_docs.axis_label`.
 - **design_editor.py** — `DesignEditor(QDialog)`: the **Groups & Comparisons**
   editor opened from the Comparison window (toolbar ▸ Groups…). A recordings
   table (include checkbox + editable **group** combo + cell counts, with bulk
@@ -237,13 +248,30 @@ Read this before opening source files. Update it when modules change.
   (per-(cell,frame) shape + nearest-neighbour + state + per-frame `speed`,
   `progress_cb`-aware), `metric_columns`, `flower_tracks` (origin-centred trajectories).
 - **metric_docs.py** — `doc` / `tooltip` / `as_html`: what each metric indicates
-  + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips).
+  + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips);
+  plus `column_units` / `column_label` / `axis_label` — derive display units +
+  a human name for an aggregated comparison column (e.g. `mean_area_um2` →
+  "mean area (µm²)", `mean_speed_spread` → "mean speed [spread]"), used for plot
+  axes + table headers; and `comparison_doc` / `comparison_tooltip` — resolve any
+  aggregated / per-state column to its (what, how) doc + a tooltip. `as_html`
+  includes a **Cross-recording comparison** section (recording = unit, whole-track
+  vs state-segmented, filters, stats).
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
   MSD), `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves),
-  `ols_adjusted` (per-arm covariate-adjusted treatment effect). Per-arm KW /
-  Bonferroni reuse `feature_tables.arm_tests`.
+  `ols_adjusted` (per-arm covariate-adjusted treatment effect),
+  `per_condition_summary` (per-group n / mean / SEM / median over recordings —
+  the Data tab). Per-arm KW / Bonferroni reuse `feature_tables.arm_tests`.
+  `build_comparison` also merges in the **state-segmented** per-cell metrics
+  (`state_metrics`) so the GUI can reproduce the original analysis.
+- **state_metrics.py** — `per_cell_state_metrics`: per-cell metrics computed
+  **separately over rounded vs spread frames** (`mean_speed_{s}`,
+  `persistence_{s}`, `straightness_{s}`, `mean_area_um2_{s}`, …), reproducing the
+  original CellScope state-aware analysis — edge frames excluded, per-step speed
+  capped at 15 µm/min, persistence/straightness over contiguous same-state
+  segments (≥5 frames). Mirrors the original `core/motility_state.py` +
+  `core/state_analysis.py` (validated to match `compare/per_recording.csv` to 3 dp).
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
   (region props incl. perimeter/circularity/state + nearest-neighbour),
   `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +
@@ -284,6 +312,11 @@ Read this before opening source files. Update it when modules change.
 - **test_project.py** — Project/Design model (GUI-free): auto-design (IC295 +
   generic single-arm), `regroup` exclude/override, effective conditions +
   `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides.
+- **test_compare_extras.py** — `metric_docs` units / labels / per-state suffix /
+  `comparison_doc` + `compare.per_condition_summary` (units + per-group summary).
+- **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
+  straightness on synthetic straight tracks, end-to-end per-cell state metrics on
+  a moving-square stack, and the speed cap.
 
 ## Config / data
 - **config.example.json** — committed template for `config.json` (gitignored,

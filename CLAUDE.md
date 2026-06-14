@@ -113,11 +113,19 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   per-cell plot metric.
 - **Comparison window** (Analysis ▸ Comparison window, `Ctrl+Shift+C`): a
   dedicated standalone window (not a dock) for cross-recording / treatment
-  analysis by condition (**recording = unit**) — tabbed **Distributions**
+  analysis by condition (**recording = unit**) — left tabbed **Distributions**
   (strip / **box** Bonferroni stars / superplot) · **Ensemble MSD** (mean±SEM /
-  median+bootstrap-CI) · **Scatter X-vs-Y** (+Spearman), beside a sortable
-  per-contrast **stats table** (p / Bonferroni / Cohen's d / optional
-  covariate-adjusted **OLS** after frac_spread + density) + omnibus KW + vehicle.
+  median+bootstrap-CI) · **Scatter X-vs-Y** (+Spearman), all **axis-labelled with
+  units**; a second **Filters** row (min frames · min track-quality · min
+  cells/recording · cell-state); and a tabbed right panel — **Stats** (sortable
+  per-contrast p / Bonferroni / Cohen's d / optional covariate-adjusted **OLS**
+  after frac_spread + density + omnibus KW + vehicle) · **Histogram** (per-cell
+  distribution by group) · **Data** (per-recording + per-group tables, unit-tagged).
+  Offers **whole-track** metrics *and* **state-segmented** ones (`mean_speed_spread`,
+  `persistence_spread`, `mean_area_um2_rounded`, … via `analysis/state_metrics.py`)
+  that **reproduce the original CellScope `compare/per_recording.csv`** (edge-excluded,
+  speed-capped, segment-gated per rounded/spread frames). A **Help** button + per-column
+  tooltips explain every metric (`metric_docs.comparison_tooltip` / `as_html`).
   Driven by the loaded project's **Design**; click a point to load that recording
   in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
   Toolbar **Groups…** opens the **Groups & Comparisons editor**
