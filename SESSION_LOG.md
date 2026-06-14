@@ -5,6 +5,19 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Fix: window too large / not resizable
+
+The stacked right docks (tabbed group + Image-Adjust) forced a ~1188 px minimum
+window height, so on smaller screens the window opened oversized with its resize
+edges off-screen. Fixes: (1) each dock's panel is wrapped in a resizable
+`QScrollArea` so a tall panel scrolls instead of inflating the window
+(minimumSizeHint 499×1188 → 289×443); (2) `setMinimumSize(720, 480)`;
+(3) initial size capped to the available screen; (4) `_fit_to_screen()` clamps a
+restored/oversized geometry and re-centres it on-screen at startup. Verified the
+window now shrinks to 720×480 and stays on-screen; panels reachable; tests pass.
+
+---
+
 ## 2026-06-13 — Self-drive remote, screengrab, illustrated README
 
 - **Self-drive remote** (`gui/remote.py`, `MASKVIEWER_REMOTE=<port>`): a

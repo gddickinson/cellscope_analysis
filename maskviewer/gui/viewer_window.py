@@ -38,7 +38,14 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
     def __init__(self, entries, parent=None):
         super().__init__(parent)
         self.setWindowTitle("cellscope_analysis — viewer & workbench")
-        self.resize(1280, 860)
+        self.setMinimumSize(720, 480)         # always shrinkable below screen
+        scr = QtWidgets.QApplication.primaryScreen()
+        avail = scr.availableGeometry() if scr else None
+        if avail:
+            self.resize(min(1280, avail.width() - 40),
+                        min(860, avail.height() - 60))
+        else:
+            self.resize(1100, 760)
         self.entries = list(entries)
         self.recording = None
         self.masks = None
@@ -56,6 +63,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._show_colorbar = True
 
         self.canvas = ImageCanvas()
+        self.canvas.setMinimumSize(160, 160)   # don't let the view inflate the window
         self.setCentralWidget(self.canvas)
         self.setDockOptions(QtWidgets.QMainWindow.AllowNestedDocks
                             | QtWidgets.QMainWindow.AllowTabbedDocks
@@ -92,6 +100,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._default_state = self.saveState()
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
         self._restore_settings()
+        self._fit_to_screen()                 # clamp restored geometry to the screen
 
         self.display.set_recordings(self.entries)
         if self.entries:
@@ -113,7 +122,13 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
     def _add_dock(self, name, widget, area):
         d = QtWidgets.QDockWidget(name, self)
         d.setObjectName("dock_" + name.replace(" ", ""))
-        d.setWidget(widget)
+        # wrap in a scroll area so a tall panel scrolls instead of forcing the
+        # whole window taller than the screen
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setWidget(widget)
+        d.setWidget(scroll)
         d.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable
                       | QtWidgets.QDockWidget.DockWidgetFloatable
                       | QtWidgets.QDockWidget.DockWidgetClosable)
@@ -429,6 +444,22 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
             self.restoreGeometry(geo)
         if st is not None:
             self.restoreState(st)
+
+    def _fit_to_screen(self):
+        """Clamp the window to the available screen + keep it on-screen, so a
+        saved/oversized geometry can never escape the display or block resizing."""
+        scr = (self.screen() if hasattr(self, "screen") else None) \
+            or QtWidgets.QApplication.primaryScreen()
+        if scr is None:
+            return
+        a = scr.availableGeometry()
+        w, h = min(self.width(), a.width()), min(self.height(), a.height())
+        if (w, h) != (self.width(), self.height()):
+            self.resize(w, h)
+        fg = self.frameGeometry()
+        if not a.contains(fg):
+            fg.moveCenter(a.center())
+            self.move(fg.topLeft())
 
     def closeEvent(self, ev):
         self._settings.setValue("geometry", self.saveGeometry())

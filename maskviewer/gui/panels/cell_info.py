@@ -51,7 +51,7 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.metric = QtWidgets.QComboBox()
         self.metric.currentIndexChanged.connect(self._replot)
         self.plot = pg.PlotWidget()
-        self.plot.setMinimumHeight(220)
+        self.plot.setMinimumHeight(120)
         self.plot.showGrid(x=True, y=True, alpha=0.2)
         self.curve = self.plot.plot([], [], pen=pg.mkPen((0, 160, 255), width=2),
                                     symbol="o", symbolSize=4,
