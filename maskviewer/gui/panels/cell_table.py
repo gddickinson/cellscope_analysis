@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from PyQt5 import QtCore, QtWidgets
 
-from ...analysis import exporters
+from ...analysis import exporters, lineage
 
 
 class CellTablePanel(QtWidgets.QWidget):
@@ -20,6 +20,7 @@ class CellTablePanel(QtWidgets.QWidget):
         self._um = None
         self._dt = None
         self._df = None
+        self._divisions = []
 
         self.title = QtWidgets.QLabel("Per-cell table")
         self.title.setStyleSheet("font-weight: bold;")
@@ -45,8 +46,9 @@ class CellTablePanel(QtWidgets.QWidget):
         lay.addWidget(self.table, 1)
 
     # -- public ----------------------------------------------------------
-    def set_recording(self, labels, um_per_px=None, dt_min=None):
+    def set_recording(self, labels, um_per_px=None, dt_min=None, divisions=None):
         self._labels, self._um, self._dt = labels, um_per_px, dt_min
+        self._divisions = divisions or []
         self._df = None
         self.table.setRowCount(0)
         self.export_btn.setEnabled(False)
@@ -71,11 +73,26 @@ class CellTablePanel(QtWidgets.QWidget):
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         try:
             self._df = exporters.per_cell_table(self._labels, self._um, self._dt)
+            self._add_division_columns()
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
         self._fill()
         self.export_btn.setEnabled(True)
         self.title.setText(f"Per-cell table — {len(self._df)} cells")
+
+    def _add_division_columns(self):
+        """Insert parent / daughters columns (label IDs) from divisions.json —
+        a cell with a `parent` is a child; a cell with `daughters` is a parent.
+        Only added when the recording has division events."""
+        if self._df is None or self._df.empty or not self._divisions:
+            return
+        parents, daughters = [], []
+        for cid in self._df["cell_id"]:
+            p, d = lineage.relatives(self._divisions, int(cid))
+            parents.append(p[0] if p else "")
+            daughters.append(", ".join(map(str, d)) if d else "")
+        self._df.insert(1, "parent", parents)
+        self._df.insert(2, "daughters", daughters)
 
     def _fill(self):
         df = self._df

@@ -99,8 +99,9 @@ Read this before opening source files. Update it when modules change.
     time series / mean ± SEM-or-SD error band / histogram / flower plot / scatter
     (X vs Y, click→select) / lineage tree / division timeline, with filters
     (min track length, state, exclude edge); lazy compute + cache.
-  - **cell_table.py** `CellTablePanel` — sortable per-cell metric table; row →
-    select cell; CSV export.
+  - **cell_table.py** `CellTablePanel` — sortable per-cell metric table (+
+    `parent` / `daughters` columns from divisions.json); row → select cell;
+    CSV export.
   - **compare_panel.py** `ComparePanel` — cross-recording comparison by condition
     (recording = unit): background compute + disk cache; plot kinds = recording
     means / box (Bonferroni stars) / superplot / **ensemble MSD** (mean±SEM or
