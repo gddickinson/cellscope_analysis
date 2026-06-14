@@ -116,8 +116,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   analysis by condition (**recording = unit**) — left tabbed **Distributions**
   (strip / **box** Bonferroni stars / superplot) · **Ensemble MSD** (mean±SEM /
   median+bootstrap-CI) · **Scatter X-vs-Y** (+Spearman), all **axis-labelled with
-  units**; a second **Filters** row (min frames · min track-quality · min
-  cells/recording · cell-state); and a tabbed right panel — **Stats** (sortable
+  units**; a **Filters…** dialog (`gui/compare_filters.py`: min frames ·
+  track-quality · min cells/recording · cell-state · **nearest-neighbour distance
+  min/max · neighbour count min/max · distance-from-image-edge**); and a tabbed
+  right panel — **Stats** (sortable
   per-contrast p / Bonferroni / Cohen's d / optional covariate-adjusted **OLS**
   after frac_spread + density + omnibus KW + vehicle) · **Histogram** (per-cell
   distribution by group) · **Data** (per-recording + per-group tables, unit-tagged).
@@ -126,6 +128,11 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   that **reproduce the original CellScope `compare/per_recording.csv`** (edge-excluded,
   speed-capped, segment-gated per rounded/spread frames). A **Help** button + per-column
   tooltips explain every metric (`metric_docs.comparison_tooltip` / `as_html`).
+  Every graph is **stylable** (`gui/plot_style.py`): a **Style…** button — or
+  **shift-right-click any plot** — opens a live editor for fonts, marker/line
+  sizes, fill opacity, grid, log axes, histogram bins, bars-vs-step, **trendlines**
+  (scatter fit / connect group means) (persisted via QSettings); the Distributions
+  tab adds a **Bars (mean ± SEM)** view.
   Driven by the loaded project's **Design**; click a point to load that recording
   in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
   Toolbar **Groups…** opens the **Groups & Comparisons editor**

@@ -18,7 +18,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt5 import QtWidgets                                    # noqa: E402
+from PyQt5 import QtWidgets, QtCore, QtGui                     # noqa: E402
 from maskviewer import project as projmod                      # noqa: E402
 from maskviewer.io.dataset import Entry                        # noqa: E402
 from maskviewer.gui.compare_window import CompareWindow        # noqa: E402
@@ -42,6 +42,8 @@ def fake_data(conditions, n_rec=4, n_cells=15):
                     "frac_spread": fs, "frac_rounded": 1.0 - fs,
                     "track_quality": float(np.clip(rng.normal(0.6, 0.2), 0, 1)),
                     "mean_n_neighbors": float(abs(rng.normal(2.0, 0.6))),
+                    "mean_nn_dist_um": float(abs(rng.normal(30.0, 10.0))),
+                    "min_border_dist_um": float(abs(rng.normal(200.0, 80.0))),
                     "shape_roundness": float(np.clip(rng.normal(0.6, 0.1), 0, 1)),
                 })
             for k in range(10):
@@ -86,17 +88,47 @@ def drive(win, label):
     assert "µm²" in win.rec_table.horizontalHeaderItem(3).text(), \
         win.rec_table.horizontalHeaderItem(3).text()
 
-    # new filters: quality / state / min-cells (each must not crash + keep data)
+    # filters (now in the Filters… dialog): quality / state / min-cells / crowding /
+    # edge — each must not crash and keep some data
+    win._open_filters_dialog()
     win.min_frames.setValue(5)
     win.min_quality.setValue(0.3)
     win.state_sel.setCurrentText("mostly spread")
     win.min_cells.setValue(2)
+    win.min_border.setValue(5.0)                       # ≥5 µm from edge
+    win.min_nn.setValue(2.0)                           # NN distance ≥ 2 µm
+    win.min_neighbors.setValue(0.0)
+    win.max_neighbors.setValue(0.0)
     assert win.rec_table.rowCount() > 0, f"{label}: filters emptied everything"
     win.min_cells.setValue(99999)                     # drop all recordings
-    win.min_cells.setValue(0)
-    win.min_quality.setValue(0.0)
-    win.state_sel.setCurrentText("all cells")
-    print(f"  {label}: tabs+filters+units OK · stats rows={win.table.rowCount()} "
+    win._reset_filters()                              # back to defaults
+
+    # bars-vs-points view + plot-style options
+    app = QtWidgets.QApplication.instance()
+    win.dist_kind.setCurrentText("Bars (mean ± SEM)")
+    assert win.dist_kind.currentIndex() == 3, "bars view missing"
+    win._open_style_dialog()
+    sd = win._style_dialog
+    sd._widgets["font_size"].setValue(14)
+    sd._widgets["hist_bins"].setValue(15)
+    sd._widgets["hist_bars"].setChecked(True)
+    sd._widgets["grid"].setChecked(True)
+    sd._widgets["trendline"].setChecked(True)         # trendlines on every graph
+    app.processEvents()
+    assert win.style.font_size == 14 and win.style.hist_bins == 15 and win.style.hist_bars
+    assert win.style.trendline
+    for k in range(win.dist_kind.count()):            # trend renders on all dist kinds
+        win.dist_kind.setCurrentIndex(k)
+    app.processEvents()
+    # shift-right-click a plot opens the style dialog (event filter consumes it)
+    ev = QtGui.QMouseEvent(QtCore.QEvent.MouseButtonPress, QtCore.QPointF(5, 5),
+                           QtCore.Qt.RightButton, QtCore.Qt.RightButton,
+                           QtCore.Qt.ShiftModifier)
+    assert win.eventFilter(win.dist_plot.viewport(), ev) is True, "shift-right filter"
+    sd._reset()                                       # restore defaults
+    win.dist_kind.setCurrentText("Strip (mean ± SEM)")
+    app.processEvents()
+    print(f"  {label}: tabs+filters+units+style OK · stats rows={win.table.rowCount()} "
           f"· per-rec rows={win.rec_table.rowCount()}")
 
 
@@ -165,11 +197,27 @@ def main():
         app.processEvents()
         win.grab().save(shot)
         print(f"  saved screenshot → {shot}")
+        win.tabs.setCurrentIndex(1)                   # Ensemble MSD (verify band+lines)
+        app.processEvents()
+        win.grab().save(shot.replace(".png", "_msd.png"))
+        print(f"  saved screenshot → {shot.replace('.png', '_msd.png')}")
+        win.tabs.setCurrentIndex(0)
         win.right_tabs.setCurrentIndex(1)             # Histogram tab (units on axis)
         app.processEvents()
         win.grab().save(shot.replace(".png", "_histogram.png"))
         print(f"  saved screenshot → {shot.replace('.png', '_histogram.png')}")
         win.right_tabs.setCurrentIndex(0)
+        win._open_style_dialog()                      # the plot-style options
+        win._style_dialog.resize(380, 470)
+        app.processEvents()
+        win._style_dialog.grab().save(shot.replace(".png", "_style.png"))
+        win._style_dialog.close()
+        print(f"  saved screenshot → {shot.replace('.png', '_style.png')}")
+        win._open_filters_dialog()                    # the filters dialog
+        app.processEvents()
+        win._filters_dlg.grab().save(shot.replace(".png", "_filters.png"))
+        win._filters_dlg.close()
+        print(f"  saved screenshot → {shot.replace('.png', '_filters.png')}")
 
     eshot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--editshot=")), None)
     if eshot:                                         # clean editor, before any edits

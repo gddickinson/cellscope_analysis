@@ -5,6 +5,58 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Comparison: crowding/edge filters, trendlines, MSD-plot fix
+
+Three Comparison-window improvements.
+
+- **More filters** (`gui/compare_filters.py`, new `FilterMixin`): the filters moved
+  from the cramped toolbar row into a non-modal **Filters…** dialog and gained
+  spatial/crowding ones — **distance from the image edge** (new per-cell
+  `min/mean_border_dist_um` in `exporters.per_cell_table`), **nearest-neighbour
+  distance** (min/max, on `mean_nn_dist`), and **neighbour count** (min/max, on
+  `mean_n_neighbors`) — alongside frames / track-quality / min-cells / state.
+  Session-only (+ Reset). Filter `_filtered()` moved into the mixin.
+- **Trendlines** in the plot-style options (`PlotStyle.trendline`): on the scatter
+  a least-squares line; on the categorical plots (strip / box / bars / superplot) a
+  dashed line connecting the per-group centres across conditions (a trend across an
+  ordered series). Replaces the scatter-only `scatter_fit`.
+- **Ensemble-MSD plot fix**: the CI band's bound curves are now added to the plot
+  (so they inherit its log mode) and clamped > 0 — previously a bare
+  `FillBetweenItem` over loose curves rendered the band/lines misaligned on the
+  log-log axes (and `mean−SEM ≤ 0` broke the log).
+
+Tests: `pytest` **44 passed** (new edge-distance test). The compare smoke drives
+the Filters… dialog + new filters, trendlines on every dist kind, and writes
+`comparison_{msd,filters}.png`. Both GUI smokes green; all files < 500 lines
+(`_filtered` + filter widgets live in `compare_filters.py`).
+
+---
+
+## 2026-06-14 — Per-graph plot-style options (Comparison window)
+
+Every Comparison-window graph is now customisable.
+
+- **`gui/plot_style.py`** (new): `PlotStyle` (dataclass of render options —
+  font size, marker/line size, fill opacity, grid, log X/Y, scatter fit line,
+  histogram bins/density/bars, show-points — QSettings-persisted), a non-modal
+  **`PlotStyleDialog`** live editor, and **`PlotStyleMixin`** that opens it from a
+  toolbar **Style…** button *or* **shift-right-click on any plot** (your suggested
+  UX) and replots live.
+- `compare_plots` functions all take the `PlotStyle` and apply it via a shared
+  `_axes` helper (fonts/grid/log/ticks); added a **`bars`** view (group mean ± SEM)
+  → the Distributions tab gains a **Bars (mean ± SEM)** option (bars-vs-points).
+- `compare_window`: holds the style (`PlotStyle.from_settings`), adds the Style…
+  button, installs the shift-right-click event filter on all four plots, and threads
+  the style into every draw call. `_show_help` moved to `compare_tables.show_metrics_help`
+  to keep the file < 500 lines.
+
+Tests: `pytest` **43 passed**; the compare smoke now drives the bars view, the
+style dialog (font/bins/bars/grid/fit), and the shift-right-click filter, and
+writes `docs/screenshots/comparison_style.png`. Both GUI smokes green; all files
+< 500 lines.
+
+---
+
 ## 2026-06-14 — Match the original analysis (state-segmented metrics) + full metric docs
 
 Investigated why the Comparison window's numbers differed from the original

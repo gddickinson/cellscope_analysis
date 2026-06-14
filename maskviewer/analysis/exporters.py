@@ -92,6 +92,15 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
             "last_frame": int(frames[-1]) if frames.size else -1,
             "frames_tracked": int(present.sum()),
         }
+        # distance from the centroid to the nearest image border (crowding /
+        # edge-proximity QC) — min over present frames + the mean
+        if labels.ndim == 3 and cen.ndim == 2 and frames.size:
+            H, W = labels.shape[1], labels.shape[2]
+            bd = np.minimum.reduce([cen[present, 1], cen[present, 0],
+                                    (W - 1) - cen[present, 1],
+                                    (H - 1) - cen[present, 0]])
+            row[f"min_border_dist_{u}"] = float(bd.min()) * scale
+            row[f"mean_border_dist_{u}"] = float(bd.mean()) * scale
         for col in agg_cols:
             if col in getattr(sub, "columns", []):
                 vals = sub[col].to_numpy(dtype=float)

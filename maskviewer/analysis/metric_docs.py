@@ -65,6 +65,11 @@ METRICS = {
                        "Count of frames where the cell's mask is non-empty."),
     "n_cells": ("Number of tracked cells in the recording.",
                 "Distinct positive label IDs present in ≥1 frame."),
+    "border_dist": ("Distance from the cell to the nearest image edge "
+                    "(field-of-view position / edge-proximity QC).",
+                    "min(x, y, W−1−x, H−1−y) of the centroid × µm/px; the "
+                    "`min_…` column is the closest the cell ever comes to a "
+                    "border, the `mean_…` column averages over its frames."),
 }
 
 # dynamic per-channel metric prefixes
@@ -209,6 +214,8 @@ _KEY_ALIASES = {
     "speed_isolated": "speed_isolated / speed_crowded / frac_isolated",
     "speed_crowded": "speed_isolated / speed_crowded / frac_isolated",
     "frac_isolated": "speed_isolated / speed_crowded / frac_isolated",
+    "min_border_dist": "border_dist", "mean_border_dist": "border_dist",
+    "nn_dist": "nn_dist", "mean_nn_dist": "nn_dist", "median_nn_dist": "nn_dist",
 }
 
 

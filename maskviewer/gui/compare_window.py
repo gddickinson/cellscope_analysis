@@ -20,11 +20,14 @@ from PyQt5 import QtCore, QtWidgets
 from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
-from .compare_tables import StatsTablesMixin
+from .compare_tables import StatsTablesMixin, show_metrics_help
+from .compare_filters import FilterMixin
+from .plot_style import PlotStyle, PlotStyleMixin
 from ..analysis import compare, metric_docs
 from ..config import PROJECT_ROOT
 
-_DIST_KINDS = ["Strip (mean ± SEM)", "Box (+ Bonferroni)", "Superplot"]
+_DIST_KINDS = ["Strip (mean ± SEM)", "Box (+ Bonferroni)", "Superplot",
+               "Bars (mean ± SEM)"]
 
 
 class _Worker(QtCore.QObject):
@@ -46,7 +49,8 @@ class _Worker(QtCore.QObject):
         self.done.emit(res)
 
 
-class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
+class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
+                    QtWidgets.QMainWindow):
     recordingPicked = QtCore.pyqtSignal(str)
 
     def __init__(self, project, parent=None):
@@ -58,6 +62,9 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self._msd = None
         self._thread = self._worker = None
         self._design_editor = None
+        self._settings = QtCore.QSettings("cellscope_analysis", "compare")
+        self.style = PlotStyle.from_settings(self._settings)
+        self._style_dialog = None
 
         self._build_ui()
         self.set_project(project)
@@ -78,28 +85,12 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.metric_y = QtWidgets.QComboBox()
         self.metric_y.setToolTip("Y metric (Scatter tab)")
         self.metric_y.currentIndexChanged.connect(self._replot)
-        self.min_frames = QtWidgets.QSpinBox()
-        self.min_frames.setRange(1, 9999)
-        self.min_frames.setPrefix("≥")
-        self.min_frames.setToolTip("Keep cells tracked for at least this many frames")
-        self.min_frames.valueChanged.connect(self._replot)
-        self.min_quality = QtWidgets.QDoubleSpinBox()
-        self.min_quality.setRange(0.0, 1.0)
-        self.min_quality.setSingleStep(0.05)
-        self.min_quality.setPrefix("≥")
-        self.min_quality.setToolTip("Keep cells with at least this track_quality (0–1)")
-        self.min_quality.valueChanged.connect(self._replot)
-        self.min_cells = QtWidgets.QSpinBox()
-        self.min_cells.setRange(0, 99999)
-        self.min_cells.setPrefix("≥")
-        self.min_cells.setToolTip("Drop recordings with fewer than this many "
-                                  "(filtered) cells — recording = unit")
-        self.min_cells.valueChanged.connect(self._replot)
-        self.state_sel = QtWidgets.QComboBox()
-        self.state_sel.addItems(["all cells", "mostly spread", "mostly rounded"])
-        self.state_sel.setToolTip("Keep cells that spend most of their time in "
-                                  "this state (frac_spread / frac_rounded ≥ 0.5)")
-        self.state_sel.currentIndexChanged.connect(self._replot)
+        self._build_filter_widgets()         # min_frames / quality / cells / state
+        self.filters_btn = QtWidgets.QPushButton("Filters…")          # + crowding /
+        self.filters_btn.setToolTip("Restrict the cells / recordings compared: "    # edge
+                                    "frames, track-quality, cells/recording, state, "
+                                    "nearest-neighbour crowding, distance from edge")
+        self.filters_btn.clicked.connect(self._open_filters_dialog)
         self.ols = QtWidgets.QCheckBox("OLS-adjust")
         self.ols.setToolTip("Treatment effect after frac_spread + density")
         self.ols.toggled.connect(self._replot)
@@ -117,14 +108,19 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.groups_btn.setToolTip("Assign recordings to groups, pick controls, "
                                    "include/exclude — applies instantly")
         self.groups_btn.clicked.connect(self._open_design_editor)
+        self.style_btn = QtWidgets.QPushButton("Style…")
+        self.style_btn.setToolTip("Plot style: fonts, marker/line sizes, fill, "
+                                  "grid, log axes, histogram bins, bars-vs-points "
+                                  "(or shift-right-click any plot)")
+        self.style_btn.clicked.connect(self._open_style_dialog)
         self.help_btn = QtWidgets.QPushButton("Help")
         self.help_btn.setToolTip("Metrics & methods reference (what each metric "
                                  "means + how the comparison is computed)")
-        self.help_btn.clicked.connect(self._show_help)
+        self.help_btn.clicked.connect(lambda: show_metrics_help(self))
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
-        for w in (self.compute_btn, self.recompute, self.groups_btn):
+        for w in (self.compute_btn, self.recompute, self.groups_btn, self.filters_btn):
             bar.addWidget(w)
         bar.addSeparator()
         for lbl, w in (("Metric", self.metric), ("Y", self.metric_y),
@@ -134,18 +130,9 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         bar.addWidget(self.ols)
         bar.addSeparator()
         bar.addWidget(export)
+        bar.addWidget(self.style_btn)
         bar.addWidget(self.help_btn)
         self.addToolBar(bar)
-
-        fbar = QtWidgets.QToolBar()          # second row: cell / recording filters
-        fbar.setMovable(False)
-        fbar.addWidget(QtWidgets.QLabel(" Filters: "))
-        for lbl, w in (("frames", self.min_frames), ("quality", self.min_quality),
-                       ("cells/rec", self.min_cells), ("state", self.state_sel)):
-            fbar.addWidget(QtWidgets.QLabel(" " + lbl + " "))
-            fbar.addWidget(w)
-        self.addToolBarBreak()
-        self.addToolBar(fbar)
 
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.currentChanged.connect(self._replot)
@@ -195,6 +182,9 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self.status = self.statusBar()
         self.busy = StatusProgress()                  # bottom-bar progress + ETA
         self.status.addPermanentWidget(self.busy)
+        # shift-right-click any plot → the plot-style dialog
+        self._install_style_filters([self.dist_plot, self.msd_plot,
+                                     self.scatter_plot, self.hist_plot])
 
     # -- right-panel tabs ------------------------------------------------
     def _build_stats_tab(self):
@@ -298,19 +288,6 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self._design_editor.show()
         self._design_editor.raise_()
 
-    def _show_help(self):
-        dlg = QtWidgets.QDialog(self)
-        dlg.setWindowTitle("Metrics & methods reference")
-        dlg.resize(680, 680)
-        lay = QtWidgets.QVBoxLayout(dlg)
-        br = QtWidgets.QTextBrowser()
-        br.setHtml(metric_docs.as_html())
-        lay.addWidget(br)
-        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
-        btns.rejected.connect(dlg.reject)
-        lay.addWidget(btns)
-        dlg.exec_()
-
     def _on_design_changed(self):
         """Grouping / control / include changed — remap + replot, no recompute."""
         self._refresh_control_combo()
@@ -391,23 +368,6 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
         self._replot()
 
     # -- plot / stats ----------------------------------------------------
-    def _filtered(self):
-        pc = self.project.regroup(self._per_cell)        # drop excluded + regroup
-        if pc is None or pc.empty:
-            return pc
-        mf = self.min_frames.value()
-        if mf > 1 and "frames_tracked" in pc.columns:
-            pc = pc[pc["frames_tracked"] >= mf]
-        q = self.min_quality.value()
-        if q > 0 and "track_quality" in pc.columns:
-            pc = pc[pc["track_quality"] >= q]
-        state = self.state_sel.currentText()
-        if state == "mostly spread" and "frac_spread" in pc.columns:
-            pc = pc[pc["frac_spread"] >= 0.5]
-        elif state == "mostly rounded" and "frac_rounded" in pc.columns:
-            pc = pc[pc["frac_rounded"] >= 0.5]
-        return pc
-
     def _filtered_msd(self):
         return self.project.regroup(self._msd)           # excluded/regroup-aware
 
@@ -434,27 +394,34 @@ class CompareWindow(StatsTablesMixin, QtWidgets.QMainWindow):
             msd = self._filtered_msd()
             if msd is not None and per_rec is not None:
                 msd = msd[msd["recording"].isin(set(per_rec["recording"]))]
-            compare_plots.ensemble_msd(self.msd_plot, msd, design, stat)
+            compare_plots.ensemble_msd(self.msd_plot, msd, design, stat, style=self.style)
         elif per_rec is not None and metric in per_rec.columns:
             if tab == 2:
                 self.scatter_plot.clear()
                 compare_plots.scatter(self.scatter_plot, per_rec, metric,
-                                      self.metric_y.currentText(), design, self._pick)
+                                      self.metric_y.currentText(), design, self._pick,
+                                      style=self.style)
             else:
                 self.dist_plot.clear()
                 kind = self.dist_kind.currentIndex()
                 if kind == 1:
-                    compare_plots.box(self.dist_plot, per_rec, metric, design)
+                    compare_plots.box(self.dist_plot, per_rec, metric, design,
+                                      style=self.style)
                 elif kind == 2:
-                    compare_plots.superplot(self.dist_plot, pc, per_rec, metric, design)
+                    compare_plots.superplot(self.dist_plot, pc, per_rec, metric,
+                                            design, style=self.style)
+                elif kind == 3:
+                    compare_plots.bars(self.dist_plot, per_rec, metric, design,
+                                       style=self.style)
                 else:
-                    compare_plots.strip(self.dist_plot, per_rec, metric, design, self._pick)
+                    compare_plots.strip(self.dist_plot, per_rec, metric, design,
+                                        self._pick, style=self.style)
         # right panel (stats + histogram + data) always tracks the current metric
         if per_rec is not None and metric and metric in per_rec.columns:
             self._update_stats(per_rec, metric)
             self.hist_plot.clear()
             self._hist_legend.clear()
-            compare_plots.histogram(self.hist_plot, pc, metric, design)
+            compare_plots.histogram(self.hist_plot, pc, metric, design, style=self.style)
             self._fill_data(per_rec, pc, metric)
 
     # -- misc ------------------------------------------------------------
