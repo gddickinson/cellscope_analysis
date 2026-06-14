@@ -23,9 +23,9 @@ from .label_stats import (
     n_cells_per_frame, cell_ids, cell_areas_px, track_lengths, centroids,
     summary)
 from . import (cell_metrics, motion, state, neighbors, edge_dynamics,
-               shape_modes, metric_docs, exporters)
+               shape_modes, metric_docs, exporters, compare)
 
 __all__ = ["n_cells_per_frame", "cell_ids", "cell_areas_px", "track_lengths",
            "centroids", "summary", "cell_metrics", "motion", "state",
            "neighbors", "edge_dynamics", "shape_modes", "metric_docs",
-           "exporters"]
+           "exporters", "compare"]

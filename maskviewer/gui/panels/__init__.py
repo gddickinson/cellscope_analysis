@@ -10,6 +10,7 @@
   population_panel.py PopulationPanel — all-cells plots (time series / mean±err /
                                       histogram / flower / scatter / lineage) + filters
   cell_table.py    CellTablePanel   — sortable per-cell metric table
+  compare_panel.py ComparePanel     — cross-recording comparison (by condition)
 """
 from .timeline import TimelinePanel
 from .display_panel import DisplayPanel
@@ -19,6 +20,8 @@ from .edge_panel import EdgePanel
 from .shape_panel import ShapeModesPanel
 from .population_panel import PopulationPanel
 from .cell_table import CellTablePanel
+from .compare_panel import ComparePanel
 
 __all__ = ["TimelinePanel", "DisplayPanel", "ImageAdjustPanel", "CellInfoPanel",
-           "EdgePanel", "ShapeModesPanel", "PopulationPanel", "CellTablePanel"]
+           "EdgePanel", "ShapeModesPanel", "PopulationPanel", "CellTablePanel",
+           "ComparePanel"]

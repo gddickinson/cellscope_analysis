@@ -101,6 +101,10 @@ Read this before opening source files. Update it when modules change.
     (min track length, state, exclude edge); lazy compute + cache.
   - **cell_table.py** `CellTablePanel` — sortable per-cell metric table; row →
     select cell; CSV export.
+  - **compare_panel.py** `ComparePanel` — cross-recording comparison by condition
+    (recording = unit): background compute + disk cache, recording-means strip /
+    superplot, per-arm KW + Bonferroni + vehicle stats, click a point → load that
+    recording, CSV export.
 - **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/**Config**
   (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help
   (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
@@ -114,8 +118,9 @@ Read this before opening source files. Update it when modules change.
   (`MASKVIEWER_REMOTE=<port>`); marshals commands to the GUI thread; for headless
   agent driving + screenshots.
 - **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
-  docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes + Population tabbed +
-  Image-Adjust right; Timeline bottom), wires panels↔canvas, split base/overlay
+  docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes + Population +
+  Cell-Table + Compare tabbed + Image-Adjust right; Timeline bottom; each dock
+  wrapped in a scroll area so the window fits any screen), wires panels↔canvas, split base/overlay
   rendering (single or additive **composite**), colour-by any calculated metric
   + units **colour bar** (`colorby.overlay_lut`), lazy caches (centroid history /
   track lengths / mean speeds / shape-mode model) shared as providers,
@@ -162,6 +167,10 @@ Read this before opening source files. Update it when modules change.
   `metric_columns`, `flower_tracks` (origin-centred trajectories).
 - **metric_docs.py** — `doc` / `tooltip` / `as_html`: what each metric indicates
   + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips).
+- **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
+  (per-cell metrics over many recordings + condition), `aggregate` (→ per-recording
+  means), `by_condition`, `order_conditions`, `metric_columns`. Stats reuse
+  `feature_tables.arm_tests`.
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
   (region props incl. perimeter/circularity/state + nearest-neighbour),
   `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +

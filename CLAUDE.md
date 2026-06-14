@@ -111,6 +111,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
 - **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
   mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
   per-cell plot metric.
+- **Compare** dock: cross-recording comparison by condition (**recording = unit**)
+  — per-recording strip + mean±SEM, or a superplot (per-cell cloud + recording
+  means); per-arm Kruskal-Wallis + within-arm Bonferroni + vehicle stats; click a
+  point to load that recording; CSV export. Heavy compute is threaded + cached.
 - **Population** dock: plot any metric across ALL cells of the recording —
   every-cell time series, **mean ± SEM/SD** error band, **histogram**, and a
   **flower plot** (origin-centred trajectories); filters (min track length,
@@ -197,6 +201,9 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
 - ✅ **Self-drive remote** (`MASKVIEWER_REMOTE=<port>` HTTP hook, `gui/remote.py`)
   for headless agent driving + screenshots; **screengrab** (File ▸ Save View /
   Save Window). README illustrated with screenshots (`docs/screenshots/`).
+- ✅ **Cross-recording comparison** (`analysis/compare.py` + Compare dock):
+  recording-as-unit, group by condition, per-arm stats (reuse `feature_tables.
+  arm_tests`), strip / superplot, threaded + cached.
 - ✅ **CellScope analysis-audit gaps** added: convexity, rel_area, Fürth fit,
   membrane metrics, density-stratified speed, area-stability + track-quality QC,
   VAMPIRE eigenshapes/normalised-entropy. (Deferred, documented: per-state
@@ -213,5 +220,5 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
 - **SiR-actin (Cy5) cortical intensity vs retraction** — correlate the per-frame
   intensity series (already exported) with edge velocity.
 - Side-by-side / difference view of two mask sets (e.g. raw vs edited).
-- **Cross-recording / treatment comparison** (superplots, per-arm stats) — the
-  big next phase once single-recording analysis is signed off.
+- Comparison extras (see the comparison-audit follow-up): effect sizes + CIs,
+  box/violin, ensemble MSD by condition, surfacing the multivariate PERMANOVA/AUC.

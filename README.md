@@ -33,6 +33,10 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   eigenshapes).
 - **Population** — all cells at once: time series, mean ± SEM/SD, histogram,
   scatter, **flower plot**, lineage tree + division timeline; with filtering.
+- **Cross-recording comparison** — group recordings by condition (**recording =
+  experimental unit**): strip / superplot a metric across conditions with per-arm
+  Kruskal-Wallis + within-arm Bonferroni + vehicle stats; click a point to load
+  that recording.
 - **Sortable per-cell table**, **CSV export** (per-frame / per-cell / tracks,
   for Origin/Prism), **save any plot** (PNG/SVG), and a **Help ▸ Metrics
   Reference** documenting every metric + tooltips throughout.
@@ -41,7 +45,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
-*(Screenshots use the bundled synthetic sample — no real data is committed.)*
+![cross-recording comparison by condition (recording = unit) with per-arm stats](docs/screenshots/comparison.png)
+
+*(Screenshots use synthetic data only — no real microscopy data is committed.)*
 
 ## Environment
 

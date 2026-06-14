@@ -45,6 +45,7 @@ class WindowActionsMixin:
             return
         self.entries = found
         self.display.set_recordings(self.entries)
+        self.compare.set_entries(self.entries)
         self._load_entry(0)
 
     def export_csv(self):

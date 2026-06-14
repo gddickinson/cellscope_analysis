@@ -5,6 +5,31 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Cross-recording comparison dock
+
+The big next phase: compare a metric across recordings grouped by condition,
+**recording = experimental unit**.
+- `analysis/compare.py`: `build_comparison` (per-cell metrics over every
+  recording via each Entry's masks + `exporters.per_cell_table`, tagged with
+  recording + condition), `aggregate` (→ per-recording means), `by_condition`,
+  `order_conditions` (arm order), `metric_columns`.
+- **Compare dock** (`panels/compare_panel.py`): background compute (QThread +
+  progress + cancel) with a disk cache; pick a metric → "Recording means" (strip
+  + mean±SEM per condition) or "Superplot" (per-cell cloud coloured by recording
+  behind the per-recording means); stats = omnibus KW + per-arm Kruskal-Wallis +
+  within-arm Bonferroni vs control + WT-vs-DMSO vehicle (reusing
+  `feature_tables.arm_tests`); min-frames filter; click a point → load that
+  recording; CSV export of the per-cell + per-recording tables.
+- Wired into the window (new tabbed dock; `set_entries` on load / open-folder;
+  `recordingPicked` → select recording). README illustrated with
+  `docs/screenshots/comparison.png`.
+
+`pytest` 28 passed (added a compare test on synthetic multi-condition fakes);
+headless smoke verified both plot kinds + arm stats + click-to-load. All files
+< 500 lines. Follow-up: a comparison-analysis audit of CellScope is queued.
+
+---
+
 ## 2026-06-13 — Fix: window too large / not resizable
 
 The stacked right docks (tabbed group + Image-Adjust) forced a ~1188 px minimum
