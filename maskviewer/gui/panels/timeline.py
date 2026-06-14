@@ -27,13 +27,17 @@ class TimelinePanel(QtWidgets.QWidget):
 
         self.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.slider.setMinimum(0)
+        self.slider.setToolTip("Scrub frames (← / → to step)")
         self.spin = QtWidgets.QSpinBox()
+        self.spin.setToolTip("Frame number")
         self.fps = QtWidgets.QSpinBox()
         self.fps.setRange(1, 60)
         self.fps.setValue(10)
         self.fps.setSuffix(" fps")
+        self.fps.setToolTip("Playback speed")
         self.loop = QtWidgets.QCheckBox("Loop")
         self.loop.setChecked(True)
+        self.loop.setToolTip("Loop back to the start at the end")
         self.label = QtWidgets.QLabel("–")
         self.label.setMinimumWidth(150)
 

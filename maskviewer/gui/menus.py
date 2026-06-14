@@ -73,5 +73,7 @@ def build_menubar(win):
     h.addAction(_act(win, "&Findings", lambda: win.open_doc("docs/FINDINGS_followup.md")))
     h.addAction(_act(win, "&Interface Map", lambda: win.open_doc("INTERFACE.md")))
     h.addSeparator()
+    h.addAction(_act(win, "&Metrics Reference…", win.show_metrics_help,
+                     tip="What each metric means and how it is calculated"))
     h.addAction(_act(win, "&Keyboard Shortcuts", win.show_shortcuts))
     h.addAction(_act(win, "&About", win.show_about))

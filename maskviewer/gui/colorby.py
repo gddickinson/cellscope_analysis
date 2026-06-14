@@ -1,9 +1,11 @@
 """Build the mask-overlay lookup table for the current colour-by metric.
 
-Kept out of `viewer_window` (file-size budget); `overlay_lut(win, lab)` reads
+Kept out of `viewer_window` (file-size budget). `overlay_lut(win, lab)` reads
 what it needs off the ViewerWindow (loaded masks/recording, the colour-by mode,
-and the lazy caches/providers) and returns a per-label RGBA LUT, or None for the
-default per-ID colouring.
+the lazy caches/providers) and returns ``(lut, legend)`` where ``lut`` is a
+per-label RGBA LUT (or None for default per-ID colouring) and ``legend`` is
+``(lo, hi, cmap_name, label)`` for the units colour bar (or None for categorical
+modes / no bar).
 """
 from __future__ import annotations
 
@@ -19,6 +21,17 @@ CMAP = {"area": "viridis", "perimeter": "viridis", "extent": "plasma",
         "speed": "magma", "shape_mode": "tab10"}
 
 
+def _label(mode, um, dt):
+    u = "µm" if um else "px"
+    spd = f"{u}/min" if dt else f"{u}/frame"
+    return {"area": f"area ({u}²)", "perimeter": f"perimeter ({u})",
+            "circularity": "circularity", "eccentricity": "eccentricity",
+            "aspect_ratio": "aspect ratio", "solidity": "solidity",
+            "extent": "extent", "nn_dist": f"NN distance ({u})",
+            "n_neighbors": "neighbour count", "speed": f"mean speed ({spd})",
+            "track": "track length (frames)"}.get(mode, mode)
+
+
 def mean_speeds(win) -> dict:
     """{cell_id: mean speed} for the recording (lazy, cached on the window)."""
     if win._mean_speed is None and win.masks is not None:
@@ -30,36 +43,43 @@ def mean_speeds(win) -> dict:
     return win._mean_speed or {}
 
 
+def _continuous(vals, mx, cmap, label):
+    finite = [v for v in vals.values() if np.isfinite(v)]
+    lo, hi = (float(min(finite)), float(max(finite))) if finite else (0.0, 1.0)
+    return scalar_label_lut(vals, mx, cmap), (lo, hi, cmap, label)
+
+
 def overlay_lut(win, lab):
     if lab is None:
-        return None
+        return None, None
     mode = win.display.color_by_mode()
     mx = win.masks.max_label
+    um = win.recording.um_per_px
+    dt = win.recording.time_interval_min
     if mode == "id":
-        return None
+        return None, None
     if mode == "state":
-        props = cell_metrics.regionprops_frame(lab, win.recording.um_per_px)
+        props = cell_metrics.regionprops_frame(lab, um)
         lut = np.zeros((mx + 1, 4), dtype=np.ubyte)
         for cid, r in props.items():
             if 0 < cid < lut.shape[0]:
                 lut[cid] = (*cell_state.STATE_COLOR.get(r["state"],
                                                         (130, 130, 130)), 255)
-        return lut
+        return lut, None                               # categorical → no bar
     if mode == "track":
         win._ensure_track_len()
-        return scalar_label_lut(win._track_len, mx, "magma")
+        return _continuous(win._track_len, mx, "magma", _label(mode, um, dt))
     if mode == "speed":
-        return scalar_label_lut(mean_speeds(win), mx, "magma")
+        return _continuous(mean_speeds(win), mx, "magma", _label(mode, um, dt))
     if mode == "shape_mode":
         model = win._shape_modes_model()
         if not model:
-            return None
+            return None, None
         t = win.timeline.value()
         vals = {cid: m for (cid, ft), m in model["by_cell_frame"].items()
                 if ft == t}
-        return scalar_label_lut(vals, mx, "tab10")
+        return scalar_label_lut(vals, mx, "tab10"), None   # categorical
     # per-frame region metrics (recomputed for the current frame)
-    um = win.recording.um_per_px
     props = cell_metrics.regionprops_frame(
         lab, um, with_solidity=(mode == "solidity"),
         with_perimeter=(mode in ("perimeter", "circularity")))
@@ -76,4 +96,4 @@ def overlay_lut(win, lab):
                "perimeter": "perimeter_um" if um else "perimeter_px"
                }.get(mode, mode)
         vals = {cid: props[cid][key] for cid in props if key in props[cid]}
-    return scalar_label_lut(vals, mx, CMAP.get(mode, "viridis"))
+    return _continuous(vals, mx, CMAP.get(mode, "viridis"), _label(mode, um, dt))

@@ -21,12 +21,12 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from .image_view import ImageCanvas
 from .panels import (TimelinePanel, DisplayPanel, ImageAdjustPanel,
-                     CellInfoPanel, EdgePanel, ShapeModesPanel)
+                     CellInfoPanel, EdgePanel, ShapeModesPanel, PopulationPanel)
 from .luts import DisplayState
 from .menus import build_menubar
 from .export_dialog import CSVExportDialog
 from . import colorby
-from ..analysis import label_stats, cell_metrics, shape_modes
+from ..analysis import label_stats, cell_metrics, shape_modes, metric_docs
 from ..io.dataset import discover, Entry
 from ..config import PROJECT_ROOT
 
@@ -51,6 +51,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self._shape_model = None        # lazy VAMPIRE shape-mode model
         self._cur_lab = None
         self._cur_ncells = 0
+        self._show_colorbar = True
 
         self.canvas = ImageCanvas()
         self.setCentralWidget(self.canvas)
@@ -65,6 +66,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.cell_info = CellInfoPanel()
         self.edge = EdgePanel()
         self.shape = ShapeModesPanel()
+        self.population = PopulationPanel()
         self.timeline = TimelinePanel()
         self.docks = {}
         self._add_dock("Display", self.display, _RIGHT)
@@ -72,8 +74,9 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self._add_dock("Cell Info", self.cell_info, _RIGHT)
         self._add_dock("Edge Dynamics", self.edge, _RIGHT)
         self._add_dock("Shape Modes", self.shape, _RIGHT)
+        self._add_dock("Population", self.population, _RIGHT)
         self._add_dock("Timeline", self.timeline, _BOTTOM)
-        for name in ("Cell Info", "Edge Dynamics", "Shape Modes"):
+        for name in ("Cell Info", "Edge Dynamics", "Shape Modes", "Population"):
             self.tabifyDockWidget(self.docks["Display"], self.docks[name])
         self.docks["Display"].raise_()
         self.status = self.statusBar()
@@ -139,6 +142,9 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.cell_info.clear_cell()
         self.edge.clear_cell()
         self.shape.clear_model()
+        self.population.set_recording(
+            self.masks.labels if self.masks is not None else None,
+            self.recording.um_per_px, self.recording.time_interval_min)
         self.canvas.overlays.set_scale(self.recording.um_per_px)
         self.display.set_channels(self.recording.channel_names)
         self.cell_info.set_available(self.recording.channel_names,
@@ -236,10 +242,13 @@ class ViewerWindow(QtWidgets.QMainWindow):
         lab = self.masks.frame(t) if self.masks is not None else None
         self._cur_lab = lab
         self._cur_ncells = int((np.unique(lab) > 0).sum()) if lab is not None else 0
+        masks_on = self.display.show_masks.isChecked()
+        lut, legend = colorby.overlay_lut(self, lab)
         self.canvas.set_overlay(lab, opacity=self.display.opacity_value,
                                 outline=self.display.outline.isChecked(),
-                                visible=self.display.show_masks.isChecked(),
-                                lut=colorby.overlay_lut(self, lab))
+                                visible=masks_on, lut=lut)
+        self.canvas.set_colorbar(legend if (self._show_colorbar and masks_on)
+                                 else None)
         self._update_overlays(t, lab)
         self._update_status()
 
@@ -272,6 +281,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
             act = QtWidgets.QAction(cell_metrics.metric_label(key, um), self)
             act.setCheckable(True)
             act.setChecked(self.cell_info.is_enabled(key))
+            act.setToolTip(metric_docs.tooltip(key))
             act.toggled.connect(lambda on, k=key: self.cell_info.set_metric_enabled(k, on))
             menu.addAction(act)
         if not self.cell_info.available:
@@ -312,7 +322,10 @@ class ViewerWindow(QtWidgets.QMainWindow):
 
     # -- interaction -----------------------------------------------------
     def _on_overlay_toggle(self, key, on):
-        self.canvas.overlays.set_show(key, on)
+        if key == "colorbar":
+            self._show_colorbar = on
+        else:
+            self.canvas.overlays.set_show(key, on)
         self._render_overlay()
 
     def _on_hover(self, cid):
@@ -415,6 +428,19 @@ class ViewerWindow(QtWidgets.QMainWindow):
             "<b>cellscope_analysis</b><br>Viewer &amp; analysis workbench for "
             "CellScope detection results (recordings + tracking masks).<br><br>"
             "Masks are produced by CellScope; this app views &amp; analyses them.")
+
+    def show_metrics_help(self):
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Metrics reference")
+        dlg.resize(640, 660)
+        lay = QtWidgets.QVBoxLayout(dlg)
+        browser = QtWidgets.QTextBrowser()
+        browser.setHtml(metric_docs.as_html())
+        lay.addWidget(browser)
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+        btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns)
+        dlg.exec_()
 
     def show_shortcuts(self):
         QtWidgets.QMessageBox.information(

@@ -110,8 +110,15 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
 - **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
   mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
   per-cell plot metric.
+- **Population** dock: plot any metric across ALL cells of the recording —
+  every-cell time series, **mean ± SEM/SD** error band, **histogram**, and a
+  **flower plot** (origin-centred trajectories); filters (min track length,
+  state, exclude edge); lazy compute.
+- Colouring cells by a metric shows a **units colour bar** (Display ▸ Colour bar).
 - **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
   + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
+- **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
+  throughout the GUI.
 - **Menus**: File (open / **Export CSV** Ctrl+E / screenshot), View (zoom),
   Image (auto/reset/colormap/invert), Analysis, Window (dock toggles), Help.
 Status bar shows frame/time/scale/cell-count + hovered/selected cell.
@@ -169,7 +176,11 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
   computed/offered (persisted, immediate recompute). `cell_frame_table(metrics=)`
   skips unselected/expensive ones.
 - ✅ **Nearest-neighbour** (`analysis/neighbors.py`) — plot + CSV + colour-by.
-- ✅ **Colour the main display by any calculated metric** (`_overlay_lut`).
+- ✅ **Colour the main display by any calculated metric** (`gui/colorby.py`) +
+  a **units colour bar**.
+- ✅ **Population tab** (`analysis/population.py`) — all-cells time series /
+  mean±error / **histogram** / **flower plot** + filtering.
+- ✅ **Metrics reference + tooltips** (`analysis/metric_docs.py`).
 - ✅ **VAMPIRE shape modes** (`analysis/shape_modes.py`) — Shape Modes dock +
   `shape_mode` plot metric + colour-by.
 - ✅ **Edge / membrane dynamics**: protrusion/retraction kymograph **+ per-frame

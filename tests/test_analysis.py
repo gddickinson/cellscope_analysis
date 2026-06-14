@@ -227,6 +227,21 @@ def test_shape_modes_cluster():
     assert model["by_cell_frame"][(1, 0)] != model["by_cell_frame"][(3, 0)]
 
 
+def test_population_table_and_flower():
+    from maskviewer.io import load_masks, load_recording
+    from maskviewer.analysis import population
+    m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))
+    rec = load_recording(os.path.join(SAMPLE, "Pos_demo.ome.tif"))
+    df = population.population_table(m.labels, rec.um_per_px, rec.time_interval_min)
+    for col in ("cell_id", "frame", "speed", "circularity", "nn_dist_um"):
+        assert col in df.columns
+    assert "speed" in population.metric_columns(df)
+    fl = population.flower_tracks(m.labels, rec.um_per_px)
+    assert set(fl) == {int(c) for c in m.cell_ids()}
+    for rel in fl.values():                              # each track starts at 0
+        assert abs(rel[0, 0]) < 1e-9 and abs(rel[0, 1]) < 1e-9
+
+
 def test_cell_series_and_history():
     from maskviewer.io import load_masks
     m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))

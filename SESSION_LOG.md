@@ -5,6 +5,34 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Colour bar, metrics reference + tooltips, Population tab
+
+- **Units colour bar** for the main display: a `ColorBarItem` on the canvas shows
+  the value range + units of the current colour-by metric (hidden for
+  categorical id/state/shape-mode); Display ▸ "Colour bar" toggle. `colorby`
+  now returns `(lut, legend)`; the bar's colormap is built from matplotlib
+  (pyqtgraph's `colormap.get` crashes on non-builtin names).
+- **Metrics reference + tooltips**: `analysis/metric_docs.py` is one source of
+  what-each-metric-indicates + how-it's-calculated. Help ▸ **Metrics Reference…**
+  opens an HTML dialog; tooltips added to the Config metric menu, the cell-plot
+  and colour-by combos (per item), and the main controls (timeline, image
+  adjust, display, edge).
+- **Edge "this frame" crop**: the per-frame edge map now auto-crops to the
+  cell's max radius and centres on it (stable view as you scrub).
+- **Population tab** (`analysis/population.py` + `panels/population_panel.py`):
+  plot any metric across ALL cells of the recording — every-cell time series,
+  **mean ± SEM/SD** error band (with optional individual curves), **histogram**,
+  and a **flower plot** (origin-centred trajectories). Filters: min track
+  length, cell state, exclude edge. Lazy compute + cache (one regionprops pass +
+  per-frame speed). Inspired by CellScope's flower/comparison plots.
+
+Verified headless + screenshots (flower, mean±error). `pytest` 23 passed (added
+population + colour-bar/docs coverage). All files < 500 lines (colour-by logic
+split into `gui/colorby.py`). Next big item: cross-recording / treatment
+comparison (superplots across conditions).
+
+---
+
 ## 2026-06-13 — VAMPIRE shape modes + edge maps + colour-by-metric + linear MSD
 
 - **VAMPIRE shape modes** (`analysis/shape_modes.py`, sklearn): each cell-frame

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from PyQt5 import QtCore, QtWidgets
 
+from ...analysis import metric_docs
+
 COLOR_BY = [
     ("Cell ID", "id"), ("Cell state", "state"),
     ("Area", "area"), ("Perimeter", "perimeter"), ("Circularity", "circularity"),
@@ -18,7 +20,8 @@ COLOR_BY = [
     ("Mean speed", "speed"), ("Track length", "track"), ("Shape mode", "shape_mode"),
 ]
 OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
-            ("ids", "Cell IDs", False), ("trails", "Track trails", False)]
+            ("ids", "Cell IDs", False), ("trails", "Track trails", False),
+            ("colorbar", "Colour bar", True)]
 
 
 class DisplayPanel(QtWidgets.QWidget):
@@ -36,12 +39,16 @@ class DisplayPanel(QtWidgets.QWidget):
         rec_box = QtWidgets.QGroupBox("Recording")
         rf = QtWidgets.QFormLayout(rec_box)
         self.recording = QtWidgets.QComboBox()
+        self.recording.setToolTip("Recording to view")
         self.recording.currentIndexChanged.connect(self.recordingChanged)
         self.channel = QtWidgets.QComboBox()
+        self.channel.setToolTip("Channel shown (and the one Image Adjust edits)")
         self.channel.currentIndexChanged.connect(self.channelChanged)
         rf.addRow("Recording", self.recording)
         rf.addRow("Channel", self.channel)
         self.composite = QtWidgets.QCheckBox("Composite (blend channels)")
+        self.composite.setToolTip("Additively blend the ticked channels "
+                                  "(e.g. DIC grey + Cy5 magenta)")
         self.composite.toggled.connect(self._composite_toggled)
         rf.addRow(self.composite)
         outer.addWidget(rec_box)
@@ -56,16 +63,25 @@ class DisplayPanel(QtWidgets.QWidget):
         mf = QtWidgets.QFormLayout(mask_box)
         self.show_masks = QtWidgets.QCheckBox("Show masks")
         self.show_masks.setChecked(True)
+        self.show_masks.setToolTip("Show the segmentation/tracking mask overlay")
         self.show_masks.toggled.connect(self.maskOptionsChanged)
         self.outline = QtWidgets.QCheckBox("Outlines only")
+        self.outline.setToolTip("Draw mask outlines instead of filled regions")
         self.outline.toggled.connect(self.maskOptionsChanged)
         self.opacity = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.opacity.setRange(0, 100)
         self.opacity.setValue(50)
+        self.opacity.setToolTip("Mask overlay opacity")
         self.opacity.valueChanged.connect(self.maskOptionsChanged)
         self.color_by = QtWidgets.QComboBox()
-        for label, _ in COLOR_BY:
+        self.color_by.setToolTip("Colour cells by a calculated metric "
+                                 "(the colour bar shows its units)")
+        _tipkey = {"state": "state_code"}
+        for i, (label, key) in enumerate(COLOR_BY):
             self.color_by.addItem(label)
+            tip = metric_docs.tooltip(_tipkey.get(key, key))
+            if tip:
+                self.color_by.setItemData(i, tip, QtCore.Qt.ToolTipRole)
         self.color_by.currentIndexChanged.connect(
             lambda i: self.colorByChanged.emit(COLOR_BY[i][1]))
         mf.addRow(self.show_masks)

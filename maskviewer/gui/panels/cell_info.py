@@ -17,7 +17,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtWidgets
 
-from ...analysis import cell_metrics, motion
+from ...analysis import cell_metrics, motion, metric_docs
 
 _MSD = "MSD (log-log)"
 _MSD_LIN = "MSD (linear)"
@@ -138,6 +138,11 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.metric.blockSignals(True)
         self.metric.clear()
         self.metric.addItems(items)
+        for i, k in enumerate(items):
+            tip = metric_docs.tooltip("MSD") if k.startswith("MSD") \
+                else metric_docs.tooltip(k)
+            if tip:
+                self.metric.setItemData(i, tip, QtCore.Qt.ToolTipRole)
         self.metric.setCurrentText(
             cur if cur in items else ("area" if "area" in s else items[0]))
         self.metric.blockSignals(False)

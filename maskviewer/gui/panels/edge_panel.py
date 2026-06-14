@@ -36,6 +36,7 @@ class EdgePanel(QtWidgets.QWidget):
         self._um = None
         self._labels = None
         self._frame = None
+        self._half = None               # max cell radius (px) → stable edge crop
         self._vfr = self._vel = self._rfr = self._rad = None
         self._lut_div = _lut("RdBu_r")
         self._lut_seq = _lut("viridis")
@@ -44,6 +45,8 @@ class EdgePanel(QtWidgets.QWidget):
         self.title.setStyleSheet("font-weight: bold;")
         self.mode = QtWidgets.QComboBox()
         self.mode.addItems(_MODES)
+        self.mode.setToolTip("Kymograph (angle × time) or the cell boundary in "
+                             "the current frame, coloured by velocity / radius")
         self.mode.currentIndexChanged.connect(self._replot)
         self.plot = pg.PlotWidget()
         self.plot.setMenuEnabled(False)
@@ -80,6 +83,8 @@ class EdgePanel(QtWidgets.QWidget):
             labels, self.cell_id, um_per_px, dt_min)
         self._rfr, self._rad = edge_dynamics.radius_kymograph(
             labels, self.cell_id, um_per_px)
+        self._half = (float(np.nanmax(self._rad)) / (um_per_px or 1.0)
+                      if self._rad.size and np.isfinite(self._rad).any() else None)
         s = edge_dynamics.edge_summary(self._vel)
         vu = "µm/min" if (um_per_px and dt_min) else ("µm/frame" if um_per_px
                                                       else "px/step")
@@ -140,6 +145,7 @@ class EdgePanel(QtWidgets.QWidget):
         self.img.setRect(QtCore.QRectF(0.0, y0, 360.0, (y1 - y0) or 1.0))
         self.plot.setLabel("bottom", "angle (deg)")
         self.plot.setLabel("left", "time (min)" if self._dt else "frame")
+        self.plot.autoRange()
 
     def _draw_edge_frame(self, velocity):
         t = self._frame
@@ -177,6 +183,10 @@ class EdgePanel(QtWidgets.QWidget):
         self.scatter.setData(x=bx, y=by, brush=brushes, size=5, pen=None)
         self.plot.setLabel("bottom", "x (px)")
         self.plot.setLabel("left", "y (px)")
+        if self._half:                                 # stable crop, cell centred
+            h = self._half * 1.15
+            self.plot.setXRange(cx - h, cx + h, padding=0)
+            self.plot.setYRange(cy - h, cy + h, padding=0)
 
     def _export(self):
         velocity = self.mode.currentIndex() in (0, 2)

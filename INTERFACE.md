@@ -62,8 +62,11 @@ Read this before opening source files. Update it when modules change.
   locked-aspect viewbox. `make_label_lut` (stable per-ID colours),
   `scalar_label_lut` (colour-by-feature), `label_boundaries` (outline mode),
   `set_base(img, levels, lut)`, `set_base_layers([...])` (additive composite of
-  several channels), `set_overlay(...)`, emits `cellHovered(int)` +
+  several channels), `set_overlay(...)`, `set_colorbar(legend)` (units colour bar
+  for colour-by, via a `ColorBarItem`), emits `cellHovered(int)` +
   `cellClicked(int)`, `zoom`/`autorange`.
+- **colorby.py** — `overlay_lut(win, lab)` → `(label-LUT, legend)` for the
+  current colour-by metric (legend = lo/hi/cmap/units for the colour bar).
 - **overlays.py** — `Overlays`: scale bar, frame/time text, cell-ID labels,
   track trails, selected-cell highlight; corner items re-anchor on pan/zoom.
 - **luts.py** — `build_lut(colormap, gamma, invert)` → RGBA LUT, `PRESETS`,
@@ -92,18 +95,22 @@ Read this before opening source files. Update it when modules change.
     summary + kymograph CSV export, for the selected cell.
   - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
     mode-fraction bars, heterogeneity entropy (lazy compute button).
+  - **population_panel.py** `PopulationPanel` — all-cells plots for the recording:
+    time series / mean ± SEM-or-SD error band / histogram / flower plot, with
+    filters (min track length, state, exclude edge); lazy compute + cache.
 - **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/**Config**
-  (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help.
+  (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help
+  (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
 - **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
-  docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes tabbed + Image-Adjust
-  right; Timeline bottom), wires panels↔canvas, split base/overlay rendering
-  (single or additive **composite** of visible channels), colour-by any
-  calculated metric (`_overlay_lut` builds the per-cell value→LUT), lazy caches
-  (centroid history / track lengths / mean speeds / shape-mode model) shared as
-  providers, click-to-select → Cell-Info + Edge dock, layout save/restore
-  (QSettings) + Reset Layout, status bar, ←/→/Space shortcuts.
+  docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes + Population tabbed +
+  Image-Adjust right; Timeline bottom), wires panels↔canvas, split base/overlay
+  rendering (single or additive **composite**), colour-by any calculated metric
+  + units **colour bar** (`colorby.overlay_lut`), lazy caches (centroid history /
+  track lengths / mean speeds / shape-mode model) shared as providers,
+  click-to-select → Cell-Info + Edge dock, `show_metrics_help`, layout
+  save/restore (QSettings) + Reset Layout, status bar, ←/→/Space shortcuts.
 
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
@@ -135,6 +142,11 @@ Read this before opening source files. Update it when modules change.
   `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
   per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
   `cell_mode_series`, `cell_heterogeneity`, `mode_contour`.
+- **population.py** — all-cells analysis for one recording: `population_table`
+  (per-(cell,frame) shape + nearest-neighbour + state + per-frame `speed`),
+  `metric_columns`, `flower_tracks` (origin-centred trajectories).
+- **metric_docs.py** — `doc` / `tooltip` / `as_html`: what each metric indicates
+  + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips).
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
   (region props incl. perimeter/circularity/state + nearest-neighbour),
   `per_cell_table` (track + shape + motion + nearest-neighbour aggregates,

@@ -87,6 +87,9 @@ class ImageCanvas(pg.GraphicsLayoutWidget):
         self.vb.addItem(self.overlay)
         self._extra = []                  # extra base layers for composite blend
         self.overlays = Overlays(self.vb)
+        self._cmap_cache = {}
+        self.colorbar = pg.ColorBarItem(width=18, interactive=False)
+        self._cb_on = False
         self._lut = make_label_lut(1)
         self._max_label = 1
         self._cur_labels = None
@@ -149,6 +152,33 @@ class ImageCanvas(pg.GraphicsLayoutWidget):
         self.overlay.setImage(disp, autoLevels=False, levels=(0, self._max_label),
                               lut=lut if lut is not None else self._lut)
         self.overlay.setOpacity(float(opacity))
+
+    # -- colour bar (units legend for colour-by) -------------------------
+    def _pg_cmap(self, name):
+        if name not in self._cmap_cache:
+            import matplotlib
+            rgba = (matplotlib.colormaps[name](np.linspace(0, 1, 256)) * 255
+                    ).astype(np.ubyte)
+            self._cmap_cache[name] = pg.ColorMap(np.linspace(0, 1, 256), rgba)
+        return self._cmap_cache[name]
+
+    def set_colorbar(self, legend):
+        """legend = (lo, hi, cmap_name, label) to show a units colour bar, or
+        None to hide it."""
+        if legend is None:
+            if self._cb_on:
+                self.removeItem(self.colorbar)
+                self._cb_on = False
+            return
+        lo, hi, cmap, label = legend
+        if hi <= lo:
+            hi = lo + 1.0
+        self.colorbar.setColorMap(self._pg_cmap(cmap))
+        self.colorbar.setLevels((lo, hi))
+        self.colorbar.getAxis("right").setLabel(label)
+        if not self._cb_on:
+            self.addItem(self.colorbar, row=0, col=1)
+            self._cb_on = True
 
     # -- view ------------------------------------------------------------
     def autorange(self):
