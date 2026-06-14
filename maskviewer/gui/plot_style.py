@@ -25,7 +25,8 @@ class PlotStyle:
     log_x: bool = False          # scatter X
     log_y: bool = False          # distributions / scatter Y (MSD is always log)
     show_points: bool = True     # individual recording points on box / bars
-    scatter_fit: bool = False    # least-squares line on the scatter plot
+    trendline: bool = False      # scatter: least-squares line; categorical: connect
+                                 # the per-group centres across conditions
     hist_bins: int = 30
     hist_density: bool = True     # density vs raw cell counts
     hist_bars: bool = False       # filled bars vs outlined step curve
@@ -60,7 +61,7 @@ class PlotStyleDialog(QtWidgets.QDialog):
                ("log_x", "Log X (scatter)"),
                ("log_y", "Log Y (distributions / scatter)"),
                ("show_points", "Show individual points (box / bars)"),
-               ("scatter_fit", "Least-squares line (scatter)"),
+               ("trendline", "Trendline (scatter fit · connect group means)"),
                ("hist_density", "Histogram density (else cell counts)"),
                ("hist_bars", "Histogram filled bars (else step curve)")]
 

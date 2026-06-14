@@ -55,6 +55,17 @@ def test_comparison_doc_resolves_base():
     assert "state-segmented" in metric_docs.as_html().lower()
 
 
+def test_border_distance_metric():
+    from maskviewer.analysis import exporters
+    T, H, W = 3, 100, 100
+    labels = np.zeros((T, H, W), np.int32)
+    labels[:, 40:60, 40:60] = 1            # centroid ~ (49.5, 49.5)
+    df = exporters.per_cell_table(labels, 0.5, 10.0)
+    assert "min_border_dist_um" in df.columns
+    # nearest edge is 49.5 px away → × 0.5 µm/px ≈ 24.75 µm
+    assert abs(df.iloc[0]["min_border_dist_um"] - 49.5 * 0.5) < 1.0
+
+
 def test_per_condition_summary():
     per_rec = pd.DataFrame({
         "recording": ["a", "b", "c", "d"],

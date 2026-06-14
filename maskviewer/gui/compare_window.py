@@ -21,6 +21,7 @@ from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
 from .compare_tables import StatsTablesMixin, show_metrics_help
+from .compare_filters import FilterMixin
 from .plot_style import PlotStyle, PlotStyleMixin
 from ..analysis import compare, metric_docs
 from ..config import PROJECT_ROOT
@@ -48,7 +49,8 @@ class _Worker(QtCore.QObject):
         self.done.emit(res)
 
 
-class CompareWindow(StatsTablesMixin, PlotStyleMixin, QtWidgets.QMainWindow):
+class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
+                    QtWidgets.QMainWindow):
     recordingPicked = QtCore.pyqtSignal(str)
 
     def __init__(self, project, parent=None):
@@ -83,28 +85,12 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, QtWidgets.QMainWindow):
         self.metric_y = QtWidgets.QComboBox()
         self.metric_y.setToolTip("Y metric (Scatter tab)")
         self.metric_y.currentIndexChanged.connect(self._replot)
-        self.min_frames = QtWidgets.QSpinBox()
-        self.min_frames.setRange(1, 9999)
-        self.min_frames.setPrefix("≥")
-        self.min_frames.setToolTip("Keep cells tracked for at least this many frames")
-        self.min_frames.valueChanged.connect(self._replot)
-        self.min_quality = QtWidgets.QDoubleSpinBox()
-        self.min_quality.setRange(0.0, 1.0)
-        self.min_quality.setSingleStep(0.05)
-        self.min_quality.setPrefix("≥")
-        self.min_quality.setToolTip("Keep cells with at least this track_quality (0–1)")
-        self.min_quality.valueChanged.connect(self._replot)
-        self.min_cells = QtWidgets.QSpinBox()
-        self.min_cells.setRange(0, 99999)
-        self.min_cells.setPrefix("≥")
-        self.min_cells.setToolTip("Drop recordings with fewer than this many "
-                                  "(filtered) cells — recording = unit")
-        self.min_cells.valueChanged.connect(self._replot)
-        self.state_sel = QtWidgets.QComboBox()
-        self.state_sel.addItems(["all cells", "mostly spread", "mostly rounded"])
-        self.state_sel.setToolTip("Keep cells that spend most of their time in "
-                                  "this state (frac_spread / frac_rounded ≥ 0.5)")
-        self.state_sel.currentIndexChanged.connect(self._replot)
+        self._build_filter_widgets()         # min_frames / quality / cells / state
+        self.filters_btn = QtWidgets.QPushButton("Filters…")          # + crowding /
+        self.filters_btn.setToolTip("Restrict the cells / recordings compared: "    # edge
+                                    "frames, track-quality, cells/recording, state, "
+                                    "nearest-neighbour crowding, distance from edge")
+        self.filters_btn.clicked.connect(self._open_filters_dialog)
         self.ols = QtWidgets.QCheckBox("OLS-adjust")
         self.ols.setToolTip("Treatment effect after frac_spread + density")
         self.ols.toggled.connect(self._replot)
@@ -134,7 +120,7 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, QtWidgets.QMainWindow):
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
-        for w in (self.compute_btn, self.recompute, self.groups_btn):
+        for w in (self.compute_btn, self.recompute, self.groups_btn, self.filters_btn):
             bar.addWidget(w)
         bar.addSeparator()
         for lbl, w in (("Metric", self.metric), ("Y", self.metric_y),
@@ -147,16 +133,6 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, QtWidgets.QMainWindow):
         bar.addWidget(self.style_btn)
         bar.addWidget(self.help_btn)
         self.addToolBar(bar)
-
-        fbar = QtWidgets.QToolBar()          # second row: cell / recording filters
-        fbar.setMovable(False)
-        fbar.addWidget(QtWidgets.QLabel(" Filters: "))
-        for lbl, w in (("frames", self.min_frames), ("quality", self.min_quality),
-                       ("cells/rec", self.min_cells), ("state", self.state_sel)):
-            fbar.addWidget(QtWidgets.QLabel(" " + lbl + " "))
-            fbar.addWidget(w)
-        self.addToolBarBreak()
-        self.addToolBar(fbar)
 
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.currentChanged.connect(self._replot)
@@ -392,23 +368,6 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, QtWidgets.QMainWindow):
         self._replot()
 
     # -- plot / stats ----------------------------------------------------
-    def _filtered(self):
-        pc = self.project.regroup(self._per_cell)        # drop excluded + regroup
-        if pc is None or pc.empty:
-            return pc
-        mf = self.min_frames.value()
-        if mf > 1 and "frames_tracked" in pc.columns:
-            pc = pc[pc["frames_tracked"] >= mf]
-        q = self.min_quality.value()
-        if q > 0 and "track_quality" in pc.columns:
-            pc = pc[pc["track_quality"] >= q]
-        state = self.state_sel.currentText()
-        if state == "mostly spread" and "frac_spread" in pc.columns:
-            pc = pc[pc["frac_spread"] >= 0.5]
-        elif state == "mostly rounded" and "frac_rounded" in pc.columns:
-            pc = pc[pc["frac_rounded"] >= 0.5]
-        return pc
-
     def _filtered_msd(self):
         return self.project.regroup(self._msd)           # excluded/regroup-aware
 

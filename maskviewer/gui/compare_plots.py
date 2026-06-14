@@ -57,11 +57,23 @@ def _pick(sp, pick_cb):
         sp.sigClicked.connect(lambda _s, pts: pts and pick_cb(str(pts[0].data())))
 
 
+def _trend(plot, centres, style):
+    """Dashed line through the per-group centre values across conditions (a trend
+    across an ordered series of conditions, e.g. a dose response)."""
+    pts = [(i, v) for i, v in enumerate(centres) if v is not None and np.isfinite(v)]
+    if len(pts) >= 2:
+        xs, ys = zip(*pts)
+        plot.plot(list(xs), list(ys),
+                  pen=pg.mkPen((255, 215, 0), width=style.line_width,
+                               style=QtCore.Qt.DashLine))
+
+
 def strip(plot, per_rec, metric, design, pick_cb=None, style=None):
     style = style or PlotStyle()
     conds = _conds(per_rec, design)
     rng = np.random.default_rng(0)
     lw = style.line_width
+    centres = [np.nan] * len(conds)
     for i, cond in enumerate(conds):
         sub = per_rec[per_rec["condition"] == cond]
         col = _rgb(design.color(cond))
@@ -76,11 +88,14 @@ def strip(plot, per_rec, metric, design, pick_cb=None, style=None):
         plot.addItem(sp)
         vals = np.array([s["pos"][1] for s in spots])
         mean = vals.mean()
+        centres[i] = mean
         sem = vals.std(ddof=1) / np.sqrt(vals.size) if vals.size > 1 else 0.0
         plot.addItem(pg.ErrorBarItem(x=np.array([i]), y=np.array([mean]),
                                      height=np.array([2 * sem]), beam=0.12,
                                      pen=pg.mkPen("w", width=lw)))
         plot.plot([i - 0.22, i + 0.22], [mean, mean], pen=pg.mkPen("w", width=lw))
+    if style.trendline:
+        _trend(plot, centres, style)
     _axes(plot, style, left=metric_docs.axis_label(metric), logy=style.log_y,
           title="each point = one recording (mean ± SEM)")
     _ticks(plot, conds)
@@ -93,12 +108,14 @@ def box(plot, per_rec, metric, design, style=None):
     r = feature_tables.arm_tests(bc, arms=design.arms, vehicle=design.vehicle)
     rng = np.random.default_rng(0)
     lw = style.line_width
+    centres = [np.nan] * len(conds)
     for i, cond in enumerate(conds):
         v = np.array(bc.get(cond, []), float)
         v = v[np.isfinite(v)]
         if v.size == 0:
             continue
         q1, med, q3 = np.percentile(v, [25, 50, 75])
+        centres[i] = med
         col = _rgb(design.color(cond))
         pen = pg.mkPen(col, width=lw)
         for x0, y0, x1, y1 in [(i - .25, q1, i + .25, q1), (i - .25, q3, i + .25, q3),
@@ -122,6 +139,8 @@ def box(plot, per_rec, metric, design, style=None):
                     lbl = pg.TextItem(star, color="w", anchor=(0.5, 1))
                     lbl.setPos(conds.index(t), max(bc[t]))
                     plot.addItem(lbl)
+    if style.trendline:
+        _trend(plot, centres, style)
     _axes(plot, style, left=metric_docs.axis_label(metric), logy=style.log_y,
           title="box = recordings/condition · * vs arm control (Bonferroni)")
     _ticks(plot, conds)
@@ -133,6 +152,7 @@ def bars(plot, per_rec, metric, design, style=None):
     style = style or PlotStyle()
     conds = _conds(per_rec, design)
     rng = np.random.default_rng(0)
+    centres = [np.nan] * len(conds)
     for i, cond in enumerate(conds):
         v = per_rec[per_rec["condition"] == cond][metric].to_numpy(float)
         v = v[np.isfinite(v)]
@@ -140,6 +160,7 @@ def bars(plot, per_rec, metric, design, style=None):
             continue
         col = _rgb(design.color(cond))
         mean = float(v.mean())
+        centres[i] = mean
         sem = float(v.std(ddof=1) / np.sqrt(v.size)) if v.size > 1 else 0.0
         plot.addItem(pg.BarGraphItem(x=np.array([i]), height=np.array([mean]),
                                      width=0.6, brush=pg.mkBrush(*col, 160),
@@ -152,6 +173,8 @@ def bars(plot, per_rec, metric, design, style=None):
                 i + rng.uniform(-0.12, 0.12, v.size), v,
                 size=max(4, style.point_size - 3), pen=pg.mkPen("k"),
                 brush=pg.mkBrush(*col, 220)))
+    if style.trendline:
+        _trend(plot, centres, style)
     _axes(plot, style, left=metric_docs.axis_label(metric), logy=style.log_y,
           title="bar = group mean ± SEM (recording = unit)")
     _ticks(plot, conds)
@@ -162,6 +185,7 @@ def superplot(plot, per_cell, per_rec, metric, design, style=None):
     conds = _conds(per_cell, design)
     rng = np.random.default_rng(0)
     cell_sz = max(2, style.point_size - 7)
+    centres = [np.nan] * len(conds)
     for i, cond in enumerate(conds):
         cc = per_cell[per_cell["condition"] == cond]
         for ri, rec in enumerate(cc["recording"].unique()):
@@ -175,12 +199,15 @@ def superplot(plot, per_cell, per_rec, metric, design, style=None):
         mr = per_rec[per_rec["condition"] == cond][metric].to_numpy(float)
         mr = mr[np.isfinite(mr)]
         if mr.size:
+            centres[i] = float(mr.mean())
             plot.addItem(pg.ScatterPlotItem(
                 i + rng.uniform(-0.1, 0.1, mr.size), mr, size=style.point_size,
                 brush=pg.mkBrush(*_rgb(design.color(cond)), 235),
                 pen=pg.mkPen("k", width=1.5)))
             plot.plot([i - 0.22, i + 0.22], [mr.mean(), mr.mean()],
                       pen=pg.mkPen("w", width=style.line_width))
+    if style.trendline:
+        _trend(plot, centres, style)
     _axes(plot, style, left=metric_docs.axis_label(metric), logy=style.log_y,
           title="small = cells (by recording) · large = recording means")
     _ticks(plot, conds)
@@ -192,10 +219,19 @@ def ensemble_msd(plot, msd, design, stat, style=None):
         plot.setTitle("no ensemble MSD (recompute to build it)")
         return
     ens = compare.ensemble_by_condition(msd, stat=stat)
+    eps = 1e-9                       # log axes need strictly-positive values
     for cond in compare.order_conditions(ens, order=design.condition_order()):
         tau, centre, lo, hi = ens[cond]
+        keep = np.isfinite(tau) & np.isfinite(centre) & (centre > 0)
+        if keep.sum() < 1:
+            continue
+        tau, centre = tau[keep], np.maximum(centre[keep], eps)
+        lo, hi = np.maximum(lo[keep], eps), np.maximum(hi[keep], eps)
         col = _rgb(design.color(cond))
-        top, bot = pg.PlotDataItem(tau, hi), pg.PlotDataItem(tau, lo)
+        # add the band's bound curves to the plot (pen=None) so they inherit its
+        # log mode — a bare FillBetweenItem over loose curves renders misaligned
+        top = plot.plot(tau, hi, pen=None)
+        bot = plot.plot(tau, lo, pen=None)
         plot.addItem(pg.FillBetweenItem(top, bot, brush=pg.mkBrush(*col, style.fill_alpha)))
         plot.plot(tau, centre, pen=pg.mkPen(col, width=style.line_width))
     band = "median + 95% CI" if stat == "median" else "mean ± SEM"
@@ -227,11 +263,12 @@ def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
         from scipy.stats import spearmanr
         rho, p = spearmanr(x[ok], y[ok])
         title += f"   (Spearman ρ={rho:.2f}, p={p:.3f})"
-    if style.scatter_fit and ok.sum() >= 2:
+    if style.trendline and ok.sum() >= 2:
         a, b = np.polyfit(x[ok], y[ok], 1)
         xr = np.array([x[ok].min(), x[ok].max()])
         plot.plot(xr, a * xr + b,
-                  pen=pg.mkPen("w", width=style.line_width, style=QtCore.Qt.DashLine))
+                  pen=pg.mkPen((255, 215, 0), width=style.line_width,
+                               style=QtCore.Qt.DashLine))
     _axes(plot, style, left=metric_docs.axis_label(my), bottom=metric_docs.axis_label(mx),
           logx=style.log_x, logy=style.log_y, title=title)
 

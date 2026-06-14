@@ -26,12 +26,13 @@ Read this before opening source files. Update it when modules change.
 - **scripts/smoke_compare_window.py** — headless (QT offscreen) smoke for the
   Comparison window + Project wiring: drives every tab / dist-kind / OLS / stats
   table on fake multi-arm + single-arm data, checks the editable control combo,
-  exercises the **filters** (frames / quality / cells-per-rec / state), the right
-  **Stats / Histogram / Data** tabs + units, the **bars view + plot-style dialog +
-  shift-right-click** filter, the **Groups & Comparisons editor** (exclude /
-  regroup / add-comparison / control / vehicle / reset), and verifies
-  `ViewerWindow.open_compare_window` / `set_project`. `--shot=PATH` (also writes
-  `_histogram` + `_style` variants) / `--editshot=PATH` (re)write the screenshots.
+  exercises the **filters** (frames / quality / cells-per-rec / state / crowding /
+  edge via the Filters… dialog), the right **Stats / Histogram / Data** tabs +
+  units, the **bars view + plot-style dialog (incl. trendline) + shift-right-click**,
+  the **Groups & Comparisons editor** (exclude / regroup / add-comparison / control
+  / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
+  `set_project`. `--shot=PATH` (also writes `_msd` / `_histogram` / `_style` /
+  `_filters` variants) / `--editshot=PATH` (re)write the screenshots.
 - **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
   unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
   Population / Cell-table / Shape computes through the off-thread runner (asserting
@@ -139,8 +140,9 @@ Read this before opening source files. Update it when modules change.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
   (Compute/recompute · **Groups…** (opens `DesignEditor`) · Metric · Y ·
   **Control** (editable for single-arm designs) · MSD stat · OLS · Export) + a
-  second **Filters** row (min frames · min track-quality · min cells/recording ·
-  cell-state). Left tabbed plots — **Distributions** (strip / box+Bonferroni /
+  **Filters…** button (opens the `FilterMixin` dialog: frames / track-quality /
+  cells-per-recording / state / nearest-neighbour crowding / distance-from-edge).
+  Left tabbed plots — **Distributions** (strip / box+Bonferroni / bars /
   superplot) · **Ensemble MSD** · **Scatter** (all axis-labelled with units). The
   right panel is tabbed: **Stats** (sortable per-contrast p / Bonferroni / Cohen d
   / OLS β,p + omnibus KW + vehicle — via `StatsTablesMixin`) · **Histogram**
@@ -156,18 +158,26 @@ Read this before opening source files. Update it when modules change.
   **Data** tables from the per-recording table + Design (`_update_stats`,
   `_fill_data`, `_set_table`); + `show_metrics_help(parent)` (the Metrics &
   methods reference dialog). Split out to keep `compare_window` small.
+- **compare_filters.py** — `FilterMixin`: builds the cell/recording filter widgets,
+  lays them out in a non-modal **Filters…** dialog, and applies them in `_filtered`
+  (min frames · track-quality · min cells/recording · state · NN distance min/max ·
+  neighbour count min/max · distance-from-image-edge). Session-only (+ Reset).
 - **compare_plots.py** — design-aware pyqtgraph drawing for `CompareWindow`
   (GUI-state-free): `strip` (mean ± SEM, clickable), `box` (+ Bonferroni stars
   via `arm_tests`), `bars` (group mean ± SEM), `superplot` (cells + per-recording
-  means), `ensemble_msd` (mean±SEM / median+CI bands), `scatter` (X-vs-Y +
-  Spearman, clickable, optional fit line), `histogram` (per-cell distribution by
-  group). Colours + condition order come from the `Design`; axes labelled with
-  units via `metric_docs.axis_label`. Every function takes a `PlotStyle` (fonts /
-  marker+line size / fill opacity / grid / log axes / histogram bins…) applied via
-  the shared `_axes` helper.
-- **plot_style.py** — `PlotStyle` (dataclass of render options, QSettings-persisted)
-  + `PlotStyleDialog` (non-modal live editor) + `PlotStyleMixin` (opens the editor
-  from a toolbar button **or shift-right-click on any plot**, saves + replots).
+  means), `ensemble_msd` (mean±SEM / median+CI bands; band-bound curves are added
+  to the plot so they inherit its log mode + clamped > 0 — fixes misaligned
+  log-log bands/lines), `scatter` (X-vs-Y + Spearman, clickable), `histogram`
+  (per-cell distribution by group). A **`trendline`** (`_trend`) option draws a
+  scatter least-squares line and connects per-group centres on the categorical
+  plots. Colours + order from the `Design`; axes labelled with units via
+  `metric_docs.axis_label`. Every function takes a `PlotStyle` (fonts /
+  marker+line size / fill opacity / grid / log axes / histogram bins / trendline…)
+  applied via the shared `_axes` helper.
+- **plot_style.py** — `PlotStyle` (dataclass of render options incl. `trendline`,
+  QSettings-persisted) + `PlotStyleDialog` (non-modal live editor) +
+  `PlotStyleMixin` (opens the editor from a toolbar button **or shift-right-click
+  on any plot**, saves + replots).
 - **design_editor.py** — `DesignEditor(QDialog)`: the **Groups & Comparisons**
   editor opened from the Comparison window (toolbar ▸ Groups…). A recordings
   table (include checkbox + editable **group** combo + cell counts, with bulk
@@ -285,7 +295,8 @@ Read this before opening source files. Update it when modules change.
   (region props incl. perimeter/circularity/state + nearest-neighbour),
   `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +
   Fürth D/persistence-time + density-stratified speed + area-stability +
-  track-quality, optional `with_edge` protrusion/retraction columns, `progress_cb`),
+  track-quality + **min/mean distance from the image border**, optional
+  `with_edge` protrusion/retraction columns, `progress_cb`),
   `track_table` (trajectories), `export_all` (single shared per-frame pass +
   `progress_cb`).
   Needs pandas.

@@ -5,6 +5,33 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Comparison: crowding/edge filters, trendlines, MSD-plot fix
+
+Three Comparison-window improvements.
+
+- **More filters** (`gui/compare_filters.py`, new `FilterMixin`): the filters moved
+  from the cramped toolbar row into a non-modal **Filters…** dialog and gained
+  spatial/crowding ones — **distance from the image edge** (new per-cell
+  `min/mean_border_dist_um` in `exporters.per_cell_table`), **nearest-neighbour
+  distance** (min/max, on `mean_nn_dist`), and **neighbour count** (min/max, on
+  `mean_n_neighbors`) — alongside frames / track-quality / min-cells / state.
+  Session-only (+ Reset). Filter `_filtered()` moved into the mixin.
+- **Trendlines** in the plot-style options (`PlotStyle.trendline`): on the scatter
+  a least-squares line; on the categorical plots (strip / box / bars / superplot) a
+  dashed line connecting the per-group centres across conditions (a trend across an
+  ordered series). Replaces the scatter-only `scatter_fit`.
+- **Ensemble-MSD plot fix**: the CI band's bound curves are now added to the plot
+  (so they inherit its log mode) and clamped > 0 — previously a bare
+  `FillBetweenItem` over loose curves rendered the band/lines misaligned on the
+  log-log axes (and `mean−SEM ≤ 0` broke the log).
+
+Tests: `pytest` **44 passed** (new edge-distance test). The compare smoke drives
+the Filters… dialog + new filters, trendlines on every dist kind, and writes
+`comparison_{msd,filters}.png`. Both GUI smokes green; all files < 500 lines
+(`_filtered` + filter widgets live in `compare_filters.py`).
+
+---
+
 ## 2026-06-14 — Per-graph plot-style options (Comparison window)
 
 Every Comparison-window graph is now customisable.

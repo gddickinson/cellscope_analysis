@@ -51,13 +51,18 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   CellScope state-aware analysis. A **Help** button + per-metric tooltips explain
   every metric, and every graph is **stylable** — a **Style…** button (or
   **shift-right-click a plot**) sets fonts, marker/line sizes, fill opacity, grid,
-  log axes, histogram bins, bars-vs-points, … (persisted). Background compute +
-  per-project cache; click a point → load that recording in the viewer.
+  log axes, histogram bins, bars-vs-points, **trendlines**, … (persisted).
+  Background compute + per-project cache; click a point → load that recording in
+  the viewer.
 - **Groups & Comparisons editor** (Comparison window ▸ **Groups…**) — assign
   recordings to **groups**, **include/exclude** any recording, define which groups
   form each **comparison** and which is the **control**, and set the vehicle pair.
   Changes apply **instantly** (a remap of the computed table — no recompute) and
   save with the project.
+- **Filters** (Comparison window ▸ **Filters…**) — restrict the cells/recordings
+  compared: min frames tracked, track-quality, min cells/recording, cell state,
+  **nearest-neighbour crowding** (NN distance + neighbour count, min/max), and
+  **distance from the image edge**.
 - **Sortable per-cell table**, **CSV export** (per-frame / per-cell / tracks,
   for Origin/Prism), **save any plot** (PNG/SVG), and a **Help ▸ Metrics
   Reference** documenting every metric + tooltips throughout.
@@ -71,6 +76,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 ![the Comparison window Histogram tab — per-cell distribution by group, units on the axis](docs/screenshots/comparison_histogram.png)
 
 ![the per-graph plot-style options (Style… / shift-right-click)](docs/screenshots/comparison_style.png)
+
+![the cell / recording filters (Filters…)](docs/screenshots/comparison_filters.png)
 
 ![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 
