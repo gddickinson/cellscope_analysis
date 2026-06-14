@@ -119,8 +119,9 @@ Read this before opening source files. Update it when modules change.
     time series / mean ± SEM-or-SD error band / histogram / flower plot / scatter
     (X vs Y, click→select) / lineage tree / division timeline, with filters
     (min track length, state, exclude edge); lazy compute + cache.
-  - **cell_table.py** `CellTablePanel` — sortable per-cell metric table; row →
-    select cell; CSV export.
+  - **cell_table.py** `CellTablePanel` — sortable per-cell metric table (+
+    `parent` / `daughters` columns from divisions.json); row → select cell;
+    CSV export.
   (cross-recording comparison is no longer a dock — it is its own window, see
   **compare_window.py** below.)
 - **compare_window.py** — `CompareWindow(QMainWindow)`: the dedicated comparison
