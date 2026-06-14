@@ -5,6 +5,44 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Comparison window + Projects (load any dataset)
+
+Promoted the cross-recording comparison from a cramped dock into its own
+**standalone window** (Analysis ▸ Comparison window, `Ctrl+Shift+C`) and added a
+**Project** concept so the app is no longer hard-wired to the single IC295
+dataset.
+
+- **`maskviewer/project.py`** (new): `Project` (name / data_roots / entries /
+  `Design`) + `Design` (arms {control, conditions}, vehicle, colours).
+  `auto_design()` derives the experiment from the condition names — recognises
+  the IC295 genetic (WT/GOF/KO) + drug (DMSO/Y1/OT) arms and the WT–DMSO vehicle,
+  otherwise builds one arm with a heuristic control. `from_entries` /
+  `from_data_roots` / `load_project` / `save_project` (small JSON). GUI-free.
+- **Generalised the stats** to a design: `feature_tables.arm_tests(by_cond,
+  arms, vehicle)` and `compare.{effect_sizes,ols_adjusted}(…, arms)` now take an
+  arbitrary arm spec (default to IC295 when called bare — back-compatible).
+- **`gui/compare_window.py`** (new): `CompareWindow(QMainWindow)` — toolbar
+  (Compute/recompute · Metric · Y · Control · MSD stat · Frames · OLS · Export);
+  tabbed plots **Distributions** (strip / box+Bonferroni / superplot) · **Ensemble
+  MSD** · **Scatter**, beside a sortable per-contrast stats table (p / Bonferroni /
+  Cohen's d / OLS β,p) + omnibus KW + vehicle. Threaded compute + per-project disk
+  cache; click a point → load that recording. `set_project` re-targets it.
+- **`gui/compare_plots.py`** (new): design-aware pyqtgraph drawing (colours +
+  condition order from the `Design`); deleted `panels/compare_panel.py`.
+- **Project loading UX**: File ▸ Open Project Folder / Open Project File / Save
+  Project As / **Recent Projects** (QSettings); `ViewerWindow.set_project` swaps
+  the dataset live and propagates to the comparison window. `main_viewer.py` now
+  builds a `Project`. `ViewerWindow` accepts a Project *or* a bare entries list
+  (back-compat for the tests/smokes).
+- File-size hygiene: moved `set_project` / `_rebuild_recent_menu` /
+  `open_compare_window` into `WindowActionsMixin` to keep `viewer_window.py` < 500.
+- **Tests**: `pytest` 28 passed; new `scripts/smoke_compare_window.py` drives
+  every tab / dist-kind / OLS / stats table on fake multi-arm + single-arm data,
+  checks the editable control combo, and verifies the ViewerWindow wiring
+  (offscreen). Regenerated `docs/screenshots/comparison.png` (`--shot=`).
+
+---
+
 ## 2026-06-13 — Comparison-audit gaps (ensemble MSD, state, OLS, box plots)
 
 A background agent audited CellScope's cross-recording/comparison code; added the

@@ -22,8 +22,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from .image_view import ImageCanvas
 from .panels import (TimelinePanel, DisplayPanel, ImageAdjustPanel,
                      CellInfoPanel, EdgePanel, ShapeModesPanel, PopulationPanel,
-                     CellTablePanel, ComparePanel)
+                     CellTablePanel)
 from ..analysis import population as _population
+from .. import project as projmod
 from .luts import DisplayState
 from .menus import build_menubar
 from .window_actions import WindowActionsMixin
@@ -46,7 +47,13 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                         min(860, avail.height() - 60))
         else:
             self.resize(1100, 760)
-        self.entries = list(entries)
+        if hasattr(entries, "design"):          # a Project was passed
+            self.project = entries
+            self.entries = list(entries.entries)
+        else:                                   # a bare entry list (back-compat)
+            self.entries = list(entries)
+            self.project = projmod.from_entries(self.entries)
+        self._compare_window = None
         self.recording = None
         self.masks = None
         self.selected = 0
@@ -78,7 +85,6 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.shape = ShapeModesPanel()
         self.population = PopulationPanel()
         self.cell_table = CellTablePanel()
-        self.compare = ComparePanel()
         self.timeline = TimelinePanel()
         self.docks = {}
         self._add_dock("Display", self.display, _RIGHT)
@@ -88,24 +94,22 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._add_dock("Shape Modes", self.shape, _RIGHT)
         self._add_dock("Population", self.population, _RIGHT)
         self._add_dock("Cell Table", self.cell_table, _RIGHT)
-        self._add_dock("Compare", self.compare, _RIGHT)
         self._add_dock("Timeline", self.timeline, _BOTTOM)
         for name in ("Cell Info", "Edge Dynamics", "Shape Modes", "Population",
-                     "Cell Table", "Compare"):
+                     "Cell Table"):
             self.tabifyDockWidget(self.docks["Display"], self.docks[name])
         self.docks["Display"].raise_()
         self.resizeDocks([self.docks["Display"]], [400], QtCore.Qt.Horizontal)
         self.status = self.statusBar()
 
-        build_menubar(self)
+        self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
+        build_menubar(self)                       # reads _settings for Recent Projects
         self._wire()
         self._default_state = self.saveState()
-        self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
         self._restore_settings()
         self._fit_to_screen()                 # clamp restored geometry to the screen
 
         self.display.set_recordings(self.entries)
-        self.compare.set_entries(self.entries)
         if self.entries:
             self._load_entry(0)
         self._start_remote()
@@ -163,7 +167,6 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.population.table_provider = self._population_table
         self.cell_table.cellSelected.connect(self.select_cell)
         self.population.cellSelected.connect(self.select_cell)
-        self.compare.recordingPicked.connect(self._select_recording_by_label)
         for key, step in ((QtCore.Qt.Key_Left, -1), (QtCore.Qt.Key_Right, 1)):
             QtWidgets.QShortcut(QtGui.QKeySequence(key), self,
                                 activated=lambda s=step: self.timeline.step(s))

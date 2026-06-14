@@ -12,7 +12,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from .export_dialog import CSVExportDialog
 from ..analysis import metric_docs
-from ..io.dataset import discover, Entry
+from ..io.dataset import Entry
+from .. import project as projmod
 from ..config import PROJECT_ROOT
 
 
@@ -34,19 +35,99 @@ class WindowActionsMixin:
         self.display.set_recordings(self.entries)
         self.display.recording.setCurrentIndex(len(self.entries) - 1)
 
+    # -- projects -------------------------------------------------------
     def open_data_root_dialog(self):
-        d = QtWidgets.QFileDialog.getExistingDirectory(self, "Open data folder")
+        """Open a folder of recordings as a project (auto-derives the design)."""
+        d = QtWidgets.QFileDialog.getExistingDirectory(self, "Open project folder")
         if not d:
             return
-        found = discover(d)
-        if not found:
+        proj = projmod.from_data_roots(d)
+        if not proj.entries:
             QtWidgets.QMessageBox.warning(self, "Nothing found",
                                           "No recordings under that folder.")
             return
-        self.entries = found
+        self.set_project(proj)
+        self._remember_project(d)
+
+    def open_project_file(self):
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open project file", "", "Project (*.json)")
+        if not fn:
+            return
+        try:
+            proj = projmod.load_project(fn)
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Open failed", str(exc))
+            return
+        self.set_project(proj)
+        self._remember_project(fn)
+
+    def save_project_as(self):
+        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save project", f"{self.project.name}.json", "Project (*.json)")
+        if not fn:
+            return
+        projmod.save_project(self.project, fn)
+        self._remember_project(fn)
+        self.statusBar().showMessage(f"Saved project → {fn}", 5000)
+
+    def _remember_project(self, path):
+        recent = [path] + [p for p in self._recent_projects() if p != path]
+        self._settings.setValue("recent_projects", recent[:8])
+        self._rebuild_recent_menu()
+
+    def _recent_projects(self):
+        rec = self._settings.value("recent_projects", [])
+        return [rec] if isinstance(rec, str) else list(rec or [])
+
+    def _open_recent(self, path):
+        if not os.path.exists(path):
+            QtWidgets.QMessageBox.warning(self, "Missing", f"Not found: {path}")
+            return
+        proj = (projmod.load_project(path) if path.lower().endswith(".json")
+                else projmod.from_data_roots(path))
+        self.set_project(proj)
+        self._remember_project(path)
+
+    def set_project(self, project):
+        """Adopt a different project (recordings + experimental design)."""
+        self.project = project
+        self.entries = list(project.entries)
         self.display.set_recordings(self.entries)
-        self.compare.set_entries(self.entries)
-        self._load_entry(0)
+        self.setWindowTitle(f"cellscope_analysis — {project.name}")
+        if self._compare_window is not None:
+            self._compare_window.set_project(project)
+        if self.entries:
+            self._load_entry(0)
+        else:
+            self.statusBar().showMessage("No recordings in this project.", 6000)
+
+    def _rebuild_recent_menu(self):
+        menu = getattr(self, "recent_menu", None)
+        if menu is None:
+            return
+        menu.clear()
+        recent = self._recent_projects()
+        if not recent:
+            a = QtWidgets.QAction("(none)", self)
+            a.setEnabled(False)
+            menu.addAction(a)
+            return
+        for p in recent:
+            act = QtWidgets.QAction(os.path.basename(p.rstrip("/")) or p, self)
+            act.setToolTip(p)
+            act.triggered.connect(lambda _c, path=p: self._open_recent(path))
+            menu.addAction(act)
+
+    # -- comparison window ----------------------------------------------
+    def open_compare_window(self):
+        if self._compare_window is None:
+            from .compare_window import CompareWindow
+            self._compare_window = CompareWindow(self.project, self)
+            self._compare_window.recordingPicked.connect(
+                self._select_recording_by_label)
+        self._compare_window.show()
+        self._compare_window.raise_()
 
     def export_csv(self):
         if self.masks is None or self.recording is None:
