@@ -23,13 +23,14 @@ from .image_view import ImageCanvas
 from .panels import (TimelinePanel, DisplayPanel, ImageAdjustPanel,
                      CellInfoPanel, EdgePanel, ShapeModesPanel, PopulationPanel,
                      CellTablePanel)
-from ..analysis import population as _population
 from .. import project as projmod
 from .luts import DisplayState
 from .menus import build_menubar
 from .window_actions import WindowActionsMixin
+from .status_progress import StatusProgress
+from .task_runner import TaskRunner
 from . import colorby
-from ..analysis import label_stats, cell_metrics, shape_modes, metric_docs
+from ..analysis import label_stats, cell_metrics, metric_docs
 
 _RIGHT = QtCore.Qt.RightDockWidgetArea
 _BOTTOM = QtCore.Qt.BottomDockWidgetArea
@@ -101,6 +102,10 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.docks["Display"].raise_()
         self.resizeDocks([self.docks["Display"]], [400], QtCore.Qt.Horizontal)
         self.status = self.statusBar()
+        self.busy = StatusProgress()                  # status-bar progress + ETA
+        self.status.addPermanentWidget(self.busy)
+        self._task = TaskRunner(self)                 # off-thread heavy compute
+        self._task.progress.connect(self.busy.update)
 
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
         build_menubar(self)                       # reads _settings for Recent Projects
@@ -165,6 +170,8 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.cell_info.shape_mode_provider = self._shape_modes_model
         self.shape.set_provider(self._shape_modes_model)
         self.population.table_provider = self._population_table
+        for p in (self.population, self.shape, self.cell_table):
+            p.run_async = self.run_task          # heavy compute → status-bar bar
         self.cell_table.cellSelected.connect(self.select_cell)
         self.population.cellSelected.connect(self.select_cell)
         for key, step in ((QtCore.Qt.Key_Left, -1), (QtCore.Qt.Key_Right, 1)):
@@ -314,29 +321,6 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         if self._cent_hist is None and self.masks is not None:
             self._cent_hist = cell_metrics.centroid_history(self.masks.labels)
         return self._cent_hist
-
-    def _population_table(self):
-        """All-cells per-frame table (lazy + cached) — fixed colour scale +
-        the Population panel."""
-        if self._pop_df is None and self.masks is not None:
-            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-            try:
-                self._pop_df = _population.population_table(
-                    self.masks.labels, self.recording.um_per_px,
-                    self.recording.time_interval_min)
-            finally:
-                QtWidgets.QApplication.restoreOverrideCursor()
-        return self._pop_df
-
-    def _shape_modes_model(self):
-        """VAMPIRE shape-mode model for the recording (lazy + cached)."""
-        if self._shape_model is None and self.masks is not None:
-            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-            try:
-                self._shape_model = shape_modes.fit_shape_modes(self.masks.labels)
-            finally:
-                QtWidgets.QApplication.restoreOverrideCursor()
-        return self._shape_model
 
     def _rebuild_metrics_menu(self):
         """Populate Config ▸ Cell plot metrics with a checkable item per

@@ -9,9 +9,10 @@ from __future__ import annotations
 from PyQt5 import QtCore, QtWidgets
 
 from ...analysis import exporters, lineage
+from ..task_runner import AsyncComputeMixin
 
 
-class CellTablePanel(QtWidgets.QWidget):
+class CellTablePanel(AsyncComputeMixin, QtWidgets.QWidget):
     cellSelected = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None):
@@ -70,12 +71,15 @@ class CellTablePanel(QtWidgets.QWidget):
     def _compute(self):
         if self._labels is None:
             return
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-        try:
-            self._df = exporters.per_cell_table(self._labels, self._um, self._dt)
-            self._add_division_columns()
-        finally:
-            QtWidgets.QApplication.restoreOverrideCursor()
+        self._dispatch("Per-cell table", self._work, self._apply)
+
+    def _work(self, progress_cb):
+        return exporters.per_cell_table(self._labels, self._um, self._dt,
+                                        progress_cb=progress_cb)
+
+    def _apply(self, df):
+        self._df = df
+        self._add_division_columns()
         self._fill()
         self.export_btn.setEnabled(True)
         self.title.setText(f"Per-cell table — {len(self._df)} cells")

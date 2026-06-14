@@ -83,7 +83,9 @@ python main_viewer.py --recording R.ome.tif --masks R/pipeline_results/masks.npz
 In the GUI: pick a recording + channel, scrub frames (slider or **←/→**, Space =
 play), toggle masks/overlays, set **Colour by** a metric, and click a cell to
 inspect it. Heavier analyses (Population, Shape Modes, Cell Table) have a
-**Compute** button.
+**Compute** button; these run **off the GUI thread** with a **progress bar + ETA
+in the bottom status bar** (the Comparison window shows the same), so the window
+stays responsive and you can see how long a pass will take.
 
 ## Self-drive (headless remote control)
 

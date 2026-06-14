@@ -56,7 +56,8 @@ def track_table(labels, um_per_px=None, dt_min=None):
 
 
 def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
-                   per_frame_df=None, with_edge=False, centroids=None):
+                   per_frame_df=None, with_edge=False, centroids=None,
+                   progress_cb=None):
     """DataFrame: one row per cell — track length, shape aggregates, motion.
 
     Shape columns are per-track means/medians of the per-frame morphometry;
@@ -64,11 +65,13 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
     if a frame interval is given). ``straightness`` is the speed-biased net/path
     ratio; ``persistence_dir_autocorr`` is the unbiased lag-1 measure. Pass
     ``per_frame_df`` to reuse an already-computed per-frame table (avoids a
-    second regionprops pass when exporting both tables).
+    second regionprops pass when exporting both tables). ``progress_cb(done,
+    total)`` drives a GUI progress bar (per frame, during the regionprops pass).
     """
     import pandas as pd
     labels = np.asarray(labels)
-    pf = per_frame_table(labels, um_per_px, dt_min, with_solidity) \
+    pf = per_frame_table(labels, um_per_px, dt_min, with_solidity,
+                         progress_cb=progress_cb) \
         if per_frame_df is None else per_frame_df
     cents = label_stats.centroids(labels) if centroids is None else centroids
     scale = float(um_per_px) if um_per_px else 1.0

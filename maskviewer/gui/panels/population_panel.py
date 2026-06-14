@@ -15,6 +15,7 @@ from PyQt5 import QtCore, QtWidgets
 
 from ...analysis import population, metric_docs, lineage
 from ..plot_export import save_plot
+from ..task_runner import AsyncComputeMixin
 
 _KINDS = ["Time series (all cells)", "Mean ± error", "Histogram", "Flower plot",
           "Scatter (X vs Y)", "Lineage tree", "Division timeline"]
@@ -22,7 +23,7 @@ _NEEDS_DF = {"Time series (all cells)", "Mean ± error", "Histogram",
              "Scatter (X vs Y)"}
 
 
-class PopulationPanel(QtWidgets.QWidget):
+class PopulationPanel(AsyncComputeMixin, QtWidgets.QWidget):
     cellSelected = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None):
@@ -106,14 +107,16 @@ class PopulationPanel(QtWidgets.QWidget):
     def _compute(self):
         if self._labels is None:
             return
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-        try:
-            self._df = (self.table_provider() if self.table_provider
-                        else population.population_table(self._labels, self._um,
-                                                         self._dt))
-            self._flower = population.flower_tracks(self._labels, self._um)
-        finally:
-            QtWidgets.QApplication.restoreOverrideCursor()
+        self._dispatch("Population", self._work, self._apply)
+
+    def _work(self, progress_cb):
+        df = (self.table_provider(progress_cb) if self.table_provider
+              else population.population_table(self._labels, self._um, self._dt,
+                                               progress_cb=progress_cb))
+        return df, population.flower_tracks(self._labels, self._um)
+
+    def _apply(self, result):
+        self._df, self._flower = result
         cols = population.metric_columns(self._df)
         for combo in (self.metric, self.metric_y):
             cur = combo.currentText()
