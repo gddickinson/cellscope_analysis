@@ -79,12 +79,15 @@ Read this before opening source files. Update it when modules change.
     brightness/contrast sliders, gamma, colormap, invert, auto/reset. Emits
     `displayChanged`; `state()`/`set_state()` for per-channel persistence.
   - **cell_info.py** `CellInfoPanel` — selected-cell summary + a combo to plot
-    ANY per-frame characteristic (shape, state, speed, displacement, turning,
-    per-channel intensity) over time, plus an MSD (log-log) view with α fit.
+    any *enabled* per-frame characteristic (shape, perimeter, circularity, state,
+    speed, displacement, turning, IoU, area-change, nearest-neighbour, intensity,
+    membrane contrast) over time + an MSD (log-log) α fit. Owns the enabled-metric
+    set (QSettings-persisted); `set_metric_enabled` recomputes immediately.
   - **edge_panel.py** `EdgePanel` — membrane protrusion/retraction kymograph
     (angle×time, blue=retraction/red=protrusion) + radius map + summary +
     kymograph CSV export, for the selected cell.
-- **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/Window/Help.
+- **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/**Config**
+  (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
 - **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
@@ -97,12 +100,16 @@ Read this before opening source files. Update it when modules change.
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
   `track_lengths`, `centroids`, `summary(labels, um_per_px)`. No GUI/IO deps.
-- **cell_metrics.py** — moment-based morphometry (no skimage): `regionprops_frame`
-  (area, centroid, bbox, axes, eccentricity, aspect ratio, orientation, extent,
-  optional solidity, + `edge` flag and per-frame `state`), `per_frame_records`
-  (with `progress_cb`), `centroid_history` (fast trails), `cell_series`, and
-  `cell_frame_table` (ALL per-frame metrics for one cell — shape, state_code,
-  speed, displacement, turning angle, per-channel intensity — for the cell panel).
+- **cell_metrics.py** — morphometry (no skimage; perimeter via a Crofton
+  estimate matching skimage): `regionprops_frame` (area, centroid, bbox, axes,
+  eccentricity, aspect ratio, orientation, extent, edge flag, state, optional
+  solidity / perimeter+circularity), `per_frame_records` (+ nearest-neighbour
+  columns, `progress_cb`), `centroid_history`, `cell_series`, and
+  `cell_frame_table` (per-frame series for ONE cell — shape, perimeter,
+  circularity, state, speed, displacement, turning, consecutive IoU, area-change,
+  nearest-neighbour, per-channel intensity + membrane contrast). `metrics=`
+  selects which series to compute. `available_frame_metrics` / `metric_label` /
+  `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
 - **motion.py** — centroid-track motion: `instantaneous_speed`,
   `displacement_metrics` (net/path/straightness/speed), `direction_autocorrelation`
   + `persistence` (lag-1, speed-unbiased), `msd` + `fit_msd` (D, α exponent),
@@ -110,14 +117,18 @@ Read this before opening source files. Update it when modules change.
 - **state.py** — `classify_state` → rounded/spread/edge/unknown per cell-frame
   (CellScope IC295 rule: area ≤ 960 µm² AND ecc ≤ 0.85 → rounded), `STATE_CODE`,
   `STATE_COLOR`.
+- **neighbors.py** — `frame_nn`: per-cell nearest-neighbour distance + count of
+  neighbours within a radius (`DEFAULT_RADIUS_UM`), centroid-to-centroid.
 - **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
   (protrusion/retraction/net/ruffling), `edge_summary_for_cell`.
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
-  (region props + state), `per_cell_table` (track + shape + motion, optional
-  `with_edge` protrusion/retraction columns), `track_table` (trajectories),
-  `export_all` (single shared per-frame pass + `progress_cb`). Needs pandas.
+  (region props incl. perimeter/circularity/state + nearest-neighbour),
+  `per_cell_table` (track + shape + motion + nearest-neighbour aggregates,
+  optional `with_edge` protrusion/retraction columns), `track_table`
+  (trajectories), `export_all` (single shared per-frame pass + `progress_cb`).
+  Needs pandas.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the
   CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,
   `tracks()`) + the experimental design (`ARMS`, `VEHICLE`) +

@@ -74,8 +74,9 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
     scale = float(um_per_px) if um_per_px else 1.0
     u = "um" if um_per_px else "px"
     speed_u = f"{u}_per_min" if dt_min else f"{u}_per_frame"
-    shape_cols = ["area_px", "area_um2", "eccentricity", "aspect_ratio",
-                  "major_axis_px", "minor_axis_px", "extent", "solidity"]
+    agg_cols = ["area_px", "area_um2", f"perimeter_{u}", "circularity",
+                "eccentricity", "aspect_ratio", "major_axis_px", "minor_axis_px",
+                "extent", "solidity", f"nn_dist_{u}", "n_neighbors"]
     rows = []
     for cid in sorted(cents):
         cen = cents[cid]
@@ -88,7 +89,7 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
             "last_frame": int(frames[-1]) if frames.size else -1,
             "frames_tracked": int(present.sum()),
         }
-        for col in shape_cols:
+        for col in agg_cols:
             if col in getattr(sub, "columns", []):
                 vals = sub[col].to_numpy(dtype=float)
                 if np.isfinite(vals).any():

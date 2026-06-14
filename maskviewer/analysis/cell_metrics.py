@@ -18,6 +18,23 @@ from scipy import ndimage
 
 from . import state as _state
 from . import motion as _motion
+from . import neighbors as _nbr
+
+# Crofton perimeter weights (identical to scikit-image's regionprops perimeter,
+# neighborhood=4) so circularity is comparable to the wider literature.
+_PERIM_W = np.zeros(50)
+_PERIM_W[[5, 7, 15, 17, 25, 27]] = 1.0
+_PERIM_W[[21, 33]] = np.sqrt(2)
+_PERIM_W[[13, 23]] = (1 + np.sqrt(2)) / 2.0
+_PERIM_KERNEL = np.array([[10, 2, 10], [2, 1, 2], [10, 2, 10]])
+
+
+def _perimeter(mask: np.ndarray) -> float:
+    """Boundary perimeter (px) of a 2-D boolean mask (Crofton estimate)."""
+    img = mask.astype(np.uint8)
+    border = img - ndimage.binary_erosion(img, border_value=0).astype(np.uint8)
+    conv = ndimage.convolve(border, _PERIM_KERNEL, mode="constant", cval=0)
+    return float(np.bincount(conv.ravel(), minlength=50)[:50] @ _PERIM_W)
 
 
 def _region_shape(rows: np.ndarray, cols: np.ndarray) -> dict:
@@ -64,12 +81,14 @@ def _solidity(rows: np.ndarray, cols: np.ndarray, area: int) -> float:
 
 
 def regionprops_frame(labels2d: np.ndarray, um_per_px: float | None = None,
-                      with_solidity: bool = False) -> dict:
+                      with_solidity: bool = False,
+                      with_perimeter: bool = False) -> dict:
     """{cell_id: props} for every labelled region in one (H, W) frame.
 
     Props: area (px and µm² if scaled), centroid (x, y), bounding box,
     major/minor axis, eccentricity, aspect ratio, orientation, extent,
-    equivalent diameter, and (optional) solidity.
+    equivalent diameter, edge flag, state, and (optional) solidity /
+    perimeter + circularity.
     """
     labels2d = np.asarray(labels2d)
     H, W = labels2d.shape[-2], labels2d.shape[-1]
@@ -116,6 +135,13 @@ def regionprops_frame(labels2d: np.ndarray, um_per_px: float | None = None,
             rec["equiv_diameter_um"] = rec["equiv_diameter_px"] * scale
         if with_solidity:
             rec["solidity"] = _solidity(rows, cols, area)
+        if with_perimeter:
+            per_px = _perimeter(sub)
+            rec["perimeter_px"] = per_px
+            rec["circularity"] = (4.0 * np.pi * area / (per_px * per_px)
+                                  if per_px > 0 else np.nan)
+            if scale:
+                rec["perimeter_um"] = per_px * scale
         rec["state"] = _state.classify_state(
             area, rec.get("area_um2"), rec["eccentricity"],
             solidity=rec.get("solidity"), edge=rec["edge"])
@@ -133,14 +159,22 @@ def per_frame_records(labels: np.ndarray, um_per_px: float | None = None,
     """
     labels = np.asarray(labels)
     T = labels.shape[0]
+    scale = float(um_per_px) if um_per_px else 1.0
+    nn_key = f"nn_dist_{'um' if um_per_px else 'px'}"
     rows: list[dict] = []
     for t in range(T):
-        props = regionprops_frame(labels[t], um_per_px, with_solidity)
-        for lab in sorted(props):
+        props = regionprops_frame(labels[t], um_per_px, with_solidity,
+                                  with_perimeter=True)
+        ids = sorted(props)
+        nn, cnt = _nbr.frame_nn([props[i]["centroid_y"] for i in ids],
+                                [props[i]["centroid_x"] for i in ids], scale)
+        for j, lab in enumerate(ids):
             row = {"frame": int(t)}
             if dt_min:
                 row["time_min"] = t * float(dt_min)
             row.update(props[lab])
+            row[nn_key] = float(nn[j])
+            row["n_neighbors"] = int(cnt[j])
             rows.append(row)
         if progress_cb:
             progress_cb(t + 1, T)
@@ -193,33 +227,82 @@ def cell_series(labels: np.ndarray, cell_id: int, um_per_px: float | None = None
 def _ylabel(key: str, u: str) -> str:
     if key.startswith("intensity_"):
         return f"{key[10:]} mean intensity"
+    if key.startswith("membrane_contrast_"):
+        return f"{key[18:]} membrane contrast"
     return {"area": f"area ({u}²)", "eccentricity": "eccentricity",
             "aspect_ratio": "aspect ratio", "major_axis": f"major axis ({u})",
             "minor_axis": f"minor axis ({u})", "orientation": "orientation (rad)",
             "extent": "extent", "equiv_diameter": f"equiv. diameter ({u})",
-            "solidity": "solidity",
-            "state_code": "state (0=unk,1=spread,2=round,3=edge)"
+            "solidity": "solidity", "perimeter": f"perimeter ({u})",
+            "circularity": "circularity",
+            "state_code": "state (0=unk,1=spread,2=round,3=edge)",
+            "speed": f"speed ({u}/frame)",
+            "displacement_from_start": f"displacement ({u})",
+            "turning_angle": "turning angle (rad)",
+            "iou_prev": "IoU vs previous frame",
+            "area_change": "relative area change",
+            "nn_dist": f"NN distance ({u})",
+            "n_neighbors": f"neighbours (≤{int(_nbr.DEFAULT_RADIUS_UM)} {u})",
             }.get(key, key.replace("_", " "))
 
 
+# Per-frame metrics the cell-plot Config menu can switch on/off. Intensity /
+# membrane-contrast keys are appended at runtime from the recording's channels.
+BASE_FRAME_METRICS = ["area", "perimeter", "circularity", "eccentricity",
+                      "aspect_ratio", "solidity", "major_axis", "minor_axis",
+                      "orientation", "extent", "equiv_diameter", "state_code",
+                      "speed", "displacement_from_start", "turning_angle",
+                      "iou_prev", "area_change", "nn_dist", "n_neighbors"]
+
+
+def available_frame_metrics(channel_names=None) -> list:
+    """All selectable per-frame metric keys (intensity / membrane-contrast keys
+    depend on the loaded recording's channels)."""
+    keys = list(BASE_FRAME_METRICS)
+    if channel_names:
+        for i, n in enumerate(channel_names):
+            nm = n or f"ch{i}"
+            keys += [f"intensity_{nm}", f"membrane_contrast_{nm}"]
+    return keys
+
+
+def metric_label(key: str, um_per_px=None) -> str:
+    """Human-readable label for a per-frame metric key."""
+    return _ylabel(key, "µm" if um_per_px else "px")
+
+
 def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
-                     dt_min=None, recording=None, with_solidity=True) -> dict:
+                     dt_min=None, recording=None, with_solidity=True,
+                     metrics=None, neighbor_history=None,
+                     nn_radius=_nbr.DEFAULT_RADIUS_UM) -> dict:
     """Rich per-frame metrics for ONE cell (for the cell-info panel / plots).
 
     Returns {frame, time_min, series{name: (values, ylabel)}, summary}. ``series``
     covers morphometry (area, eccentricity, aspect ratio, axes, orientation,
     extent, equiv diameter, solidity), per-frame ``state_code``, motion-derived
-    (speed, displacement_from_start, turning_angle) and — if ``recording`` is
-    given — mean intensity of each channel inside the mask (e.g. SiR-actin Cy5).
+    (speed, displacement_from_start, turning_angle), nearest-neighbour distance /
+    count (when ``neighbor_history`` is given) and — if ``recording`` is given —
+    mean intensity of each channel inside the mask (e.g. SiR-actin Cy5).
+
+    ``metrics`` (an iterable of keys) restricts which series are computed +
+    returned, so unselected/expensive ones (solidity, intensity, nn) are skipped.
     """
     labels = np.asarray(labels)
     T = labels.shape[0]
     H, W = labels.shape[-2], labels.shape[-1]
     scale = float(um_per_px) if um_per_px else None
     u = "µm" if scale else "px"
+    want = set(metrics) if metrics is not None else None
+    want_sol = ("solidity" in want) if want is not None else with_solidity
     cen = np.full((T, 2), np.nan)
     frames: list = []
     recs: list = []
+    want_per = want is None or bool({"perimeter", "circularity"} & want)
+    want_iou = want is None or bool({"iou_prev", "area_change"} & want)
+    want_mem = recording is not None and (
+        want is None or any(k.startswith("membrane_contrast_") for k in want))
+    prev_m = None
+    prev_area = 0
     for t in range(T):
         m = labels[t] == cell_id
         area = int(m.sum())
@@ -242,16 +325,46 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
             "extent": area / ((y1 - y0 + 1) * (x1 - x0 + 1)),
             "equiv_diameter": np.sqrt(4.0 * area / np.pi) * (scale or 1.0),
         }
-        if with_solidity:
+        if want_sol:
             rec["solidity"] = _solidity(rows, cols, area)
+        if want_per:
+            per_px = _perimeter(m[y0:y1 + 1, x0:x1 + 1])
+            rec["perimeter"] = per_px * (scale or 1.0)
+            rec["circularity"] = (4.0 * np.pi * area / (per_px * per_px)
+                                  if per_px > 0 else np.nan)
         edge = bool(x0 == 0 or y0 == 0 or x1 >= W - 1 or y1 >= H - 1)
         rec["state_code"] = _state.STATE_CODE[_state.classify_state(
             area, area_um2, sh["eccentricity"], solidity=rec.get("solidity"),
             edge=edge)]
+        if want_iou:
+            if prev_m is not None:
+                union = float(np.logical_or(m, prev_m).sum())
+                rec["iou_prev"] = (float(np.logical_and(m, prev_m).sum()) / union
+                                   if union else np.nan)
+                rec["area_change"] = abs(area - prev_area) / prev_area \
+                    if prev_area else np.nan
+            else:
+                rec["iou_prev"] = np.nan
+                rec["area_change"] = np.nan
+        if want_mem:
+            ys = slice(max(y0 - 2, 0), min(y1 + 3, H))
+            xs = slice(max(x0 - 2, 0), min(x1 + 3, W))
+            subm = labels[t][ys, xs] == cell_id
+            inner = subm & ~ndimage.binary_erosion(subm)
+            outer = ndimage.binary_dilation(subm) & ~subm
+            for c in range(recording.n_channels):
+                key = f"membrane_contrast_{recording.channel_names[c] or f'ch{c}'}"
+                if want is None or key in want:
+                    img = recording.frame(t, c)[ys, xs]
+                    rec[key] = (abs(float(img[inner].mean()) - float(img[outer].mean()))
+                                if inner.any() and outer.any() else np.nan)
         if recording is not None:
             for c in range(recording.n_channels):
-                name = recording.channel_names[c] or f"ch{c}"
-                rec[f"intensity_{name}"] = float(recording.frame(t, c)[m].mean())
+                key = f"intensity_{recording.channel_names[c] or f'ch{c}'}"
+                if want is None or key in want:
+                    rec[key] = float(recording.frame(t, c)[m].mean())
+        prev_m = m
+        prev_area = area
         frames.append(t)
         recs.append(rec)
 
@@ -275,6 +388,22 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
     if fr.size >= 3:
         turn[1:-1] = _motion.turning_angles(pres)
     series["turning_angle"] = (turn, "turning angle (rad)")
+    if neighbor_history is not None and (
+            want is None or {"nn_dist", "n_neighbors"} & want):
+        nn = np.full(fr.size, np.nan)
+        cnt = np.full(fr.size, np.nan)
+        for i, t in enumerate(fr):
+            others = [oc[t] for oid, oc in neighbor_history.items()
+                      if oid != cell_id and np.isfinite(oc[t, 0])]
+            if others and np.isfinite(cen[t, 0]):
+                d = np.sqrt(((np.array(others) - cen[t]) ** 2).sum(axis=1)) \
+                    * (scale or 1.0)
+                nn[i] = d.min()
+                cnt[i] = int((d <= nn_radius).sum())
+        series["nn_dist"] = (nn, _ylabel("nn_dist", u))
+        series["n_neighbors"] = (cnt, _ylabel("n_neighbors", u))
+    if want is not None:
+        series = {k: v for k, v in series.items() if k in want}
     return {"frame": fr, "time_min": times, "series": series,
             "summary": _motion.motion_summary(cen_um, dt_min),
             "centroid_um": cen_um, "dt": dt_min, "scaled": bool(scale)}

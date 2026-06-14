@@ -172,6 +172,40 @@ def test_cell_frame_table_series():
     assert cf["centroid_um"].shape == (m.n_frames, 2)
 
 
+def test_frame_nn():
+    from maskviewer.analysis import neighbors
+    nn, cnt = neighbors.frame_nn([0.0, 0.0], [0.0, 10.0], scale=2.0, radius=50.0)
+    assert nn[0] == pytest.approx(20.0)            # 10 px × 2 µm/px
+    assert list(cnt) == [1, 1]
+    nn1, cnt1 = neighbors.frame_nn([0.0], [0.0])    # a lone cell
+    assert np.isnan(nn1[0]) and cnt1[0] == 0
+
+
+def test_disk_circularity_near_one():
+    lab = np.zeros((60, 60), int)
+    lab[_disk(60, 60, 30, 30, 18)] = 1
+    r = cell_metrics.regionprops_frame(lab, with_perimeter=True)[1]
+    assert "perimeter_px" in r
+    assert 0.85 <= r["circularity"] <= 1.05         # a disk is ~maximally round
+
+
+def test_available_metrics_and_gating():
+    from maskviewer.io import load_masks, load_recording
+    m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))
+    rec = load_recording(os.path.join(SAMPLE, "Pos_demo.ome.tif"))
+    avail = cell_metrics.available_frame_metrics(rec.channel_names)
+    for k in ("circularity", "perimeter", "iou_prev", "area_change", "nn_dist",
+              "n_neighbors", "solidity", "state_code"):
+        assert k in avail
+    assert any(k.startswith("membrane_contrast_") for k in avail)
+    cid = int(m.cell_ids()[0])
+    nh = cell_metrics.centroid_history(m.labels)
+    sub = cell_metrics.cell_frame_table(
+        m.labels, cid, rec.um_per_px, rec.time_interval_min, recording=rec,
+        metrics={"circularity", "nn_dist"}, neighbor_history=nh)
+    assert set(sub["series"]) == {"circularity", "nn_dist"}   # only requested
+
+
 def test_cell_series_and_history():
     from maskviewer.io import load_masks
     m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))

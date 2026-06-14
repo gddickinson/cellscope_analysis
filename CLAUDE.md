@@ -97,11 +97,15 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   + Cy5 magenta) + per-channel visibility, mask show/outline/opacity, colour-by
   (Cell ID / **state** / area / track), overlay toggles (scale bar, frame/time,
   cell IDs, track trails).
-- **Cell Info** dock: click a cell → summary + plot ANY per-frame characteristic
-  (area, eccentricity, solidity, axes, speed, displacement, turning angle,
-  per-frame state, per-channel intensity) over time, or MSD (log-log, α/D fit).
+- **Cell Info** dock: click a cell → summary + plot any *enabled* per-frame
+  characteristic (area, perimeter, circularity, eccentricity, aspect ratio,
+  solidity, axes, orientation, extent, state, speed, displacement, turning,
+  consecutive IoU, area-change, **nearest-neighbour** dist/count, per-channel
+  intensity + membrane contrast) over time, or MSD (log-log, α/D fit).
 - **Edge Dynamics** dock: protrusion/retraction kymograph (angle×time) + radius
   map + summary for the selected cell, with kymograph CSV export.
+- **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
+  + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
 - **Menus**: File (open / **Export CSV** Ctrl+E / screenshot), View (zoom),
   Image (auto/reset/colormap/invert), Analysis, Window (dock toggles), Help.
 Status bar shows frame/time/scale/cell-count + hovered/selected cell.
@@ -149,16 +153,23 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
 - ✅ Menus (File/View/Image/Analysis/Window/Help) + layout persistence.
 - ✅ Overlays (scale bar, frame/time, cell IDs, track trails, selection);
   colour-by id / **state** / area / track.
-- ✅ Cell-info panel: click → summary + plot ANY per-frame characteristic
-  (shape, state, speed, displacement, turning, per-channel intensity) + MSD
-  (α/D fit).
+- ✅ Cell-info panel: click → summary + plot any per-frame characteristic + MSD
+  (α/D fit). The plottable set covers the full CellScope per-frame metric list
+  except VAMPIRE (see below): area, perimeter, circularity, ecc, aspect ratio,
+  solidity, axes, orientation, extent, state, speed, displacement, turning,
+  consecutive IoU, area-change, nearest-neighbour, intensity + membrane contrast.
+- ✅ **Config ▸ Cell plot metrics** — choose which per-frame metrics are
+  computed/offered (persisted, immediate recompute). `cell_frame_table(metrics=)`
+  skips unselected/expensive ones.
+- ✅ **Nearest-neighbour** (`analysis/neighbors.py`) — plot + CSV.
 - ✅ **Edge / membrane dynamics**: protrusion/retraction kymograph dock +
   summary + CSV (`analysis/edge_dynamics.py`).
 - ✅ **CSV export** (per-frame / per-cell / tracks, optional solidity + edge
   columns) for Origin — `analysis/exporters.py`, **threaded** with progress.
 - ✅ Per-frame **state** (rounded/spread, CellScope rule) — `analysis/state.py`.
-- ✅ Morphometry (`cell_metrics.py`) + motion (`motion.py`: persistence via
-  direction-autocorr, MSD + `fit_msd`, turning angles) — pure, skimage-free, tested.
+- ✅ Morphometry (`cell_metrics.py`: incl. Crofton perimeter/circularity) +
+  motion (`motion.py`: direction-autocorr persistence, MSD + `fit_msd`, turning
+  angles) — pure, skimage-free, tested.
 
 ## Good next expansions (evidence-weighted; PIEZO1-focused)
 
@@ -167,7 +178,10 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
   recording=unit stats into every figure. Reuse `feature_tables`/`multivariate`;
   this is the natural home for treatment comparisons.
 - **VAMPIRE-style shape modes** (PCA+K-means on cell contours → per-frame shape
-  mode + heterogeneity entropy) — quantifies PIEZO1 morphological diversity.
+  mode + heterogeneity entropy) — *the only remaining CellScope per-frame
+  analysis not yet ported*; it's a recording-level population model (sklearn is
+  available), so it wants a lazy fit + a small mode-distribution/eigenshape dock,
+  with "shape_mode" then added to the configurable cell-plot metrics.
 - **Per-protrusion event detection** on the edge kymograph (retraction
   duration/frequency/strength, à la ADAPT) — richer than the current summary.
 - **SiR-actin (Cy5) cortical intensity vs retraction** — correlate the per-frame

@@ -106,6 +106,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.timeline.frameChanged.connect(self._on_frame)
         self.canvas.cellHovered.connect(self._on_hover)
         self.canvas.cellClicked.connect(self._on_click)
+        self.cell_info.neighbor_provider = self._centroid_history
         for key, step in ((QtCore.Qt.Key_Left, -1), (QtCore.Qt.Key_Right, 1)):
             QtWidgets.QShortcut(QtGui.QKeySequence(key), self,
                                 activated=lambda s=step: self.timeline.step(s))
@@ -131,6 +132,9 @@ class ViewerWindow(QtWidgets.QMainWindow):
         self.edge.clear_cell()
         self.canvas.overlays.set_scale(self.recording.um_per_px)
         self.display.set_channels(self.recording.channel_names)
+        self.cell_info.set_available(self.recording.channel_names,
+                                     self.recording.um_per_px)
+        self._rebuild_metrics_menu()
         self.timeline.set_time_interval(self.recording.time_interval_min)
         self.timeline.set_range(self.recording.n_frames)
         if self.masks is not None:
@@ -250,6 +254,32 @@ class ViewerWindow(QtWidgets.QMainWindow):
             return scalar_label_lut(self._track_len, self.masks.max_label, "magma")
         return None                                     # "id" → canvas default
 
+    def _centroid_history(self):
+        """All cells' centroid tracks (lazy + cached) — for trails + nearest
+        neighbour metrics."""
+        if self._cent_hist is None and self.masks is not None:
+            self._cent_hist = cell_metrics.centroid_history(self.masks.labels)
+        return self._cent_hist
+
+    def _rebuild_metrics_menu(self):
+        """Populate Config ▸ Cell plot metrics with a checkable item per
+        available per-frame metric (toggling recomputes the cell plot)."""
+        menu = getattr(self, "metrics_menu", None)
+        if menu is None:
+            return
+        menu.clear()
+        um = self.recording.um_per_px if self.recording else None
+        for key in self.cell_info.available:
+            act = QtWidgets.QAction(cell_metrics.metric_label(key, um), self)
+            act.setCheckable(True)
+            act.setChecked(self.cell_info.is_enabled(key))
+            act.toggled.connect(lambda on, k=key: self.cell_info.set_metric_enabled(k, on))
+            menu.addAction(act)
+        if not self.cell_info.available:
+            empty = QtWidgets.QAction("(load a recording)", self)
+            empty.setEnabled(False)
+            menu.addAction(empty)
+
     def _ensure_track_len(self):
         if self._track_len is None and self.masks is not None:
             counts: dict = {}
@@ -269,9 +299,7 @@ class ViewerWindow(QtWidgets.QMainWindow):
             bbox = {c: (r["bbox_x0"], r["bbox_y0"], r["bbox_x1"], r["bbox_y1"])
                     for c, r in props.items()}
         if ov["trails"] and self.masks is not None:
-            if self._cent_hist is None:
-                self._cent_hist = cell_metrics.centroid_history(self.masks.labels)
-            history = self._cent_hist
+            history = self._centroid_history()
         self.canvas.overlays.update_overlay(
             info_text=self._info_text(t), centroids=centroids, history=history,
             frame=t, selected=self.selected, bbox=bbox)

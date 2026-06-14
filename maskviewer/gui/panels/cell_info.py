@@ -1,21 +1,26 @@
 """Cell-info panel — inspect the cell clicked in the view.
 
-Shows a summary of the selected cell's track (length, motion, state fractions)
-and a time-series plot of any per-frame characteristic — area, eccentricity,
+Shows a summary of the selected cell's track and a time-series plot of any
+*selected* per-frame characteristic — area, perimeter, circularity, eccentricity,
 aspect ratio, solidity, axes, orientation, extent, speed, displacement, turning
-angle, per-frame state, and mean intensity of each channel (e.g. SiR-actin Cy5)
-— plus an MSD (log-log) view with the diffusion-exponent fit. Computation uses
-the GUI-free `analysis` helpers; this panel only formats + plots.
+angle, consecutive IoU, area change, nearest-neighbour distance/count, per-frame
+state, and per-channel intensity / membrane contrast — plus an MSD (log-log)
+view with the diffusion-exponent fit.
+
+Which metrics are computed + offered is controlled by the Config ▸ Cell plot
+metrics menu (the panel owns the enabled set, persisted via QSettings); changing
+one recomputes the selected cell and updates this plot menu immediately.
 """
 from __future__ import annotations
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
-from ...analysis import cell_metrics, motion, state
+from ...analysis import cell_metrics, motion
 
 _MSD = "MSD (log-log)"
+_NN = {"nn_dist", "n_neighbors"}
 
 
 class CellInfoPanel(QtWidgets.QWidget):
@@ -24,6 +29,14 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.cell_id = 0
         self._cft = {}
         self._dt = None
+        self._ctx = None                       # (labels, um, dt, recording)
+        self.available = []                    # selectable metric keys
+        self.neighbor_provider = None          # callable -> {cid:(T,2)} | None
+        self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
+        dis = self._settings.value("cell_metrics_disabled", [])
+        if isinstance(dis, str):                       # QSettings may unwrap a 1-list
+            dis = [dis]
+        self._disabled = set(dis) if dis else set()
 
         self.title = QtWidgets.QLabel("No cell selected")
         self.title.setStyleSheet("font-weight: bold;")
@@ -39,7 +52,7 @@ class CellInfoPanel(QtWidgets.QWidget):
                                     symbol="o", symbolSize=4,
                                     symbolBrush=(0, 160, 255))
         self.fit = self.plot.plot([], [], pen=pg.mkPen((230, 90, 60), width=2,
-                                                       style=2))   # dashed
+                                                       style=2))
         self.marker = pg.InfiniteLine(angle=90, movable=False,
                                       pen=pg.mkPen((255, 200, 0), width=1))
         self.plot.addItem(self.marker)
@@ -53,33 +66,57 @@ class CellInfoPanel(QtWidgets.QWidget):
         lay.addLayout(mrow)
         lay.addWidget(self.plot)
 
-    # -- public ----------------------------------------------------------
+    # -- config ----------------------------------------------------------
+    def set_available(self, channel_names, um_per_px=None):
+        self.available = cell_metrics.available_frame_metrics(channel_names)
+
+    def enabled(self):
+        return [k for k in self.available if k not in self._disabled]
+
+    def is_enabled(self, key):
+        return key not in self._disabled
+
+    def set_metric_enabled(self, key, on):
+        if on:
+            self._disabled.discard(key)
+        else:
+            self._disabled.add(key)
+        self._settings.setValue("cell_metrics_disabled", sorted(self._disabled))
+        if self._ctx and self.cell_id:
+            self._compute()                    # recompute + re-list immediately
+
+    # -- data ------------------------------------------------------------
     def set_cell(self, cell_id, labels, um_per_px=None, dt_min=None, recording=None):
         if not cell_id:
             return self.clear_cell()
         self.cell_id = int(cell_id)
         self._dt = dt_min
+        self._ctx = (labels, um_per_px, dt_min, recording)
+        self._compute()
+
+    def _compute(self):
+        labels, um, dt, rec = self._ctx
+        want = self.enabled()
+        nh = self.neighbor_provider() if (self.neighbor_provider
+                                          and _NN & set(want)) else None
         self._cft = cell_metrics.cell_frame_table(
-            labels, self.cell_id, um_per_px, dt_min, recording=recording)
+            labels, self.cell_id, um, dt, recording=rec, metrics=want,
+            neighbor_history=nh)
+        self.title.setText(f"Cell {self.cell_id}")
+        self._update_info()
+        self._rebuild_combo()
+
+    def _update_info(self):
         s = self._cft.get("series", {})
         m = self._cft.get("summary", {})
         u = "µm" if self._cft.get("scaled") else "px"
-
-        # state fractions (rounded/spread over classifiable frames)
-        codes = s.get("state_code", (np.array([]),))[0]
-        cls = codes[(codes == state.STATE_CODE["rounded"]) |
-                    (codes == state.STATE_CODE["spread"])]
-        frac_round = float((codes == state.STATE_CODE["rounded"]).sum() / cls.size) \
-            if cls.size else float("nan")
-
-        self.metric.blockSignals(True)
-        self.metric.clear()
-        self.metric.addItems(sorted(s) + [_MSD])
-        self.metric.setCurrentText("area" if "area" in s else (sorted(s)[0] if s else _MSD))
-        self.metric.blockSignals(False)
-
-        self.title.setText(f"Cell {self.cell_id}")
         fr = self._cft.get("frame", np.array([]))
+        extra = ""
+        if "state_code" in s:
+            codes = s["state_code"][0]
+            cls = codes[(codes == 1) | (codes == 2)]
+            fr_round = float((codes == 2).sum() / cls.size) if cls.size else float("nan")
+            extra = f"<br>rounded fraction: {fr_round:.2f}"
         self.info.setText(
             f"frames tracked: {fr.size}"
             f" ({int(fr[0]) if fr.size else '-'}→{int(fr[-1]) if fr.size else '-'})<br>"
@@ -88,8 +125,18 @@ class CellInfoPanel(QtWidgets.QWidget):
             f"straightness: {m.get('straightness', float('nan')):.3f}"
             f"   persistence: {m.get('dir_autocorr_lag1', float('nan')):.3f}<br>"
             f"mean speed: {m.get('mean_speed', float('nan')):.3f} "
-            f"{u}/{'min' if dt_min else 'frame'}<br>"
-            f"rounded fraction: {frac_round:.2f}")
+            f"{u}/{'min' if self._dt else 'frame'}" + extra)
+
+    def _rebuild_combo(self):
+        cur = self.metric.currentText()
+        s = self._cft.get("series", {})
+        items = sorted(s) + [_MSD]
+        self.metric.blockSignals(True)
+        self.metric.clear()
+        self.metric.addItems(items)
+        self.metric.setCurrentText(
+            cur if cur in items else ("area" if "area" in s else items[0]))
+        self.metric.blockSignals(False)
         self._replot()
 
     def set_frame_marker(self, t):
@@ -98,18 +145,18 @@ class CellInfoPanel(QtWidgets.QWidget):
     def clear_cell(self):
         self.cell_id = 0
         self._cft = {}
+        self._ctx = None
         self.title.setText("No cell selected")
         self.info.setText("Click a cell in the view to inspect it.")
         self.curve.setData([], [])
         self.fit.setData([], [])
 
-    # -- internal --------------------------------------------------------
+    # -- plotting --------------------------------------------------------
     def _replot(self):
         key = self.metric.currentText()
         self.fit.setData([], [])
         if key == _MSD:
-            self._plot_msd()
-            return
+            return self._plot_msd()
         self.plot.setLogMode(x=False, y=False)
         self.marker.show()
         series = self._cft.get("series", {})
@@ -132,9 +179,7 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.curve.setData(np.asarray(tau), np.asarray(vals))
         fit = motion.fit_msd(tau, vals)
         if np.isfinite(fit["alpha"]) and len(tau):
-            model = 4 * fit["D"] * np.asarray(tau) ** fit["alpha"]
-            self.fit.setData(np.asarray(tau), model)
-            self.plot.setTitle(f"α={fit['alpha']:.2f}  D={fit['D']:.3g}  "
-                               f"R²={fit['r2']:.2f}")
+            self.fit.setData(np.asarray(tau), 4 * fit["D"] * np.asarray(tau) ** fit["alpha"])
+            self.plot.setTitle(f"α={fit['alpha']:.2f}  D={fit['D']:.3g}  R²={fit['r2']:.2f}")
         self.plot.setLabel("left", "MSD (µm²)" if self._cft.get("scaled") else "MSD (px²)")
         self.plot.setLabel("bottom", "lag (min)" if self._dt else "lag (frames)")

@@ -57,6 +57,11 @@ def build_menubar(win):
     soon.setEnabled(False)
     an.addAction(soon)
 
+    cfg = mb.addMenu("&Config")
+    win.metrics_menu = cfg.addMenu("Cell plot &metrics")
+    win.metrics_menu.setToolTipsVisible(True)
+    win._rebuild_metrics_menu()
+
     w = mb.addMenu("&Window")
     for dock in win.docks.values():
         w.addAction(dock.toggleViewAction())

@@ -5,6 +5,35 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Configurable cell-plot metrics + nearest-neighbour + full CellScope per-frame set
+
+- **Config menu** (`Config ▸ Cell plot metrics`): a checkable item per available
+  per-frame metric; toggling recomputes the selected cell and updates the plot
+  combo **immediately**. The panel owns the enabled set (QSettings-persisted);
+  `cell_frame_table(metrics=…)` computes only the selected series, so expensive
+  ones (solidity, perimeter, intensity, membrane contrast, nearest-neighbour)
+  are skipped when off. Menu rebuilt per recording (intensity/membrane keys
+  depend on channels).
+- **Nearest-neighbour** (`analysis/neighbors.py`): per-cell NN distance + count
+  within a radius (centroid-to-centroid). Added to the cell plot, the per-frame
+  CSV (`nn_dist_*`, `n_neighbors`) and per-cell aggregates. The window provides
+  the cached centroid history to the panel as a lazy neighbour provider.
+- **Completed the CellScope per-frame metric set** so all are plottable:
+  added **perimeter** (Crofton estimate matching skimage) + **circularity**
+  (in `regionprops_frame`/exports too), **consecutive IoU**, **relative
+  area-change**, and **membrane contrast** (inside-vs-outside ring intensity per
+  channel — a boundary/membrane-quality proxy). With the existing area, ecc,
+  aspect ratio, solidity, axes, orientation, extent, state, speed, displacement,
+  turning, MSD and per-channel intensity, the only CellScope analysis not yet
+  ported is **VAMPIRE shape-mode** classification (a population PCA+K-means model
+  — its own recording-level feature; flagged for next).
+
+Verified headless: 23 configurable metrics, immediate toggle on/off, NN +
+membrane + circularity plots, composite + edge unaffected. `pytest` 21 passed
+(added NN / perimeter-circularity / metric-gating tests). All files < 500 lines.
+
+---
+
 ## 2026-06-13 — Membrane dynamics, composite, threaded export, rich cell plots
 
 Second workbench pass (options 2–4 + richer cell info), informed by a deep read
