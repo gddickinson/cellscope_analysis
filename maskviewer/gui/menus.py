@@ -70,6 +70,10 @@ def build_menubar(win):
     win.metrics_menu = cfg.addMenu("Cell plot &metrics")
     win.metrics_menu.setToolTipsVisible(True)
     win._rebuild_metrics_menu()
+    cfg.addSeparator()
+    cfg.addAction(_act(win, "Comparison &plot options…", win.open_compare_plot_options,
+                       tip="Fonts, sizes, axes, bins, trendlines… for the "
+                           "Comparison-window graphs"))
 
     w = mb.addMenu("&Window")
     for dock in win.docks.values():

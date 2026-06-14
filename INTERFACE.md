@@ -139,7 +139,8 @@ Read this before opening source files. Update it when modules change.
   space (Analysis ▸ Comparison window), opened on the loaded **Project**.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
   (Compute/recompute · **Groups…** (opens `DesignEditor`) · Metric · Y ·
-  **Control** (editable for single-arm designs) · MSD stat · OLS · Export) + a
+  **Control** (editable for single-arm designs) · MSD stat · OLS · **Results ▾**
+  (save / load computed results · export CSVs) · **Style…** · **Help**) + a
   **Filters…** button (opens the `FilterMixin` dialog: frames / track-quality /
   cells-per-recording / state / nearest-neighbour crowding / distance-from-edge).
   Left tabbed plots — **Distributions** (strip / box+Bonferroni / bars /
@@ -153,11 +154,15 @@ Read this before opening source files. Update it when modules change.
   **and** state-segmented (`…_spread` / `…_rounded`) metrics are offered; metric
   combos carry per-column tooltips (`metric_docs.comparison_tooltip`); a **Help**
   button opens the Metrics & methods reference; a **Style…** button (or
-  shift-right-click a plot) opens the `PlotStyleDialog`; tabs/controls tooltipped.
+  shift-right-click a plot, or main-viewer Config ▸ Comparison plot options) opens
+  the `PlotStyleDialog`; tabs/controls tooltipped. `hidden_groups` (set via the
+  style dialog's Show-groups list) hides groups from the **graphs** only (Stats /
+  Data still cover all); per-plot legends are managed in `_prep_legend`.
 - **compare_tables.py** — `StatsTablesMixin`: fills the right-panel **Stats** +
-  **Data** tables from the per-recording table + Design (`_update_stats`,
-  `_fill_data`, `_set_table`); + `show_metrics_help(parent)` (the Metrics &
-  methods reference dialog). Split out to keep `compare_window` small.
+  **Data** tables (`_update_stats`, `_fill_data`, `_set_table`); `ResultsIOMixin`:
+  **save / load** the computed results (`_save_results`/`_load_results` →
+  `compare.save_results`/`load_results`, restoring design + exclusions) + CSV
+  **`_export`**; `show_metrics_help(parent)`. Split out to keep `compare_window` small.
 - **compare_filters.py** — `FilterMixin`: builds the cell/recording filter widgets,
   lays them out in a non-modal **Filters…** dialog, and applies them in `_filtered`
   (min frames · track-quality · min cells/recording · state · NN distance min/max ·
@@ -165,19 +170,24 @@ Read this before opening source files. Update it when modules change.
 - **compare_plots.py** — design-aware pyqtgraph drawing for `CompareWindow`
   (GUI-state-free): `strip` (mean ± SEM, clickable), `box` (+ Bonferroni stars
   via `arm_tests`), `bars` (group mean ± SEM), `superplot` (cells + per-recording
-  means), `ensemble_msd` (mean±SEM / median+CI bands; band-bound curves are added
-  to the plot so they inherit its log mode + clamped > 0 — fixes misaligned
-  log-log bands/lines), `scatter` (X-vs-Y + Spearman, clickable), `histogram`
-  (per-cell distribution by group). A **`trendline`** (`_trend`) option draws a
-  scatter least-squares line and connects per-group centres on the categorical
-  plots. Colours + order from the `Design`; axes labelled with units via
-  `metric_docs.axis_label`. Every function takes a `PlotStyle` (fonts /
-  marker+line size / fill opacity / grid / log axes / histogram bins / trendline…)
-  applied via the shared `_axes` helper.
-- **plot_style.py** — `PlotStyle` (dataclass of render options incl. `trendline`,
-  QSettings-persisted) + `PlotStyleDialog` (non-modal live editor) +
-  `PlotStyleMixin` (opens the editor from a toolbar button **or shift-right-click
-  on any plot**, saves + replots).
+  means), `ensemble_msd` (mean±SEM / median+CI bands; band-bound curves added to
+  the plot so they inherit its log mode + clamped > 0 — fixes misaligned log-log
+  bands/lines; honours τ-binning, linear/log axis, and optional point markers +
+  per-point error bars), `scatter` (X-vs-Y + Spearman, clickable, optional
+  per-group / all-data **fit lines** with ±SE band — `_fit_xy`/`_draw_fit`),
+  `histogram` (per-cell distribution by group). `_trend` connects per-group
+  centres on the categorical plots; `_legend_entry` registers coloured legend
+  items. Colours + order from the `Design`; axes labelled with units. Every
+  function takes a `PlotStyle`, applied via the shared `_axes` helper (which also
+  sets the **background** + contrasting foreground).
+- **plot_style.py** — `PlotStyle` (dataclass of render options — fonts / marker+line
+  size / fill opacity / grid / log axes / **background** / **legend** / histogram
+  bins+bars / **MSD τ-bin + linear axis + point markers** / **trendline** /
+  **scatter fit** (linear/power/exp/log, per-group/all, ±SE band); QSettings-
+  persisted) + `PlotStyleDialog` (non-modal live editor, incl. a dynamic **Show
+  groups** visibility section via `set_groups`) + `PlotStyleMixin` (opens the editor
+  from a toolbar button **or shift-right-click on any plot**, refreshes the group
+  list via `_style_groups`, saves + replots).
 - **design_editor.py** — `DesignEditor(QDialog)`: the **Groups & Comparisons**
   editor opened from the Comparison window (toolbar ▸ Groups…). A recordings
   table (include checkbox + editable **group** combo + cell counts, with bulk
@@ -190,8 +200,8 @@ Read this before opening source files. Update it when modules change.
   Folder / Open Project File / Save Project As / Recent Projects** / Export CSV /
   screenshots) / View / Image / Analysis (**Comparison window…** `Ctrl+Shift+C`
   + Export CSV) / **Config** (Cell-plot-metrics checkable submenu, rebuilt per
-  recording) / Window / Help (incl. **Metrics Reference…** → `metric_docs.as_html`).
-  Tooltips throughout.
+  recording; **Comparison plot options…** → `open_compare_plot_options`) / Window /
+  Help (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
 - **plot_export.py** — `save_plot(plot, parent)`: PNG/SVG export for any panel plot.
@@ -281,7 +291,9 @@ Read this before opening source files. Update it when modules change.
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
   `per_condition_summary` (per-group n / mean / SEM / median over recordings —
-  the Data tab). Per-arm KW / Bonferroni reuse `feature_tables.arm_tests`.
+  the Data tab), `save_results` / `load_results` (pickle the computed per-cell +
+  MSD frames + meta for reload-without-recompute). Per-arm KW / Bonferroni reuse
+  `feature_tables.arm_tests`.
   `build_comparison` also merges in the **state-segmented** per-cell metrics
   (`state_metrics`) so the GUI can reproduce the original analysis.
 - **state_metrics.py** — `per_cell_state_metrics`: per-cell metrics computed

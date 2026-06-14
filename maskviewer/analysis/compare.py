@@ -79,15 +79,21 @@ def build_comparison(entries, progress_cb=None, with_solidity=False):
     return per_cell, msd
 
 
-def ensemble_by_condition(msd_long, stat="mean", n_boot=400):
+def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0):
     """{condition: (tau, centre, lo, hi)} ensemble MSD across recordings.
 
     stat='mean' → mean ± SEM; stat='median' → median + bootstrap 95% CI (over
     recordings). Recording = unit (each recording contributes one MSD curve).
+    ``bin_min`` > 0 coarsens the lag axis: each τ is snapped to the centre of a
+    ``bin_min``-wide bin and the MSD values within it are pooled (smooths noisy
+    long lags) — a display-time rebinning, no recompute.
     """
     out = {}
     if msd_long is None or msd_long.empty:
         return out
+    if bin_min and bin_min > 0:
+        msd_long = msd_long.copy()
+        msd_long["tau"] = (np.floor(msd_long["tau"] / bin_min) + 0.5) * bin_min
     rng = np.random.default_rng(0)
     for cond, g in msd_long.groupby("condition"):
         taus = np.sort(g["tau"].unique())
@@ -163,6 +169,23 @@ def ols_adjusted(per_recording, outcome, covariates=("frac_spread", "mean_n_neig
                         "p": p, "ci_lo": b - crit * s, "ci_hi": b + crit * s,
                         "covs": cov})
     return out
+
+
+def save_results(path, per_cell, msd, meta=None):
+    """Pickle the computed comparison results (per-cell + ensemble-MSD frames +
+    a small meta dict: project name, design, exclusions) so they can be reloaded
+    and re-plotted later without the raw masks. GUI-free."""
+    import pickle
+    with open(path, "wb") as f:
+        pickle.dump({"per_cell": per_cell, "msd": msd, "meta": meta or {}}, f)
+    return path
+
+
+def load_results(path):
+    """Inverse of `save_results` → {'per_cell', 'msd', 'meta'}."""
+    import pickle
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
 
 def aggregate(per_cell):

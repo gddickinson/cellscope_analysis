@@ -66,6 +66,18 @@ def test_border_distance_metric():
     assert abs(df.iloc[0]["min_border_dist_um"] - 49.5 * 0.5) < 1.0
 
 
+def test_save_load_results_roundtrip(tmp_path):
+    pc = pd.DataFrame({"recording": ["a", "b"], "condition": ["WT", "KO"],
+                       "cell_id": [1, 2], "mean_area_um2": [100.0, 200.0]})
+    msd = pd.DataFrame({"recording": ["a"], "condition": ["WT"], "tau": [10.0],
+                        "msd": [5.0]})
+    fp = os.path.join(tmp_path, "r.cmp")
+    compare.save_results(fp, pc, msd, {"name": "x", "excluded": ["b"]})
+    blob = compare.load_results(fp)
+    assert blob["meta"]["name"] == "x" and blob["meta"]["excluded"] == ["b"]
+    assert blob["per_cell"].equals(pc) and blob["msd"].equals(msd)
+
+
 def test_per_condition_summary():
     per_rec = pd.DataFrame({
         "recording": ["a", "b", "c", "d"],

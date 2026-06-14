@@ -120,6 +120,32 @@ def drive(win, label):
     for k in range(win.dist_kind.count()):            # trend renders on all dist kinds
         win.dist_kind.setCurrentIndex(k)
     app.processEvents()
+    # background / legend / fits / msd points + bins + linear axis
+    sd._widgets["background"].setCurrentText("white")
+    sd._widgets["legend"].setChecked(True)
+    sd._widgets["fit_kind"].setCurrentText("linear")
+    sd._widgets["fit_groups"].setChecked(True)
+    sd._widgets["fit_all"].setChecked(True)
+    sd._widgets["fit_ci"].setChecked(True)
+    sd._widgets["msd_points"].setChecked(True)
+    sd._widgets["msd_bin_min"].setValue(20)
+    sd._widgets["msd_log"].setChecked(False)
+    app.processEvents()
+    assert (win.style.background == "white" and win.style.legend
+            and win.style.fit_kind == "linear" and win.style.msd_points
+            and win.style.msd_bin_min == 20 and not win.style.msd_log)
+    win.tabs.setCurrentIndex(2); app.processEvents()      # scatter (fits + CI)
+    win.tabs.setCurrentIndex(1); app.processEvents()      # msd (points / bins / linear)
+    win.tabs.setCurrentIndex(0); app.processEvents()
+    # group visibility (Show groups in the style dialog)
+    gboxes = sd._groups_box.findChildren(QtWidgets.QCheckBox)
+    assert gboxes, f"{label}: no group checkboxes"
+    gboxes[0].setChecked(False)                           # hide first group
+    app.processEvents()
+    assert win.hidden_groups, f"{label}: group not hidden"
+    gboxes[0].setChecked(True)
+    app.processEvents()
+    assert not win.hidden_groups
     # shift-right-click a plot opens the style dialog (event filter consumes it)
     ev = QtGui.QMouseEvent(QtCore.QEvent.MouseButtonPress, QtCore.QPointF(5, 5),
                            QtCore.Qt.RightButton, QtCore.Qt.RightButton,
@@ -128,7 +154,7 @@ def drive(win, label):
     sd._reset()                                       # restore defaults
     win.dist_kind.setCurrentText("Strip (mean ± SEM)")
     app.processEvents()
-    print(f"  {label}: tabs+filters+units+style OK · stats rows={win.table.rowCount()} "
+    print(f"  {label}: tabs+filters+units+style+groups OK · stats rows={win.table.rowCount()} "
           f"· per-rec rows={win.rec_table.rowCount()}")
 
 
@@ -184,6 +210,23 @@ def main():
     assert not win.control.isEnabled(), "multi-arm control combo should be disabled"
     win._on_done((*fake_data(ic.conditions),), cached=True)
     drive(win, "multi-arm")
+
+    # save / load comparison results (patch the file dialogs)
+    import tempfile
+    rpath = os.path.join(tempfile.mkdtemp(), "res.cmp")
+    _save, _open = (QtWidgets.QFileDialog.getSaveFileName,
+                    QtWidgets.QFileDialog.getOpenFileName)
+    QtWidgets.QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (rpath, ""))
+    QtWidgets.QFileDialog.getOpenFileName = staticmethod(lambda *a, **k: (rpath, ""))
+    try:
+        win._save_results()
+        win._per_cell = win._msd = None              # wipe, then reload from disk
+        win._load_results()
+        assert win._per_cell is not None and not win._per_cell.empty, "reload failed"
+    finally:
+        QtWidgets.QFileDialog.getSaveFileName = _save
+        QtWidgets.QFileDialog.getOpenFileName = _open
+    print(f"  results save/load OK ({win._per_cell['recording'].nunique()} recordings)")
 
     shot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--shot=")), None)
     if shot:                                          # box view = clearest for docs
@@ -254,7 +297,9 @@ def main():
     assert cw is not None and cw.project.name == "sample"
     vw.set_project(ic)                                # propagates to compare window
     assert cw.project.name == "ic295-like", cw.project.name
-    print(f"  viewer: open_compare_window + set_project OK "
+    vw.open_compare_plot_options()                    # Config ▸ Comparison plot options
+    assert vw._compare_window._style_dialog is not None, "Config plot-options entry"
+    print(f"  viewer: open_compare_window + set_project + plot-options OK "
           f"({proj.n_recordings} sample recording(s))")
 
     print("SMOKE OK")
