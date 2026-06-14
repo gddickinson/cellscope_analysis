@@ -112,9 +112,11 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
   per-cell plot metric.
 - **Compare** dock: cross-recording comparison by condition (**recording = unit**)
-  — per-recording strip + mean±SEM, or a superplot (per-cell cloud + recording
-  means); per-arm Kruskal-Wallis + within-arm Bonferroni + vehicle stats; click a
-  point to load that recording; CSV export. Heavy compute is threaded + cached.
+  — plot kinds: recording means (strip+mean±SEM), **box** (Bonferroni stars),
+  superplot, **ensemble MSD** (mean±SEM / median+bootstrap-CI), **scatter X-vs-Y**
+  (+Spearman); stats = per-arm KW + within-arm Bonferroni + vehicle, plus optional
+  **covariate-adjusted OLS** (treatment after frac_spread + density); click a point
+  to load that recording; CSV export. Heavy compute is threaded + cached.
 - **Population** dock: plot any metric across ALL cells of the recording —
   every-cell time series, **mean ± SEM/SD** error band, **histogram**, and a
   **flower plot** (origin-centred trajectories); filters (min track length,

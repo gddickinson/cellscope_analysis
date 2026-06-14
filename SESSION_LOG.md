@@ -5,6 +5,32 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Comparison-audit gaps (ensemble MSD, state, OLS, box plots)
+
+A background agent audited CellScope's cross-recording/comparison code; added the
+high-value mask-computable gaps to the Compare dock:
+- **Ensemble MSD by condition** (`compare.build_comparison` now also returns a
+  per-recording ensemble MSD; `ensemble_by_condition` → mean±SEM or
+  median+bootstrap-CI) — the headline migration figure. (Reuses centroids via a
+  new `per_cell_table(centroids=)` param so it's not an extra pass.)
+- **Per-state composition**: `frac_rounded` / `frac_spread` per cell → comparable
+  metrics (the IC295 phenotype lives in state).
+- **Covariate-adjusted OLS** (`compare.ols_adjusted`): per-arm treatment effect
+  after frac_spread + density — disentangles migration from the state/crowding
+  confounds (central to a mechanosensor claim). Dependency-free (lstsq + t-tests),
+  surfaced via a dock checkbox.
+- **Box plots** by condition with within-arm Bonferroni significance stars; a
+  **metric-vs-metric scatter by condition** with Spearman.
+Deferred (documented, lower value / dependency-gated): cell-level LMM
+(statsmodels), van Elteren stratified test + CEM matching + residual
+normalization, violin plots, ANOVA/Welch/Shapiro options, per-condition flower
+grid / histograms, pooled cell-level stats toggle.
+
+`pytest` 28 passed (warning-free); headless smoke verified all five plot kinds +
+OLS + median MSD; screenshot refreshed. All files < 500 lines.
+
+---
+
 ## 2026-06-13 — Cross-recording comparison dock
 
 The big next phase: compare a metric across recordings grouped by condition,

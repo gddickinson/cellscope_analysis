@@ -56,7 +56,7 @@ def track_table(labels, um_per_px=None, dt_min=None):
 
 
 def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
-                   per_frame_df=None, with_edge=False):
+                   per_frame_df=None, with_edge=False, centroids=None):
     """DataFrame: one row per cell — track length, shape aggregates, motion.
 
     Shape columns are per-track means/medians of the per-frame morphometry;
@@ -70,7 +70,7 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
     labels = np.asarray(labels)
     pf = per_frame_table(labels, um_per_px, dt_min, with_solidity) \
         if per_frame_df is None else per_frame_df
-    cents = label_stats.centroids(labels)
+    cents = label_stats.centroids(labels) if centroids is None else centroids
     scale = float(um_per_px) if um_per_px else 1.0
     u = "um" if um_per_px else "px"
     speed_u = f"{u}_per_min" if dt_min else f"{u}_per_frame"
@@ -95,6 +95,12 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
                 if np.isfinite(vals).any():
                     row[f"mean_{col}"] = float(np.nanmean(vals))
                     row[f"median_{col}"] = float(np.nanmedian(vals))
+        if "state" in getattr(sub, "columns", []):       # time-in-state fractions
+            st = sub["state"].to_numpy()
+            cls = st[(st == "rounded") | (st == "spread")]
+            n = cls.size
+            row["frac_rounded"] = float((cls == "rounded").sum() / n) if n else np.nan
+            row["frac_spread"] = float((cls == "spread").sum() / n) if n else np.nan
         m = motion.motion_summary(cen * scale, dt_min)
         row[f"net_disp_{u}"] = m["net_disp"]
         row[f"total_path_{u}"] = m["total_path"]

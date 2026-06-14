@@ -307,14 +307,24 @@ def test_compare_build_aggregate():
     entries = [FE("A1", "WT", stack([(20, 15), (50, 15)])),
                FE("B1", "KO", stack([(20, 15), (50, 15), (35, 40)]))]
     prog = []
-    pc = compare.build_comparison(entries, progress_cb=lambda i, n: prog.append(i) or True)
+    pc, msd = compare.build_comparison(
+        entries, progress_cb=lambda i, n: prog.append(i) or True)
     assert set(pc["recording"]) == {"A1", "B1"}
     assert set(pc["condition"]) == {"WT", "KO"}
+    assert "frac_spread" in pc.columns
     per_rec = compare.aggregate(pc)
     assert len(per_rec) == 2 and "n_cells" in per_rec.columns
     assert "mean_area_um2" in compare.metric_columns(pc)
     assert set(compare.by_condition(per_rec, "mean_area_um2")) == {"WT", "KO"}
     assert prog and compare.order_conditions(["KO", "WT"]) == ["WT", "KO"]
+    # ensemble MSD by condition
+    assert not msd.empty and {"recording", "condition", "tau", "msd"} <= set(msd.columns)
+    ens = compare.ensemble_by_condition(msd, stat="mean")
+    assert set(ens) == {"WT", "KO"}
+    tau, centre, lo, hi = ens["WT"]
+    assert tau.size and np.all(np.diff(tau) > 0)
+    # OLS runs (few recordings → may be skipped per arm, but must not error)
+    assert isinstance(compare.ols_adjusted(per_rec, "mean_area_um2"), list)
 
 
 def test_cell_series_and_history():
