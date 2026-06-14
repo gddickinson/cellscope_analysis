@@ -42,10 +42,15 @@ def main(argv=None):
               "config.json (see config.example.json).", file=sys.stderr)
         return 2
 
+    roots = [] if args.recording else (args.data_root
+                                       or load_config(args.config)["data_roots"])
+    name = os.path.basename(os.path.normpath(roots[0])) if roots else "current"
+
     from PyQt5 import QtWidgets               # imported late so --help needs no Qt
     from maskviewer.gui import ViewerWindow
+    from maskviewer import project as projmod
     app = QtWidgets.QApplication(sys.argv)
-    win = ViewerWindow(entries)
+    win = ViewerWindow(projmod.from_entries(entries, name=name, data_roots=roots))
     win.show()
     print(f"Loaded {len(entries)} recording(s).")
     return app.exec_()

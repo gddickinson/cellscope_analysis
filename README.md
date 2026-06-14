@@ -33,10 +33,23 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   eigenshapes).
 - **Population** — all cells at once: time series, mean ± SEM/SD, histogram,
   scatter, **flower plot**, lineage tree + division timeline; with filtering.
-- **Cross-recording comparison** — group recordings by condition (**recording =
-  experimental unit**): strip / superplot a metric across conditions with per-arm
-  Kruskal-Wallis + within-arm Bonferroni + vehicle stats; click a point to load
-  that recording.
+- **Projects** — load any dataset (any treatments / recording counts) via
+  **File ▸ Open Project Folder** (auto-derives the experimental *design* — arms,
+  controls, vehicle, colours), save/reopen it as a small **project file**, and
+  switch between **Recent Projects** without restarting.
+- **Comparison window** — a dedicated space (**Analysis ▸ Comparison window**,
+  `Ctrl+Shift+C`) for cross-recording / treatment analysis (**recording =
+  experimental unit**): tabbed **Distributions** (strip / box+Bonferroni /
+  superplot) · **Ensemble MSD** (mean±SEM or median+CI) · **Scatter** (X-vs-Y +
+  Spearman), beside a sortable per-contrast **stats table** (p / Bonferroni /
+  Cohen's d / covariate-adjusted OLS) with per-arm Kruskal-Wallis + vehicle
+  test. Background compute + per-project cache; click a point → load that
+  recording in the viewer.
+- **Groups & Comparisons editor** (Comparison window ▸ **Groups…**) — assign
+  recordings to **groups**, **include/exclude** any recording, define which groups
+  form each **comparison** and which is the **control**, and set the vehicle pair.
+  Changes apply **instantly** (a remap of the computed table — no recompute) and
+  save with the project.
 - **Sortable per-cell table**, **CSV export** (per-frame / per-cell / tracks,
   for Origin/Prism), **save any plot** (PNG/SVG), and a **Help ▸ Metrics
   Reference** documenting every metric + tooltips throughout.
@@ -45,7 +58,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
-![cross-recording comparison by condition (recording = unit) with per-arm stats](docs/screenshots/comparison.png)
+![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + per-contrast stats table](docs/screenshots/comparison.png)
+
+![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 
 *(Screenshots use synthetic data only — no real microscopy data is committed.)*
 
@@ -88,15 +103,22 @@ GUI changes can also be verified headless with `QT_QPA_PLATFORM=offscreen` (see
 
 ## Pointing at your data
 
-Real data is **not** stored in this repo. Copy the template and edit:
+Real data is **not** stored in this repo. The quickest way in is **File ▸ Open
+Project Folder** — point it at a folder of recording folders and it loads them as
+a project, auto-deriving the experimental design (arms / controls / vehicle /
+colours) from the condition names. **Save Project As** writes a small JSON you can
+reopen (or pick from **Recent Projects**); **Open Project File** loads it back.
+
+For the default launch set, copy the config template and edit:
 
 ```bash
 cp config.example.json config.json     # gitignored
 # "data_roots": [".../cellscope/ic295_analysis/by_condition"]
 ```
 
-Each root is scanned for recording folders (`*.ome.tif` + `pipeline_results/masks.npz`).
-The bundled synthetic `sample_data/` is always available as a fallback.
+Each root is scanned for recording folders (`*.ome.tif` + `pipeline_results/masks.npz`);
+the immediate sub-folder name is used as the **condition**. The bundled synthetic
+`sample_data/` is always available as a fallback.
 
 ## Data formats
 

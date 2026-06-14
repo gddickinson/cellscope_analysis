@@ -95,19 +95,28 @@ def _kw(groups):
         return None
 
 
-def arm_tests(by_cond: dict) -> dict:
+def arm_tests(by_cond: dict, arms=None, vehicle=None) -> dict:
     """by_cond = {condition: [values]} → {arm: {kw, pairs{ctrl_vs_test:{p,p_bonf}}},
-    vehicle: {p}}. Bonferroni n = #test-vs-control pairs within the arm."""
+    vehicle: {p}}. Bonferroni n = #test-vs-control pairs within the arm.
+
+    ``arms`` / ``vehicle`` default to the IC295 design (back-compat); pass a
+    project's design (``Design.arms`` / ``Design.vehicle``) for other datasets.
+    """
+    use_arms = ARMS if arms is None else arms
+    if arms is None and vehicle is None:
+        vehicle = VEHICLE
     res = {}
-    for arm, spec in ARMS.items():
-        conds = spec["conditions"]; ctrl = spec["control"]
+    for arm, spec in use_arms.items():
+        conds = spec["conditions"]
+        ctrl = spec["control"]
         res[arm] = {"kw": _kw([by_cond.get(c, []) for c in conds]), "pairs": {}}
         tests = [c for c in conds if c != ctrl]
         for t in tests:
             p = _mwu(by_cond.get(ctrl, []), by_cond.get(t, []))
             pb = min(p * len(tests), 1.0) if p is not None else None
             res[arm]["pairs"][f"{ctrl}_vs_{t}"] = {"p": p, "p_bonf": pb}
-    res["vehicle"] = {"p": _mwu(by_cond.get("WT", []), by_cond.get("DMSO", []))}
+    res["vehicle"] = {"p": (_mwu(by_cond.get(vehicle[0], []), by_cond.get(vehicle[1], []))
+                            if vehicle else None)}
     return res
 
 

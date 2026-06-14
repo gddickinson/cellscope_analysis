@@ -14,14 +14,21 @@ Read this before opening source files. Update it when modules change.
 ## Entry points
 - **main_viewer.py** — CLI launcher. Resolves recordings (from `config.json`
   `data_roots`, `--data-root`, or an explicit `--recording/--masks`),
-  discovers them, and opens `ViewerWindow`. Qt is imported lazily so
-  `--help` needs no display.
+  discovers them, wraps them in a **Project** (`project.from_entries`, with the
+  data-root folder name as the project name), and opens `ViewerWindow`. Qt is
+  imported lazily so `--help` needs no display.
 - **scripts/make_sample_data.py** — writes the synthetic `sample_data/Pos_demo/`
   (recording `.ome.tif` + `.ome.json` + `pipeline_results/masks.npz`). Safe,
   fake data so the app runs out of the box.
 - **scripts/link_data.py** — populates the gitignored `data/` folder with
   symlinks into a CellScope tree (`by_condition`, flat `recordings/`,
   `results/`, `gt/`). Convenience browser + viewer `data_root`. Idempotent.
+- **scripts/smoke_compare_window.py** — headless (QT offscreen) smoke for the
+  Comparison window + Project wiring: drives every tab / dist-kind / OLS / stats
+  table on fake multi-arm + single-arm data, checks the editable control combo,
+  exercises the **Groups & Comparisons editor** (exclude / regroup / add-comparison
+  / control / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
+  `set_project`. `--shot=PATH` / `--editshot=PATH` (re)write the docs screenshots.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -44,6 +51,19 @@ Read this before opening source files. Update it when modules change.
 - **config.py** — `load_config(path)` → dict with `data_roots` (always
   appends the bundled `sample_data/` as a fallback). `PROJECT_ROOT`,
   `SAMPLE_DIR`, `CONFIG_PATH` constants.
+- **project.py** — `Project` (name, data_roots, entries, design, **`excluded`**
+  recording labels + **`overrides`** label→group; `.conditions` (effective,
+  override-aware), `.all_groups`, `.n_recordings`, `group_of`, `included_entries`,
+  **`regroup(df)`** = drop-excluded + apply-overrides remap of a per-cell/MSD
+  frame so grouping changes need no recompute) + `Design` (`arms`
+  {arm:{control,conditions}}, `vehicle`, `colors`; `condition_order`, `color`).
+  `auto_design(conditions)` derives the experiment structure (recognises the
+  IC295 genetic/drug arms + WT–DMSO vehicle; otherwise one arm with a heuristic
+  control); `ensure_colors(design, groups)` assigns palette colours to new
+  groups. `from_entries`, `from_data_roots` (discover + auto-design),
+  `load_project`/`save_project` (small JSON, incl. excluded/overrides). Decouples
+  the app from the hard-coded IC295 design so any dataset (any treatments /
+  counts / groupings) loads + compares correctly. GUI-free.
 
 ### maskviewer/io/  — load data (GUI-free)
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
@@ -102,33 +122,59 @@ Read this before opening source files. Update it when modules change.
   - **cell_table.py** `CellTablePanel` — sortable per-cell metric table (+
     `parent` / `daughters` columns from divisions.json); row → select cell;
     CSV export.
-  - **compare_panel.py** `ComparePanel` — cross-recording comparison by condition
-    (recording = unit): background compute + disk cache; plot kinds = recording
-    means / box (Bonferroni stars) / superplot / **ensemble MSD** (mean±SEM or
-    median+CI) / **scatter X-vs-Y** (+Spearman); per-arm KW + Bonferroni + vehicle
-    stats + optional **covariate-adjusted OLS**; click a point → load recording;
-    CSV export.
-- **menus.py** — `build_menubar(win)`: File/View/Image/Analysis/**Config**
-  (Cell-plot-metrics checkable submenu, rebuilt per recording)/Window/Help
-  (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
+  (cross-recording comparison is no longer a dock — it is its own window, see
+  **compare_window.py** below.)
+- **compare_window.py** — `CompareWindow(QMainWindow)`: the dedicated comparison
+  space (Analysis ▸ Comparison window), opened on the loaded **Project**.
+  Background compute (`_Worker` thread) + per-project disk cache; toolbar
+  (Compute/recompute · **Groups…** (opens `DesignEditor`) · Metric · Y ·
+  **Control** (editable for single-arm designs) · MSD stat · Frames · OLS ·
+  Export); tabbed plots — **Distributions**
+  (strip / box+Bonferroni / superplot) · **Ensemble MSD** · **Scatter** — beside
+  a sortable per-contrast **stats table** (p / Bonferroni / Cohen d / OLS β,p) +
+  omnibus KW + vehicle. Uses the project's `Design`; click a point → load that
+  recording in the main viewer (`recordingPicked`). `set_project` re-targets it.
+- **compare_plots.py** — design-aware pyqtgraph drawing for `CompareWindow`
+  (GUI-state-free): `strip` (mean ± SEM, clickable), `box` (+ Bonferroni stars
+  via `arm_tests`), `superplot` (cells + per-recording means), `ensemble_msd`
+  (mean±SEM / median+CI bands), `scatter` (X-vs-Y + Spearman, clickable). Colours
+  + condition order come from the `Design`.
+- **design_editor.py** — `DesignEditor(QDialog)`: the **Groups & Comparisons**
+  editor opened from the Comparison window (toolbar ▸ Groups…). A recordings
+  table (include checkbox + editable **group** combo + cell counts, with bulk
+  include/exclude/set-group) over a comparisons editor (per-comparison member-group
+  checkboxes + control combo + rename/remove, an Add-comparison button, and a
+  vehicle/batch pair) + Auto-detect / Reset. Edits the `Project`'s
+  `excluded`/`overrides` + `Design` in place and emits `designChanged`; the
+  window remaps + replots with **no recompute**.
+- **menus.py** — `build_menubar(win)`: File (Open Recording / **Open Project
+  Folder / Open Project File / Save Project As / Recent Projects** / Export CSV /
+  screenshots) / View / Image / Analysis (**Comparison window…** `Ctrl+Shift+C`
+  + Export CSV) / **Config** (Cell-plot-metrics checkable submenu, rebuilt per
+  recording) / Window / Help (incl. **Metrics Reference…** → `metric_docs.as_html`).
+  Tooltips throughout.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
 - **plot_export.py** — `save_plot(plot, parent)`: PNG/SVG export for any panel plot.
-- **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers +
-  the remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
+- **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers
+  (incl. **project** open-folder / open-file / save-as / recent-projects +
+  `set_project` to adopt a different dataset, and `open_compare_window`) + the
+  remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
   `viewer_window` small.
 - **remote.py** — `RemoteControl`: optional localhost HTTP self-drive
   (`MASKVIEWER_REMOTE=<port>`); marshals commands to the GUI thread; for headless
   agent driving + screenshots.
-- **viewer_window.py** — `ViewerWindow(QMainWindow)`: owns the data, builds the
-  docks (Display + Cell-Info + Edge-Dynamics + Shape-Modes + Population +
-  Cell-Table + Compare tabbed + Image-Adjust right; Timeline bottom; each dock
-  wrapped in a scroll area so the window fits any screen), wires panels↔canvas, split base/overlay
-  rendering (single or additive **composite**), colour-by any calculated metric
-  + units **colour bar** (`colorby.overlay_lut`), lazy caches (centroid history /
-  track lengths / mean speeds / shape-mode model) shared as providers,
-  click-to-select → Cell-Info + Edge dock, `show_metrics_help`, layout
-  save/restore (QSettings) + Reset Layout, status bar, ←/→/Space shortcuts.
+- **viewer_window.py** — `ViewerWindow(QMainWindow)`: accepts a **Project** (or a
+  bare entries list, auto-wrapped); owns the data, builds the docks (Display +
+  Cell-Info + Edge-Dynamics + Shape-Modes + Population + Cell-Table tabbed +
+  Image-Adjust right; Timeline bottom; each dock wrapped in a scroll area so the
+  window fits any screen), wires panels↔canvas, split base/overlay rendering
+  (single or additive **composite**), colour-by any calculated metric + units
+  **colour bar** (`colorby.overlay_lut`), lazy caches (centroid history / track
+  lengths / mean speeds / shape-mode model) shared as providers, click-to-select →
+  Cell-Info + Edge dock, opens the standalone **CompareWindow** (lazy, kept in
+  sync via `set_project`), `show_metrics_help`, layout save/restore (QSettings) +
+  Reset Layout, status bar, ←/→/Space shortcuts.
 
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
@@ -212,6 +258,9 @@ Read this before opening source files. Update it when modules change.
 - **test_analysis.py** — cell_metrics / motion / exporters (known-answer
   synthetic arrays + the sample): shape morphometry, persistence vs
   straightness, CSV table shapes + writing.
+- **test_project.py** — Project/Design model (GUI-free): auto-design (IC295 +
+  generic single-arm), `regroup` exclude/override, effective conditions +
+  `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides.
 
 ## Config / data
 - **config.example.json** — committed template for `config.json` (gitignored,

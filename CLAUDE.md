@@ -111,23 +111,44 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
 - **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
   mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
   per-cell plot metric.
-- **Compare** dock: cross-recording comparison by condition (**recording = unit**)
-  — plot kinds: recording means (strip+mean±SEM), **box** (Bonferroni stars),
-  superplot, **ensemble MSD** (mean±SEM / median+bootstrap-CI), **scatter X-vs-Y**
-  (+Spearman); stats = per-arm KW + within-arm Bonferroni + vehicle, plus optional
-  **covariate-adjusted OLS** (treatment after frac_spread + density); click a point
-  to load that recording; CSV export. Heavy compute is threaded + cached.
+- **Comparison window** (Analysis ▸ Comparison window, `Ctrl+Shift+C`): a
+  dedicated standalone window (not a dock) for cross-recording / treatment
+  analysis by condition (**recording = unit**) — tabbed **Distributions**
+  (strip / **box** Bonferroni stars / superplot) · **Ensemble MSD** (mean±SEM /
+  median+bootstrap-CI) · **Scatter X-vs-Y** (+Spearman), beside a sortable
+  per-contrast **stats table** (p / Bonferroni / Cohen's d / optional
+  covariate-adjusted **OLS** after frac_spread + density) + omnibus KW + vehicle.
+  Driven by the loaded project's **Design**; click a point to load that recording
+  in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
+  Toolbar **Groups…** opens the **Groups & Comparisons editor**
+  (`gui/design_editor.py`): a recordings table to **include/exclude** + reassign
+  each recording's **group**, and a comparisons editor (member groups + control
+  per comparison, vehicle pair, colours). Regrouping/excluding only **remaps the
+  computed table — no recompute** (`Project.regroup`), so it applies instantly.
+  Code: `gui/compare_window.py` + `gui/compare_plots.py` + `gui/design_editor.py`.
 - **Population** dock: plot any metric across ALL cells of the recording —
   every-cell time series, **mean ± SEM/SD** error band, **histogram**, and a
   **flower plot** (origin-centred trajectories); filters (min track length,
   state, exclude edge); lazy compute.
 - Colouring cells by a metric shows a **units colour bar** (Display ▸ Colour bar).
+- **Projects** (`maskviewer/project.py`): a `Project` = recordings + a `Design`
+  (arms / controls / vehicle / colours). **File ▸ Open Project Folder** loads any
+  dataset and `auto_design`s its structure from the condition names (recognises
+  the IC295 genetic/drug arms + WT–DMSO vehicle; else one arm with a heuristic
+  control). **Save/Open Project File** (small JSON, incl. per-recording
+  include/exclude + group overrides) + **Recent Projects**; switch datasets
+  without restarting (`ViewerWindow.set_project`). The comparison stats are
+  design-driven and the design is editable at runtime (see the Groups &
+  Comparisons editor below), so arbitrary treatments / recording counts /
+  groupings compare correctly.
 - **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
   + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
   throughout the GUI.
-- **Menus**: File (open / **Export CSV** Ctrl+E / screenshot), View (zoom),
-  Image (auto/reset/colormap/invert), Analysis, Window (dock toggles), Help.
+- **Menus**: File (open recording / **open+save projects** / **Recent Projects** /
+  **Export CSV** Ctrl+E / screenshot), View (zoom), Image (auto/reset/colormap/
+  invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
+  Window (dock toggles), Help.
 Status bar shows frame/time/scale/cell-count + hovered/selected cell.
 
 **CSV export** (File ▸ Export CSV…, Ctrl+E) writes tidy, unit-tagged tables for

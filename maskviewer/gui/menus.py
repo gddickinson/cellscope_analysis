@@ -26,7 +26,14 @@ def build_menubar(win):
 
     f = mb.addMenu("&File")
     f.addAction(_act(win, "Open &Recording…", win.open_recording_dialog, "Ctrl+O"))
-    f.addAction(_act(win, "Open Data &Folder…", win.open_data_root_dialog))
+    f.addSeparator()
+    f.addAction(_act(win, "Open Project &Folder…", win.open_data_root_dialog,
+                     tip="Open a folder of recordings as a project"))
+    f.addAction(_act(win, "Open &Project File…", win.open_project_file))
+    f.addAction(_act(win, "&Save Project As…", win.save_project_as))
+    win.recent_menu = f.addMenu("&Recent Projects")
+    win.recent_menu.setToolTipsVisible(True)
+    win._rebuild_recent_menu()
     f.addSeparator()
     f.addAction(_act(win, "&Export CSV…", win.export_csv, "Ctrl+E",
                      "Export tracks / masks / cell properties as CSV"))
@@ -55,10 +62,9 @@ def build_menubar(win):
     im.addAction(_act(win, "&Outlines Only", win.display.outline.toggle))
 
     an = mb.addMenu("&Analysis")
+    an.addAction(_act(win, "&Comparison window…", win.open_compare_window,
+                     "Ctrl+Shift+C", "Cross-recording / treatment comparison"))
     an.addAction(_act(win, "&Export CSV…", win.export_csv, "Ctrl+E"))
-    soon = QtWidgets.QAction("Comparison plots… (coming soon)", win)
-    soon.setEnabled(False)
-    an.addAction(soon)
 
     cfg = mb.addMenu("&Config")
     win.metrics_menu = cfg.addMenu("Cell plot &metrics")

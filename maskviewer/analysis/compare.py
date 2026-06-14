@@ -105,7 +105,8 @@ def ensemble_by_condition(msd_long, stat="mean", n_boot=400):
     return out
 
 
-def ols_adjusted(per_recording, outcome, covariates=("frac_spread", "mean_n_neighbors")):
+def ols_adjusted(per_recording, outcome, covariates=("frac_spread", "mean_n_neighbors"),
+                 arms=None):
     """Per-arm OLS: outcome ~ treatment dummies (vs control) + covariates.
 
     The covariate-adjusted treatment effect (does it survive the state-time +
@@ -114,9 +115,10 @@ def ols_adjusted(per_recording, outcome, covariates=("frac_spread", "mean_n_neig
     """
     from . import feature_tables
     from scipy.stats import t as tdist
+    use_arms = feature_tables.ARMS if arms is None else arms
     df = per_recording
     out = []
-    for arm, spec in feature_tables.ARMS.items():
+    for arm, spec in use_arms.items():
         conds, ctrl = spec["conditions"], spec["control"]
         tests = [c for c in conds if c != ctrl]
         sub = df[df["condition"].isin(conds)]
@@ -172,10 +174,39 @@ def metric_columns(per_cell):
             and np.issubdtype(per_cell[c].dtype, np.number)]
 
 
-def order_conditions(conditions):
+def order_conditions(conditions, order=None):
+    order = order or ARM_ORDER
     conds = list(conditions)
-    return ([c for c in ARM_ORDER if c in conds]
-            + sorted(c for c in conds if c not in ARM_ORDER))
+    return ([c for c in order if c in conds]
+            + sorted(c for c in conds if c not in order))
+
+
+def cohens_d(control, test):
+    """Cohen's d (test − control), pooled SD. NaN if either group < 2."""
+    a = np.asarray(control, float)
+    a = a[np.isfinite(a)]
+    b = np.asarray(test, float)
+    b = b[np.isfinite(b)]
+    if a.size < 2 or b.size < 2:
+        return np.nan
+    sp = np.sqrt(((a.size - 1) * a.var(ddof=1) + (b.size - 1) * b.var(ddof=1))
+                 / (a.size + b.size - 2))
+    return float((b.mean() - a.mean()) / sp) if sp > 0 else np.nan
+
+
+def effect_sizes(by_cond, arms=None):
+    """[{arm, contrast, n_ctrl, n_test, cohen_d}] per within-arm test vs control."""
+    from . import feature_tables
+    use_arms = feature_tables.ARMS if arms is None else arms
+    out = []
+    for arm, spec in use_arms.items():
+        ctrl = spec["control"]
+        for t in [c for c in spec["conditions"] if c != ctrl]:
+            a, b = by_cond.get(ctrl, []), by_cond.get(t, [])
+            out.append({"arm": arm, "contrast": f"{t} vs {ctrl}",
+                        "n_ctrl": len(a), "n_test": len(b),
+                        "cohen_d": cohens_d(a, b)})
+    return out
 
 
 def by_condition(per_recording, metric):
