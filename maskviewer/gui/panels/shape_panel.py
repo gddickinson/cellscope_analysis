@@ -13,12 +13,13 @@ from PyQt5 import QtCore, QtWidgets
 
 from ...analysis import shape_modes
 from ..plot_export import save_plot
+from ..task_runner import AsyncComputeMixin
 
 PALETTE = [(31, 119, 180), (255, 127, 14), (44, 160, 44), (214, 39, 40),
            (148, 103, 189), (140, 86, 75), (227, 119, 194)]
 
 
-class ShapeModesPanel(QtWidgets.QWidget):
+class ShapeModesPanel(AsyncComputeMixin, QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.provider = None                   # callable -> model dict | None
@@ -72,11 +73,9 @@ class ShapeModesPanel(QtWidgets.QWidget):
     def _compute(self):
         if not self.provider:
             return
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-        try:
-            model = self.provider()
-        finally:
-            QtWidgets.QApplication.restoreOverrideCursor()
+        self._dispatch("Shape modes", self.provider, self._apply)
+
+    def _apply(self, model):
         if not model:
             self.info.setText("Not enough cells/frames for shape modes "
                               "(need ≥5 valid contours).")

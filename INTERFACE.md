@@ -29,6 +29,11 @@ Read this before opening source files. Update it when modules change.
   exercises the **Groups & Comparisons editor** (exclude / regroup / add-comparison
   / control / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
   `set_project`. `--shot=PATH` / `--editshot=PATH` (re)write the docs screenshots.
+- **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
+  unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
+  Population / Cell-table / Shape computes through the off-thread runner (asserting
+  progress ticks + applied results) and the Comparison window's threaded compute,
+  plus the busy-guard.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -114,14 +119,16 @@ Read this before opening source files. Update it when modules change.
     boundary in the current frame coloured by per-sector velocity or radius) +
     summary + kymograph CSV export, for the selected cell.
   - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
-    mode-fraction bars, heterogeneity entropy (lazy compute button).
+    mode-fraction bars, heterogeneity entropy (lazy compute button). Compute runs
+    off-thread (`AsyncComputeMixin`) → status-bar progress + ETA.
   - **population_panel.py** `PopulationPanel` — all-cells plots for the recording:
     time series / mean ± SEM-or-SD error band / histogram / flower plot / scatter
     (X vs Y, click→select) / lineage tree / division timeline, with filters
-    (min track length, state, exclude edge); lazy compute + cache.
+    (min track length, state, exclude edge); off-thread compute (`AsyncComputeMixin`)
+    → status-bar progress + ETA, cached.
   - **cell_table.py** `CellTablePanel` — sortable per-cell metric table (+
     `parent` / `daughters` columns from divisions.json); row → select cell;
-    CSV export.
+    CSV export. Off-thread compute (`AsyncComputeMixin`) → status-bar progress + ETA.
   (cross-recording comparison is no longer a dock — it is its own window, see
   **compare_window.py** below.)
 - **compare_window.py** — `CompareWindow(QMainWindow)`: the dedicated comparison
@@ -134,6 +141,8 @@ Read this before opening source files. Update it when modules change.
   a sortable per-contrast **stats table** (p / Bonferroni / Cohen d / OLS β,p) +
   omnibus KW + vehicle. Uses the project's `Design`; click a point → load that
   recording in the main viewer (`recordingPicked`). `set_project` re-targets it.
+  Threaded compute reports into a bottom-bar **`StatusProgress`** (per-recording
+  progress + ETA).
 - **compare_plots.py** — design-aware pyqtgraph drawing for `CompareWindow`
   (GUI-state-free): `strip` (mean ± SEM, clickable), `box` (+ Bonferroni stars
   via `arm_tests`), `superplot` (cells + per-recording means), `ensemble_msd`
@@ -156,10 +165,21 @@ Read this before opening source files. Update it when modules change.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
 - **plot_export.py** — `save_plot(plot, parent)`: PNG/SVG export for any panel plot.
+- **status_progress.py** — `StatusProgress(QWidget)`: a compact status-bar progress
+  widget (label + bar + elapsed/**ETA**, `fmt_secs`); `start` / `update(done,
+  total)` / `finish` / `fail`. ETA = elapsed × remaining/done. Embedded in both
+  windows' bottom bars.
+- **task_runner.py** — `TaskRunner(QObject)`: runs `fn(progress_cb)` on a worker
+  `QThread`, re-emitting `progress` and calling `on_done` / `on_error` on the GUI
+  thread (one task at a time; busy → refuses). `AsyncComputeMixin._dispatch` lets a
+  panel run its heavy compute through an injected `run_async` (the window's
+  `run_task`), falling back to synchronous compute when none is set (tests/headless).
 - **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers
   (incl. **project** open-folder / open-file / save-as / recent-projects +
-  `set_project` to adopt a different dataset, and `open_compare_window`) + the
-  remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
+  `set_project` to adopt a different dataset, and `open_compare_window`), the
+  lazy+cached heavy-compute providers (`_population_table` / `_shape_modes_model`,
+  `progress_cb`-aware), **`run_task`** (off-thread compute → status-bar bar/ETA),
+  + the remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
   `viewer_window` small.
 - **remote.py** — `RemoteControl`: optional localhost HTTP self-drive
   (`MASKVIEWER_REMOTE=<port>`); marshals commands to the GUI thread; for headless
@@ -174,7 +194,8 @@ Read this before opening source files. Update it when modules change.
   lengths / mean speeds / shape-mode model) shared as providers, click-to-select →
   Cell-Info + Edge dock, opens the standalone **CompareWindow** (lazy, kept in
   sync via `set_project`), `show_metrics_help`, layout save/restore (QSettings) +
-  Reset Layout, status bar, ←/→/Space shortcuts.
+  Reset Layout, **status bar with a `StatusProgress` bar+ETA** (heavy panel
+  computes run off-thread via `run_task` + `TaskRunner`), ←/→/Space shortcuts.
 
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
@@ -211,9 +232,10 @@ Read this before opening source files. Update it when modules change.
   per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
   `cell_mode_series`, `cell_heterogeneity`, `mode_contour`; the model also returns
   **eigenshapes** (PCA components) + per-PC explained variance + normalised entropy.
+  `fit_shape_modes` takes `progress_cb` (per-frame, drives the GUI progress bar).
 - **population.py** — all-cells analysis for one recording: `population_table`
-  (per-(cell,frame) shape + nearest-neighbour + state + per-frame `speed`),
-  `metric_columns`, `flower_tracks` (origin-centred trajectories).
+  (per-(cell,frame) shape + nearest-neighbour + state + per-frame `speed`,
+  `progress_cb`-aware), `metric_columns`, `flower_tracks` (origin-centred trajectories).
 - **metric_docs.py** — `doc` / `tooltip` / `as_html`: what each metric indicates
   + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips).
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
@@ -226,8 +248,9 @@ Read this before opening source files. Update it when modules change.
   (region props incl. perimeter/circularity/state + nearest-neighbour),
   `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +
   Fürth D/persistence-time + density-stratified speed + area-stability +
-  track-quality, optional `with_edge` protrusion/retraction columns), `track_table`
-  (trajectories), `export_all` (single shared per-frame pass + `progress_cb`).
+  track-quality, optional `with_edge` protrusion/retraction columns, `progress_cb`),
+  `track_table` (trajectories), `export_all` (single shared per-frame pass +
+  `progress_cb`).
   Needs pandas.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the
   CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,

@@ -149,7 +149,12 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   **Export CSV** Ctrl+E / screenshot), View (zoom), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
-Status bar shows frame/time/scale/cell-count + hovered/selected cell.
+Status bar shows frame/time/scale/cell-count + hovered/selected cell, plus a
+**progress bar with ETA** (`gui/status_progress.py`) for long compute — the
+Population / Shape / Cell-table passes run **off the GUI thread**
+(`gui/task_runner.py`) so the bar animates + the window stays responsive; the
+Comparison window's compute shows the same bar (per-recording progress + ETA) in
+its bottom bar.
 
 **CSV export** (File ▸ Export CSV…, Ctrl+E) writes tidy, unit-tagged tables for
 Origin/Prism: per-frame region properties ("masks as CSV"), per-cell summary

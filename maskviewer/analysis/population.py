@@ -20,10 +20,13 @@ PLOT_COLUMNS = ["area_um2", "area_px", "perimeter_um", "perimeter_px",
                 "nn_dist_um", "nn_dist_px", "n_neighbors", "speed"]
 
 
-def population_table(labels, um_per_px=None, dt_min=None, with_solidity=True):
+def population_table(labels, um_per_px=None, dt_min=None, with_solidity=True,
+                     progress_cb=None):
     """DataFrame: one row per (cell, frame) — region/shape + nearest-neighbour +
-    state (from `per_frame_table`) plus a per-frame ``speed`` column."""
-    df = exporters.per_frame_table(labels, um_per_px, dt_min, with_solidity)
+    state (from `per_frame_table`) plus a per-frame ``speed`` column.
+    ``progress_cb(done, total)`` drives a GUI progress bar (per frame)."""
+    df = exporters.per_frame_table(labels, um_per_px, dt_min, with_solidity,
+                                   progress_cb=progress_cb)
     if df.empty:
         return df
     scale = float(um_per_px) if um_per_px else 1.0

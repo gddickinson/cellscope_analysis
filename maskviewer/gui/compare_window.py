@@ -19,6 +19,7 @@ from PyQt5 import QtCore, QtWidgets
 
 from . import compare_plots
 from .plot_export import save_plot
+from .status_progress import StatusProgress
 from ..analysis import compare, metric_docs, feature_tables
 from ..config import PROJECT_ROOT
 
@@ -67,9 +68,6 @@ class CompareWindow(QtWidgets.QMainWindow):
         self.compute_btn = QtWidgets.QPushButton("Compute")
         self.compute_btn.clicked.connect(self._compute)
         self.recompute = QtWidgets.QCheckBox("ignore cache")
-        self.progress = QtWidgets.QProgressBar()
-        self.progress.setMaximumWidth(160)
-        self.progress.hide()
         self.metric = QtWidgets.QComboBox()
         self.metric.currentIndexChanged.connect(self._replot)
         self.metric_y = QtWidgets.QComboBox()
@@ -98,7 +96,7 @@ class CompareWindow(QtWidgets.QMainWindow):
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
-        for w in (self.compute_btn, self.recompute, self.progress, self.groups_btn):
+        for w in (self.compute_btn, self.recompute, self.groups_btn):
             bar.addWidget(w)
         bar.addSeparator()
         for lbl, w in (("Metric", self.metric), ("Y", self.metric_y),
@@ -152,6 +150,8 @@ class CompareWindow(QtWidgets.QMainWindow):
         split.setStretchFactor(1, 2)
         self.setCentralWidget(split)
         self.status = self.statusBar()
+        self.busy = StatusProgress()                  # bottom-bar progress + ETA
+        self.status.addPermanentWidget(self.busy)
 
     # -- project ---------------------------------------------------------
     def set_project(self, project):
@@ -232,14 +232,12 @@ class CompareWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
         self.compute_btn.setText("Cancel")
-        self.progress.setValue(0)
-        self.progress.show()
+        self.busy.start(f"Measuring {len(self.project.entries)} recordings")
         self._thread = QtCore.QThread(self)
         self._worker = _Worker(self.project.entries)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
-        self._worker.progress.connect(
-            lambda i, n: self.progress.setValue(int(100 * i / n) if n else 0))
+        self._worker.progress.connect(self.busy.update)
         self._worker.done.connect(lambda r: self._on_done(r, cached=False))
         self._thread.start()
 
@@ -249,11 +247,13 @@ class CompareWindow(QtWidgets.QMainWindow):
             self._thread.wait()
             self._thread = self._worker = None
         self.compute_btn.setText("Compute")
-        self.progress.hide()
         if isinstance(result, Exception):
+            self.busy.fail("compute failed")
             self.status.showMessage(f"Compute failed: {result}")
             return
         per_cell, msd = result
+        if not cached:
+            self.busy.finish()
         if per_cell is None or per_cell.empty:
             self.status.showMessage("No cells found across recordings.")
             return

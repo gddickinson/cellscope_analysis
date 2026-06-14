@@ -45,11 +45,14 @@ def contour_signature(mask):
     return rad / eqr if eqr > 0 else rad
 
 
-def fit_shape_modes(labels, n_modes=N_MODES, n_pcs=N_PCS):
-    """Cluster all cell-frame contours into shape modes. None if too few cells."""
+def fit_shape_modes(labels, n_modes=N_MODES, n_pcs=N_PCS, progress_cb=None):
+    """Cluster all cell-frame contours into shape modes. None if too few cells.
+    ``progress_cb(done, total)`` drives a GUI progress bar (per frame, during the
+    contour-extraction pass — the dominant cost before PCA/K-means)."""
     labels = np.asarray(labels)
     sigs, keys = [], []
-    for t in range(labels.shape[0]):
+    T = labels.shape[0]
+    for t in range(T):
         for lab, sl in enumerate(ndimage.find_objects(labels[t]), start=1):
             if sl is None:
                 continue
@@ -57,6 +60,8 @@ def fit_shape_modes(labels, n_modes=N_MODES, n_pcs=N_PCS):
             if sig is not None:
                 sigs.append(sig)
                 keys.append((lab, t))
+        if progress_cb:
+            progress_cb(t + 1, T)
     if len(sigs) < max(n_modes, 5):
         return None
     from sklearn.decomposition import PCA

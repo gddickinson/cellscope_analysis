@@ -5,6 +5,39 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Status-bar progress bars + ETA (off-thread compute)
+
+Long compute (the per-frame regionprops / contour passes) now reports into a
+**bottom-bar progress widget with elapsed + ETA** in both the main viewer and the
+Comparison window, so the user can see how long a pass will take — and the GUI
+stays responsive because the work runs on a worker thread.
+
+- **`gui/status_progress.py`** — `StatusProgress(QWidget)`: label + bar +
+  elapsed/ETA (`start` / `update(done,total)` / `finish` / `fail`); ETA =
+  elapsed × remaining/done. Embedded via `statusBar().addPermanentWidget`.
+- **`gui/task_runner.py`** — `TaskRunner(QObject)`: runs `fn(progress_cb)` on a
+  `QThread`, marshalling `progress` + `on_done`/`on_error` back to the GUI thread
+  (one task at a time). `AsyncComputeMixin` lets a panel run its compute through an
+  injected `run_async`, with a synchronous fallback for tests/headless.
+- **Main viewer**: Population / Shape-modes / Cell-table `_compute` split into
+  `_work(progress_cb)` (off-thread) + `_apply(result)` (GUI); the window injects
+  `run_task` (status-bar bar/ETA, busy-guard) into the panels. The
+  `_population_table` / `_shape_modes_model` providers + `run_task` moved to
+  `WindowActionsMixin` (keeps `viewer_window.py` < 500). Synchronous callers
+  (colour-by) still get a wait cursor.
+- **Comparison window**: moved its progress from the toolbar to the bottom bar
+  (`StatusProgress`, per-recording progress + ETA); fail/cancel handled.
+- **Analysis**: `population_table`, `exporters.per_cell_table`, and
+  `shape_modes.fit_shape_modes` gained a `progress_cb` (per-frame), forwarded to
+  the existing `per_frame_table` pass / contour loop.
+
+Tests: `pytest` **34 passed**. New `scripts/smoke_progress.py` (offscreen)
+unit-checks `StatusProgress` + `TaskRunner` and drives the real threaded compute
+in both windows (progress ticks + applied results + busy-guard);
+`smoke_compare_window.py` still green. All files < 500 lines.
+
+---
+
 ## 2026-06-14 — Groups & Comparisons editor (configure grouping live)
 
 Closed the gap that grouping was implicit (folder name → condition → `auto_design`)

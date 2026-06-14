@@ -11,7 +11,7 @@ import os
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from .export_dialog import CSVExportDialog
-from ..analysis import metric_docs
+from ..analysis import metric_docs, population as _population, shape_modes
 from ..io.dataset import Entry
 from .. import project as projmod
 from ..config import PROJECT_ROOT
@@ -118,6 +118,57 @@ class WindowActionsMixin:
             act.setToolTip(p)
             act.triggered.connect(lambda _c, path=p: self._open_recent(path))
             menu.addAction(act)
+
+    # -- heavy-compute providers (lazy + cached; progress_cb → off-thread) --
+    def _population_table(self, progress_cb=None):
+        """All-cells per-frame table (lazy + cached) — fixed colour scale +
+        the Population panel. ``progress_cb`` set → caller runs us off-thread
+        (no wait cursor); else block on the GUI thread with a busy cursor."""
+        if self._pop_df is None and self.masks is not None:
+            sync = progress_cb is None
+            if sync:
+                QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+            try:
+                self._pop_df = _population.population_table(
+                    self.masks.labels, self.recording.um_per_px,
+                    self.recording.time_interval_min, progress_cb=progress_cb)
+            finally:
+                if sync:
+                    QtWidgets.QApplication.restoreOverrideCursor()
+        return self._pop_df
+
+    def _shape_modes_model(self, progress_cb=None):
+        """VAMPIRE shape-mode model for the recording (lazy + cached)."""
+        if self._shape_model is None and self.masks is not None:
+            sync = progress_cb is None
+            if sync:
+                QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+            try:
+                self._shape_model = shape_modes.fit_shape_modes(
+                    self.masks.labels, progress_cb=progress_cb)
+            finally:
+                if sync:
+                    QtWidgets.QApplication.restoreOverrideCursor()
+        return self._shape_model
+
+    # -- threaded compute (status-bar progress + ETA) -------------------
+    def run_task(self, label, work, apply):
+        """Run ``work(progress_cb)`` off-thread with a status-bar bar/ETA, then
+        ``apply(result)`` on the GUI thread. Injected into panels as run_async."""
+        if self._task.busy:
+            self.status.showMessage("Another computation is still running…", 3000)
+            return
+
+        def done(result):
+            self.busy.finish()
+            apply(result)
+
+        def failed(msg):
+            self.busy.fail("compute failed")
+            self.status.showMessage(f"Compute failed: {msg}", 6000)
+
+        self.busy.start(f"{label}…")
+        self._task.run(work, done, failed)
 
     # -- comparison window ----------------------------------------------
     def open_compare_window(self):
