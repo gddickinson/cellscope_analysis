@@ -79,6 +79,47 @@ def drive(win, label):
     print(f"  {label}: tabs OK · stats rows={rows} · omnibus={win.omnibus.text()[:48]!r}")
 
 
+def drive_editor(win, app):
+    """Open the Groups & Comparisons editor and exercise every edit path."""
+    win._open_design_editor()
+    ed = win._design_editor
+    base_recs = win._filtered()["recording"].nunique()
+
+    # exclude one recording (via its row checkbox) → window drops it
+    ed._row_include["WT__0"].setChecked(False)
+    app.processEvents()
+    assert "WT__0" in win.project.excluded
+    assert win._filtered()["recording"].nunique() == base_recs - 1, "exclude failed"
+    assert win._filtered_msd()["recording"].nunique() == base_recs - 1
+
+    # reassign a recording to a brand-new group → appears in the plots' data
+    ed._row_combos["GOF__0"].setCurrentText("GOF_special")
+    app.processEvents()
+    assert win.project.overrides.get("GOF__0") == "GOF_special"
+    assert "GOF_special" in win._filtered()["condition"].unique(), "regroup failed"
+
+    # add a comparison, set its control, set the vehicle pair
+    n_before = len(ed.project.design.arms)
+    ed._add_comparison()
+    app.processEvents()
+    assert len(ed.project.design.arms) == n_before + 1, "add comparison failed"
+    arm = next(iter(ed.project.design.arms))
+    ed._set_control(arm, ed.project.design.arms[arm]["conditions"][0])
+    ed.veh_a.setCurrentText("WT")
+    ed.veh_b.setCurrentText("KO")
+    app.processEvents()
+    assert ed.project.design.vehicle == ["WT", "KO"], ed.project.design.vehicle
+
+    # reset clears exclusions + overrides and re-detects the design
+    ed._reset()
+    app.processEvents()
+    assert win.project.excluded == set() and win.project.overrides == {}
+    assert win._filtered()["recording"].nunique() == base_recs, "reset failed"
+    win._replot()                                     # must not raise
+    print(f"  editor: exclude/regroup/add-comparison/control/vehicle/reset OK "
+          f"({base_recs} recordings)")
+
+
 def main():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
@@ -102,6 +143,17 @@ def main():
         app.processEvents()
         win.grab().save(shot)
         print(f"  saved screenshot → {shot}")
+
+    eshot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--editshot=")), None)
+    if eshot:                                         # clean editor, before any edits
+        win._open_design_editor()
+        ed = win._design_editor
+        ed.resize(760, 680)
+        app.processEvents()
+        ed.grab().save(eshot)
+        print(f"  saved editor screenshot → {eshot}")
+
+    drive_editor(win, app)
 
     # --- single-arm design (editable control combo) -------------------
     sp = make_project("single-arm", ["ctrl", "drugA", "drugB"])

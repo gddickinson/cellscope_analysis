@@ -26,8 +26,9 @@ Read this before opening source files. Update it when modules change.
 - **scripts/smoke_compare_window.py** — headless (QT offscreen) smoke for the
   Comparison window + Project wiring: drives every tab / dist-kind / OLS / stats
   table on fake multi-arm + single-arm data, checks the editable control combo,
-  and verifies `ViewerWindow.open_compare_window` / `set_project`. `--shot=PATH`
-  also (re)writes the docs comparison screenshot.
+  exercises the **Groups & Comparisons editor** (exclude / regroup / add-comparison
+  / control / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
+  `set_project`. `--shot=PATH` / `--editshot=PATH` (re)write the docs screenshots.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -50,14 +51,19 @@ Read this before opening source files. Update it when modules change.
 - **config.py** — `load_config(path)` → dict with `data_roots` (always
   appends the bundled `sample_data/` as a fallback). `PROJECT_ROOT`,
   `SAMPLE_DIR`, `CONFIG_PATH` constants.
-- **project.py** — `Project` (name, data_roots, entries, design; `.conditions`,
-  `.n_recordings`) + `Design` (`arms` {arm:{control,conditions}}, `vehicle`,
-  `colors`; `condition_order`, `color`). `auto_design(conditions)` derives the
-  experiment structure (recognises the IC295 genetic/drug arms + WT–DMSO
-  vehicle; otherwise one arm with a heuristic control). `from_entries`,
-  `from_data_roots` (discover + auto-design), `load_project`/`save_project`
-  (small JSON). Decouples the app from the hard-coded IC295 design so any
-  dataset (any treatments / counts) loads + compares correctly. GUI-free.
+- **project.py** — `Project` (name, data_roots, entries, design, **`excluded`**
+  recording labels + **`overrides`** label→group; `.conditions` (effective,
+  override-aware), `.all_groups`, `.n_recordings`, `group_of`, `included_entries`,
+  **`regroup(df)`** = drop-excluded + apply-overrides remap of a per-cell/MSD
+  frame so grouping changes need no recompute) + `Design` (`arms`
+  {arm:{control,conditions}}, `vehicle`, `colors`; `condition_order`, `color`).
+  `auto_design(conditions)` derives the experiment structure (recognises the
+  IC295 genetic/drug arms + WT–DMSO vehicle; otherwise one arm with a heuristic
+  control); `ensure_colors(design, groups)` assigns palette colours to new
+  groups. `from_entries`, `from_data_roots` (discover + auto-design),
+  `load_project`/`save_project` (small JSON, incl. excluded/overrides). Decouples
+  the app from the hard-coded IC295 design so any dataset (any treatments /
+  counts / groupings) loads + compares correctly. GUI-free.
 
 ### maskviewer/io/  — load data (GUI-free)
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
@@ -120,8 +126,9 @@ Read this before opening source files. Update it when modules change.
 - **compare_window.py** — `CompareWindow(QMainWindow)`: the dedicated comparison
   space (Analysis ▸ Comparison window), opened on the loaded **Project**.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
-  (Compute/recompute · Metric · Y · **Control** (editable for single-arm
-  designs) · MSD stat · Frames · OLS · Export); tabbed plots — **Distributions**
+  (Compute/recompute · **Groups…** (opens `DesignEditor`) · Metric · Y ·
+  **Control** (editable for single-arm designs) · MSD stat · Frames · OLS ·
+  Export); tabbed plots — **Distributions**
   (strip / box+Bonferroni / superplot) · **Ensemble MSD** · **Scatter** — beside
   a sortable per-contrast **stats table** (p / Bonferroni / Cohen d / OLS β,p) +
   omnibus KW + vehicle. Uses the project's `Design`; click a point → load that
@@ -131,6 +138,14 @@ Read this before opening source files. Update it when modules change.
   via `arm_tests`), `superplot` (cells + per-recording means), `ensemble_msd`
   (mean±SEM / median+CI bands), `scatter` (X-vs-Y + Spearman, clickable). Colours
   + condition order come from the `Design`.
+- **design_editor.py** — `DesignEditor(QDialog)`: the **Groups & Comparisons**
+  editor opened from the Comparison window (toolbar ▸ Groups…). A recordings
+  table (include checkbox + editable **group** combo + cell counts, with bulk
+  include/exclude/set-group) over a comparisons editor (per-comparison member-group
+  checkboxes + control combo + rename/remove, an Add-comparison button, and a
+  vehicle/batch pair) + Auto-detect / Reset. Edits the `Project`'s
+  `excluded`/`overrides` + `Design` in place and emits `designChanged`; the
+  window remaps + replots with **no recompute**.
 - **menus.py** — `build_menubar(win)`: File (Open Recording / **Open Project
   Folder / Open Project File / Save Project As / Recent Projects** / Export CSV /
   screenshots) / View / Image / Analysis (**Comparison window…** `Ctrl+Shift+C`
@@ -242,6 +257,9 @@ Read this before opening source files. Update it when modules change.
 - **test_analysis.py** — cell_metrics / motion / exporters (known-answer
   synthetic arrays + the sample): shape morphometry, persistence vs
   straightness, CSV table shapes + writing.
+- **test_project.py** — Project/Design model (GUI-free): auto-design (IC295 +
+  generic single-arm), `regroup` exclude/override, effective conditions +
+  `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides.
 
 ## Config / data
 - **config.example.json** — committed template for `config.json` (gitignored,

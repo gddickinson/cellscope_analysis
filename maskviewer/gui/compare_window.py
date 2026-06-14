@@ -57,6 +57,7 @@ class CompareWindow(QtWidgets.QMainWindow):
         self._per_cell = None
         self._msd = None
         self._thread = self._worker = None
+        self._design_editor = None
 
         self._build_ui()
         self.set_project(project)
@@ -90,10 +91,14 @@ class CompareWindow(QtWidgets.QMainWindow):
         self.stat.currentIndexChanged.connect(self._replot)
         export = QtWidgets.QPushButton("Export…")
         export.clicked.connect(self._export)
+        self.groups_btn = QtWidgets.QPushButton("Groups…")
+        self.groups_btn.setToolTip("Assign recordings to groups, pick controls, "
+                                   "include/exclude — applies instantly")
+        self.groups_btn.clicked.connect(self._open_design_editor)
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
-        for w in (self.compute_btn, self.recompute, self.progress):
+        for w in (self.compute_btn, self.recompute, self.progress, self.groups_btn):
             bar.addWidget(w)
         bar.addSeparator()
         for lbl, w in (("Metric", self.metric), ("Y", self.metric_y),
@@ -161,10 +166,12 @@ class CompareWindow(QtWidgets.QMainWindow):
         self.table.setRowCount(0)
         self.omnibus.setText("")
         self._refresh_control_combo()
+        if self._design_editor is not None:
+            self._design_editor.set_project(project, None)
         self.setWindowTitle(f"Comparison — {project.name}")
         self.status.showMessage(
             f"{project.name}: {project.n_recordings} recordings · "
-            f"{len(project.conditions)} conditions — click Compute")
+            f"{len(project.conditions)} groups — click Compute")
 
     def _refresh_control_combo(self):
         arms = self.project.design.arms
@@ -187,6 +194,27 @@ class CompareWindow(QtWidgets.QMainWindow):
         if len(arms) == 1 and self.control.isEnabled():
             next(iter(arms.values()))["control"] = self.control.currentText()
             self._replot()
+
+    # -- groups & comparisons editor -------------------------------------
+    def _open_design_editor(self):
+        if self._design_editor is None:
+            from .design_editor import DesignEditor
+            self._design_editor = DesignEditor(self.project, self._per_cell, self)
+            self._design_editor.designChanged.connect(self._on_design_changed)
+        else:
+            self._design_editor.set_data(self._per_cell)
+        self._design_editor.show()
+        self._design_editor.raise_()
+
+    def _on_design_changed(self):
+        """Grouping / control / include changed — remap + replot, no recompute."""
+        self._refresh_control_combo()
+        if self._per_cell is not None and not self._per_cell.empty:
+            pc = self._filtered()
+            self.status.showMessage(
+                f"{self.project.name}: {pc['recording'].nunique()} recordings · "
+                f"{pc['condition'].nunique()} groups · {len(pc)} cells")
+        self._replot()
 
     # -- compute ---------------------------------------------------------
     def _compute(self):
@@ -251,19 +279,24 @@ class CompareWindow(QtWidgets.QMainWindow):
             default = "mean_area_um2" if "mean_area_um2" in cols else (cols[0] if cols else "")
             combo.setCurrentText(cur if cur in cols else default)
             combo.blockSignals(False)
+        if self._design_editor is not None:
+            self._design_editor.set_data(per_cell)
         self.status.showMessage(
             f"{self.project.name}: {per_cell['recording'].nunique()} recordings · "
-            f"{per_cell['condition'].nunique()} conditions · {len(per_cell)} cells"
+            f"{per_cell['condition'].nunique()} groups · {len(per_cell)} cells"
             + ("  (cached)" if cached else ""))
         self._replot()
 
     # -- plot / stats ----------------------------------------------------
     def _filtered(self):
-        pc = self._per_cell
+        pc = self.project.regroup(self._per_cell)        # drop excluded + regroup
         mf = self.min_frames.value()
-        if mf > 1 and "frames_tracked" in pc.columns:
+        if mf > 1 and pc is not None and "frames_tracked" in pc.columns:
             pc = pc[pc["frames_tracked"] >= mf]
         return pc
+
+    def _filtered_msd(self):
+        return self.project.regroup(self._msd)           # excluded/regroup-aware
 
     def _pick(self, label):
         self.recordingPicked.emit(label)
@@ -277,7 +310,7 @@ class CompareWindow(QtWidgets.QMainWindow):
             self.msd_plot.clear()
             self.msd_plot.setLogMode(x=False, y=False)
             stat = "median" if self.stat.currentText().startswith("median") else "mean"
-            compare_plots.ensemble_msd(self.msd_plot, self._msd, design, stat)
+            compare_plots.ensemble_msd(self.msd_plot, self._filtered_msd(), design, stat)
             return
         pc = self._filtered()
         metric = self.metric.currentText()

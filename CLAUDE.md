@@ -120,7 +120,12 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   covariate-adjusted **OLS** after frac_spread + density) + omnibus KW + vehicle.
   Driven by the loaded project's **Design**; click a point to load that recording
   in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
-  Code: `gui/compare_window.py` + `gui/compare_plots.py`.
+  Toolbar **Groups…** opens the **Groups & Comparisons editor**
+  (`gui/design_editor.py`): a recordings table to **include/exclude** + reassign
+  each recording's **group**, and a comparisons editor (member groups + control
+  per comparison, vehicle pair, colours). Regrouping/excluding only **remaps the
+  computed table — no recompute** (`Project.regroup`), so it applies instantly.
+  Code: `gui/compare_window.py` + `gui/compare_plots.py` + `gui/design_editor.py`.
 - **Population** dock: plot any metric across ALL cells of the recording —
   every-cell time series, **mean ± SEM/SD** error band, **histogram**, and a
   **flower plot** (origin-centred trajectories); filters (min track length,
@@ -130,9 +135,12 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   (arms / controls / vehicle / colours). **File ▸ Open Project Folder** loads any
   dataset and `auto_design`s its structure from the condition names (recognises
   the IC295 genetic/drug arms + WT–DMSO vehicle; else one arm with a heuristic
-  control). **Save/Open Project File** (small JSON) + **Recent Projects**; switch
-  datasets without restarting (`ViewerWindow.set_project`). The comparison stats
-  are design-driven, so arbitrary treatments / recording counts compare correctly.
+  control). **Save/Open Project File** (small JSON, incl. per-recording
+  include/exclude + group overrides) + **Recent Projects**; switch datasets
+  without restarting (`ViewerWindow.set_project`). The comparison stats are
+  design-driven and the design is editable at runtime (see the Groups &
+  Comparisons editor below), so arbitrary treatments / recording counts /
+  groupings compare correctly.
 - **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
   + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips

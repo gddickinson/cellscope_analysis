@@ -5,6 +5,37 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Groups & Comparisons editor (configure grouping live)
+
+Closed the gap that grouping was implicit (folder name → condition → `auto_design`)
+with no way to reconfigure it. New **Groups & Comparisons editor** (Comparison
+window toolbar ▸ **Groups…**, `gui/design_editor.py`):
+
+- **Recordings table** — include/exclude each recording (checkbox), reassign its
+  **group** (editable combo, free-text new groups allowed), per-recording cell
+  counts; bulk include / exclude / set-group on the selected rows.
+- **Comparisons editor** — one card per comparison: rename, choose member groups
+  (colour-coded checkboxes), pick the **control**; add / remove comparisons; set
+  the **vehicle/batch** pair. Auto-detect-from-names + Reset-all.
+- Edits the `Project`'s `excluded` / `overrides` + `Design` **in place** and emits
+  `designChanged`; the window remaps + replots with **no recompute** — grouping
+  is a remap of the already-computed per-cell/MSD table (`Project.regroup`), so
+  changes are instant. Include/exclude + group overrides **persist** in the
+  project JSON.
+- Model: `Project` gained `excluded` (labels) + `overrides` (label→group),
+  override-aware `.conditions` / `.all_groups` / `.n_recordings` / `group_of` /
+  `included_entries` / `regroup`; `project.ensure_colors` assigns palette colours
+  to new groups. The Comparison window's `_filtered()` / ensemble MSD now go
+  through `regroup`; toolbar gained the **Groups…** button.
+
+Tests: `pytest` **34 passed** (new `tests/test_project.py` — auto-design, regroup,
+effective groups, ensure_colors, save/load roundtrip). `scripts/smoke_compare_window.py`
+now also drives the editor (exclude / regroup / add-comparison / control / vehicle
+/ reset) and writes `docs/screenshots/groups_editor.png` (`--editshot=`). All
+files < 500 lines.
+
+---
+
 ## 2026-06-14 — Comparison window + Projects (load any dataset)
 
 Promoted the cross-recording comparison from a cramped dock into its own

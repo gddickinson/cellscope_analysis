@@ -45,6 +45,11 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   Cohen's d / covariate-adjusted OLS) with per-arm Kruskal-Wallis + vehicle
   test. Background compute + per-project cache; click a point → load that
   recording in the viewer.
+- **Groups & Comparisons editor** (Comparison window ▸ **Groups…**) — assign
+  recordings to **groups**, **include/exclude** any recording, define which groups
+  form each **comparison** and which is the **control**, and set the vehicle pair.
+  Changes apply **instantly** (a remap of the computed table — no recompute) and
+  save with the project.
 - **Sortable per-cell table**, **CSV export** (per-frame / per-cell / tracks,
   for Origin/Prism), **save any plot** (PNG/SVG), and a **Help ▸ Metrics
   Reference** documenting every metric + tooltips throughout.
@@ -54,6 +59,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + per-contrast stats table](docs/screenshots/comparison.png)
+
+![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 
 *(Screenshots use synthetic data only — no real microscopy data is committed.)*
 

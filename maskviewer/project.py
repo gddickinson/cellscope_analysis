@@ -55,20 +55,54 @@ class Project:
     entries: list
     design: Design
     path: str | None = None
+    excluded: set = field(default_factory=set)    # recording labels dropped from compare
+    overrides: dict = field(default_factory=dict)  # recording label -> group (condition)
+
+    def group_of(self, entry):
+        """The comparison group of a recording (override wins over its folder)."""
+        return self.overrides.get(entry.label, entry.condition or "?")
+
+    def included_entries(self):
+        return [e for e in self.entries if e.label not in self.excluded]
 
     @property
     def conditions(self):
+        """Groups present across included recordings (override-aware), in design order."""
         seen = []
-        for e in self.entries:
-            c = e.condition or "?"
-            if c not in seen:
-                seen.append(c)
+        for e in self.included_entries():
+            g = self.group_of(e)
+            if g not in seen:
+                seen.append(g)
         order = self.design.condition_order()
         return [c for c in order if c in seen] + [c for c in seen if c not in order]
 
     @property
+    def all_groups(self):
+        """Every group name the user can assign to (originals ∪ overrides ∪ design)."""
+        seen = []
+        for e in self.entries:
+            for g in (e.condition or "?", self.overrides.get(e.label)):
+                if g and g not in seen:
+                    seen.append(g)
+        for c in self.design.condition_order():
+            if c not in seen:
+                seen.append(c)
+        return seen
+
+    @property
     def n_recordings(self):
-        return len(self.entries)
+        return len(self.included_entries())
+
+    def regroup(self, df):
+        """Drop excluded recordings + apply group overrides to a per-cell / MSD
+        frame (needs ``recording`` + ``condition`` columns). Lets grouping change
+        without recomputing the (expensive) per-cell metrics."""
+        if df is None or getattr(df, "empty", True):
+            return df
+        out = df[~df["recording"].isin(self.excluded)].copy()
+        if self.overrides:
+            out["condition"] = out["recording"].map(self.overrides).fillna(out["condition"])
+        return out
 
 
 # ----------------------------------------------------------- design helpers
@@ -94,6 +128,24 @@ def _palette(conds):
             out[c] = _PALETTE[pi % len(_PALETTE)]
             pi += 1
     return out
+
+
+def ensure_colors(design, groups):
+    """Give every group a colour (keep existing; assign new ones from the palette)."""
+    used = set(design.colors.values())
+    pi = 0
+    for g in groups:
+        if g in design.colors:
+            continue
+        if g in feature_tables.COND_COLOR:
+            design.colors[g] = feature_tables.COND_COLOR[g]
+        else:
+            while _PALETTE[pi % len(_PALETTE)] in used and pi < len(_PALETTE):
+                pi += 1
+            design.colors[g] = _PALETTE[pi % len(_PALETTE)]
+            used.add(design.colors[g])
+            pi += 1
+    return design.colors
 
 
 def auto_design(conditions):
@@ -156,13 +208,16 @@ def load_project(path):
     else:
         design = auto_design(_conditions_of(entries))
     name = blob.get("name") or os.path.splitext(os.path.basename(path))[0]
-    return Project(name, roots, entries, design, path=path)
+    return Project(name, roots, entries, design, path=path,
+                   excluded=set(blob.get("excluded", [])),
+                   overrides=dict(blob.get("overrides", {})))
 
 
 def save_project(project, path):
     blob = {"name": project.name, "data_roots": project.data_roots,
             "arms": project.design.arms, "vehicle": project.design.vehicle,
-            "colors": project.design.colors}
+            "colors": project.design.colors,
+            "excluded": sorted(project.excluded), "overrides": project.overrides}
     with open(path, "w") as f:
         json.dump(blob, f, indent=2)
     project.path = path
