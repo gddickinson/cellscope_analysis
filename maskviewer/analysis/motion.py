@@ -122,6 +122,33 @@ def fit_msd(tau: np.ndarray, msd_vals: np.ndarray) -> dict:
             "r2": float(lr.rvalue ** 2)}
 
 
+def fit_furth(tau: np.ndarray, msd_vals: np.ndarray) -> dict:
+    """Fit the Fürth / persistent-random-walk MSD → {D, persistence_time}.
+
+    MSD(t) = 4·D·(t − P·(1 − e^(−t/P))): motility coefficient D (units²/min) and
+    a directional-memory **persistence time** P (min) — more interpretable for
+    migrating cells than the power-law exponent. NaNs if the fit fails.
+    """
+    tau = np.asarray(tau, float)
+    m = np.asarray(msd_vals, float)
+    ok = (tau > 0) & np.isfinite(tau) & np.isfinite(m)
+    if ok.sum() < 3:
+        return {"D": np.nan, "persistence_time": np.nan}
+    t, y = tau[ok], m[ok]
+
+    def furth(tt, d, p):
+        return 4.0 * d * (tt - p * (1.0 - np.exp(-tt / p)))
+
+    try:
+        from scipy.optimize import curve_fit
+        p0 = [max(y[-1] / (4.0 * t[-1]), 1e-6), max(t[len(t) // 4], t[0])]
+        popt, _ = curve_fit(furth, t, y, p0=p0, maxfev=5000,
+                            bounds=([1e-9, 1e-9], [np.inf, np.inf]))
+        return {"D": float(popt[0]), "persistence_time": float(popt[1])}
+    except Exception:
+        return {"D": np.nan, "persistence_time": np.nan}
+
+
 def motion_summary(cen: np.ndarray, dt_min: float | None = None) -> dict:
     """One-row motion summary for a track: displacement metrics + persistence."""
     out = displacement_metrics(cen, dt_min)

@@ -227,6 +227,46 @@ def test_shape_modes_cluster():
     assert model["by_cell_frame"][(1, 0)] != model["by_cell_frame"][(3, 0)]
 
 
+def test_convexity_disk_vs_ruffled():
+    disk_lab = np.zeros((60, 60), int)
+    disk_lab[_disk(60, 60, 30, 30, 18)] = 1
+    d = cell_metrics.regionprops_frame(disk_lab, with_perimeter=True)[1]
+    assert d["convexity"] > 0.9                          # smooth disk
+    cross = np.zeros((60, 60), int)
+    cross[26:34, 8:52] = 1
+    cross[8:52, 26:34] = 1                                # concave plus shape
+    c = cell_metrics.regionprops_frame(cross, with_perimeter=True)[1]
+    assert c["convexity"] < d["convexity"]
+
+
+def test_membrane_metrics():
+    from maskviewer.analysis import membrane
+    img = np.zeros((40, 40))
+    img[15:25, 15:25] = 100.0
+    mask = img > 0
+    assert membrane.boundary_confidence(mask, img) > 0   # edge has a gradient
+    assert membrane.intensity_contrast(mask, img) > 0
+
+
+def test_fit_furth_runs():
+    cen = np.column_stack([np.arange(15.0), np.zeros(15)])
+    tau, v = motion.msd(cen, dt_min=1.0)
+    fu = motion.fit_furth(tau, v)
+    assert np.isfinite(fu["D"]) and np.isfinite(fu["persistence_time"])
+
+
+def test_per_cell_quality_columns():
+    from maskviewer.io import load_masks, load_recording
+    m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))
+    rec = load_recording(os.path.join(SAMPLE, "Pos_demo.ome.tif"))
+    pc = exporters.per_cell_table(m.labels, rec.um_per_px, rec.time_interval_min)
+    for c in ("track_quality", "frac_isolated", "area_cv", "persistence_time_min",
+              "furth_D_um2_per_min"):
+        assert c in pc.columns
+    tq = pc["track_quality"].to_numpy(float)
+    assert ((tq >= 0) & (tq <= 1)).all()
+
+
 def test_population_table_and_flower():
     from maskviewer.io import load_masks, load_recording
     from maskviewer.analysis import population

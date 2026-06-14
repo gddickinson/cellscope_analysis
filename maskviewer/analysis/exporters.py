@@ -101,6 +101,41 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
         row["straightness"] = m["straightness"]
         row[f"mean_speed_{speed_u}"] = m["mean_speed"]
         row["persistence_dir_autocorr"] = m["dir_autocorr_lag1"]
+        # Fürth / persistent-random-walk fit (D + persistence time)
+        tau, msdv = motion.msd(cen * scale, dt_min)
+        fu = motion.fit_furth(tau, msdv)
+        row[f"furth_D_{u}2_per_min" if dt_min else "furth_D"] = fu["D"]
+        row["persistence_time_min" if dt_min else "persistence_time"] = \
+            fu["persistence_time"]
+        # density-stratified speed + isolation (contact-inhibition readout)
+        area_col = "area_um2" if um_per_px else "area_px"
+        if not getattr(sub, "empty", True):
+            ss = sub.sort_values("frame")
+            fr_present = ss["frame"].to_numpy()
+            nn = ss.get("n_neighbors")
+            cp = cen[fr_present] * scale
+            if nn is not None and cp.shape[0] >= 2:
+                nn = nn.to_numpy()
+                seg = np.sqrt((np.diff(cp, axis=0) ** 2).sum(axis=1))
+                sp = seg / float(dt_min) if dt_min else seg
+                iso, crd = sp[nn[1:] == 0], sp[nn[1:] > 0]
+                row[f"speed_isolated_{speed_u}"] = float(iso.mean()) if iso.size else np.nan
+                row[f"speed_crowded_{speed_u}"] = float(crd.mean()) if crd.size else np.nan
+                row["frac_isolated"] = float((nn == 0).mean())
+            ac = ss[area_col].to_numpy(float)
+            ac = ac[np.isfinite(ac)]
+            if ac.size:
+                mean_a = ac.mean()
+                row["area_cv"] = float(ac.std() / mean_a) if mean_a else np.nan
+                row["area_max_min_ratio"] = float(ac.max() / ac.min()) if ac.min() > 0 else np.nan
+                rel = np.abs(np.diff(ac)) / ac[:-1] if ac.size > 1 else np.array([])
+                row["n_large_area_jumps"] = int((rel > 0.3).sum())
+        # composite track-quality score (0–1)
+        frames_score = present.sum() / labels.shape[0]
+        area_score = max(0.0, 1.0 - row.get("area_cv", 1.0))
+        path_score = min((m["total_path"] or 0.0) / 50.0, 1.0)
+        row["track_quality"] = float(0.5 * frames_score + 0.3 * area_score
+                                     + 0.2 * path_score)
         if with_edge:
             for k, v in edge_dynamics.edge_summary_for_cell(
                     labels, int(cid), um_per_px, dt_min).items():

@@ -17,8 +17,13 @@ METRICS = {
                      "√(1 − minor²/major²) from the second central moments."),
     "aspect_ratio": ("Elongation (long vs short axis).",
                      "major_axis / minor_axis of the second-moment ellipse."),
-    "solidity": ("Convexity (1 = convex; lower = ruffled / concave).",
+    "solidity": ("Convexity by area (1 = convex; lower = ruffled / concave).",
                  "area / convex-hull area (SciPy hull of the mask pixels)."),
+    "convexity": ("Boundary roughness/ruffling (≤1; lower = spiky/ruffled).",
+                  "convex-hull perimeter / actual perimeter — perimeter-based, far "
+                  "more sensitive to fine membrane ruffling than solidity."),
+    "rel_area": ("Footprint collapse vs the cell's own spread size (scale-free).",
+                 "area / the cell's 90th-percentile area."),
     "major_axis": ("Length of the long axis of the fitted ellipse.",
                    "4·√(largest second-moment eigenvalue) × µm/px."),
     "minor_axis": ("Length of the short axis of the fitted ellipse.",
@@ -62,6 +67,13 @@ PREFIX = {
                            "(boundary quality / cortical enrichment).",
                            "|mean inside-ring − mean outside-ring| intensity "
                            "across the boundary."),
+    "boundary_grad_": ("Edge sharpness for this channel (boundary confidence).",
+                       "Mean |∇(blurred image)| sampled along the contour — a "
+                       "derivative on the boundary line, distinct from the "
+                       "inside/outside intensity step."),
+    "membrane_score_": ("Composite membrane-fidelity score for this channel.",
+                        "0.15·intensity-contrast + 0.85·max(texture-contrast, 0), "
+                        "where texture = inside − outside local-std."),
 }
 
 # track / motion / edge summaries (reported, not per-frame plots)
@@ -76,6 +88,16 @@ EXTRA = {
     "MSD": ("Mean squared displacement vs lag.",
             "⟨‖r(t+τ)−r(t)‖²⟩ over all t, per lag τ; α/D from MSD = 4D·τ^α "
             "(α≈1 Brownian, >1 directed, <1 confined)."),
+    "Fürth fit (D, persistence time)": ("Persistent-random-walk migration model.",
+        "Fit MSD = 4D·(t − P·(1 − e^(−t/P))) → motility coefficient D and a "
+        "directional-memory persistence time P (minutes)."),
+    "speed_isolated / speed_crowded / frac_isolated": ("Contact effect on speed.",
+        "Mean step speed split by neighbour count at the step (0 vs ≥1 neighbours), "
+        "and the fraction of frames with no neighbour."),
+    "track_quality": ("Composite 0–1 track-reliability score.",
+        "0.5·frames-present + 0.3·(1 − area CV) + 0.2·(path / 50 µm)."),
+    "area_stability": ("Area-jump QC.",
+        "area CV, max/min ratio, and # of >30% consecutive area changes."),
     "edge velocity": ("Membrane protrusion (+) / retraction (−) speed.",
                       "Per-angular-sector change in boundary radius about the "
                       "mid-centroid ÷ interval (µm/min)."),

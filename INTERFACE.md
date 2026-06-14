@@ -121,14 +121,18 @@ Read this before opening source files. Update it when modules change.
   solidity / perimeter+circularity), `per_frame_records` (+ nearest-neighbour
   columns, `progress_cb`), `centroid_history`, `cell_series`, and
   `cell_frame_table` (per-frame series for ONE cell — shape, perimeter,
-  circularity, state, speed, displacement, turning, consecutive IoU, area-change,
-  nearest-neighbour, per-channel intensity + membrane contrast). `metrics=`
+  circularity, **convexity**, **rel_area**, state, speed, displacement, turning,
+  consecutive IoU, area-change, nearest-neighbour, and per-channel intensity /
+  membrane-contrast / **boundary-gradient** / **membrane-score**). `metrics=`
   selects which series to compute. `available_frame_metrics` / `metric_label` /
   `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
 - **motion.py** — centroid-track motion: `instantaneous_speed`,
   `displacement_metrics` (net/path/straightness/speed), `direction_autocorrelation`
   + `persistence` (lag-1, speed-unbiased), `msd` + `fit_msd` (D, α exponent),
-  `turning_angles`, `motion_summary`.
+  `fit_furth` (Fürth/PRW D + persistence-time), `turning_angles`, `motion_summary`.
+- **membrane.py** — boundary/membrane quality from mask + image channel:
+  `boundary_confidence` (gradient along contour), `intensity_contrast`,
+  `texture_contrast`, `membrane_score` (composite). PIEZO1-relevant.
 - **state.py** — `classify_state` → rounded/spread/edge/unknown per cell-frame
   (CellScope IC295 rule: area ≤ 960 µm² AND ecc ≤ 0.85 → rounded), `STATE_CODE`,
   `STATE_COLOR`.
@@ -141,7 +145,8 @@ Read this before opening source files. Update it when modules change.
 - **shape_modes.py** — VAMPIRE-style population shape clustering (sklearn):
   `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
   per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
-  `cell_mode_series`, `cell_heterogeneity`, `mode_contour`.
+  `cell_mode_series`, `cell_heterogeneity`, `mode_contour`; the model also returns
+  **eigenshapes** (PCA components) + per-PC explained variance + normalised entropy.
 - **population.py** — all-cells analysis for one recording: `population_table`
   (per-(cell,frame) shape + nearest-neighbour + state + per-frame `speed`),
   `metric_columns`, `flower_tracks` (origin-centred trajectories).
@@ -149,8 +154,9 @@ Read this before opening source files. Update it when modules change.
   + how it's calculated (powers Help ▸ Metrics reference and the GUI tooltips).
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
   (region props incl. perimeter/circularity/state + nearest-neighbour),
-  `per_cell_table` (track + shape + motion + nearest-neighbour aggregates,
-  optional `with_edge` protrusion/retraction columns), `track_table`
+  `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +
+  Fürth D/persistence-time + density-stratified speed + area-stability +
+  track-quality, optional `with_edge` protrusion/retraction columns), `track_table`
   (trajectories), `export_all` (single shared per-frame pass + `progress_cb`).
   Needs pandas.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the

@@ -5,6 +5,29 @@ change. Most recent first.
 
 ---
 
+## 2026-06-13 — Single-recording push (part 2): CellScope analysis-audit gaps
+
+A background agent audited every CellScope analysis file; implemented the
+mask/image-computable per-recording gaps it found:
+- **convexity** (hull-perim/perim — perimeter-based ruffling) + **rel_area**
+  (area / cell's 90th-pct, scale-free footprint collapse) — per-frame metrics.
+- **membrane.py**: `boundary_confidence` (gradient along contour),
+  `intensity_contrast`, `texture_contrast`, `membrane_score` — per-channel in the
+  cell plot (boundary_grad_/membrane_score_ + existing intensity/membrane_contrast).
+- **Fürth/PRW MSD fit** (`motion.fit_furth` → D + persistence-time P) — shown in
+  the Cell-Info MSD title + per_cell export.
+- **per_cell QC + contact**: density-stratified speed (isolated vs crowded) +
+  frac_isolated, area-stability (CV / max-min / large-jumps), composite
+  **track_quality** score.
+- **VAMPIRE eigenshapes** (PCA components ± mean) + per-PC variance + normalised
+  entropy, drawn in the Shape-Modes dock.
+All surface automatically in the configurable cell-plot / colour-by / Config menu
+(30 metrics now). Consciously deferred (documented): per-state segment
+MSD/straightness suite, Sarle bimodality, shape min/max, small-τ MSD option —
+low marginal value or CellScope-specific. `pytest` 27 passed; all files < 500.
+
+---
+
 ## 2026-06-13 — Single-recording push (part 1): lineage, correlation/autocorr, edge events, cell table, save-plots, click-select, fixed scale, layout
 
 Eight requested single-recording / UX items:

@@ -78,7 +78,11 @@ def fit_shape_modes(labels, n_modes=N_MODES, n_pcs=N_PCS):
     return {"by_cell_frame": {k: int(m) for k, m in zip(keys, lab)},
             "n_modes": n_modes, "mode_signatures": mode_sig,
             "mode_fractions": fr, "entropy": ent, "n_samples": len(sigs),
-            "explained_variance": float(pca.explained_variance_ratio_.sum())}
+            "explained_variance": float(pca.explained_variance_ratio_.sum()),
+            "normalized_entropy": ent / np.log2(n_modes) if n_modes > 1 else 0.0,
+            "explained_variance_per_pc": pca.explained_variance_ratio_.tolist(),
+            "eigenshapes": pca.components_,        # (n_pcs, n_points) deformations
+            "mean_signature": X.mean(0)}
 
 
 def cell_mode_series(model, cell_id):

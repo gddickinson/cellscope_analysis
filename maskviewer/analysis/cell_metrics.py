@@ -19,6 +19,7 @@ from scipy import ndimage
 from . import state as _state
 from . import motion as _motion
 from . import neighbors as _nbr
+from . import membrane as _membrane
 
 # Crofton perimeter weights (identical to scikit-image's regionprops perimeter,
 # neighborhood=4) so circularity is comparable to the wider literature.
@@ -35,6 +36,24 @@ def _perimeter(mask: np.ndarray) -> float:
     border = img - ndimage.binary_erosion(img, border_value=0).astype(np.uint8)
     conv = ndimage.convolve(border, _PERIM_KERNEL, mode="constant", cval=0)
     return float(np.bincount(conv.ravel(), minlength=50)[:50] @ _PERIM_W)
+
+
+def _convexity(rows: np.ndarray, cols: np.ndarray, perimeter_px: float) -> float:
+    """Convex-hull perimeter / actual perimeter (≤1; lower = ruffled boundary).
+
+    Perimeter-based (unlike solidity, which is area-based) so it is far more
+    sensitive to fine membrane ruffling / blebbing — an actin-protrusion readout.
+    """
+    if perimeter_px <= 0:
+        return float("nan")
+    try:
+        from scipy.spatial import ConvexHull
+        pts = np.column_stack([cols, rows]).astype(float)
+        if pts.shape[0] < 3:
+            return float("nan")
+        return float(min(ConvexHull(pts).area / perimeter_px, 1.0))  # 2-D .area = perim
+    except Exception:
+        return float("nan")
 
 
 def _region_shape(rows: np.ndarray, cols: np.ndarray) -> dict:
@@ -140,6 +159,7 @@ def regionprops_frame(labels2d: np.ndarray, um_per_px: float | None = None,
             rec["perimeter_px"] = per_px
             rec["circularity"] = (4.0 * np.pi * area / (per_px * per_px)
                                   if per_px > 0 else np.nan)
+            rec["convexity"] = _convexity(rows, cols, per_px)
             if scale:
                 rec["perimeter_um"] = per_px * scale
         rec["state"] = _state.classify_state(
@@ -229,12 +249,17 @@ def _ylabel(key: str, u: str) -> str:
         return f"{key[10:]} mean intensity"
     if key.startswith("membrane_contrast_"):
         return f"{key[18:]} membrane contrast"
+    if key.startswith("boundary_grad_"):
+        return f"{key[14:]} boundary gradient"
+    if key.startswith("membrane_score_"):
+        return f"{key[15:]} membrane score"
     return {"area": f"area ({u}²)", "eccentricity": "eccentricity",
             "aspect_ratio": "aspect ratio", "major_axis": f"major axis ({u})",
             "minor_axis": f"minor axis ({u})", "orientation": "orientation (rad)",
             "extent": "extent", "equiv_diameter": f"equiv. diameter ({u})",
             "solidity": "solidity", "perimeter": f"perimeter ({u})",
-            "circularity": "circularity",
+            "circularity": "circularity", "convexity": "convexity (hull / perim)",
+            "rel_area": "rel. area (/90th pct)",
             "state_code": "state (0=unk,1=spread,2=round,3=edge)",
             "shape_mode": "shape mode (cluster)",
             "speed": f"speed ({u}/frame)",
@@ -249,12 +274,12 @@ def _ylabel(key: str, u: str) -> str:
 
 # Per-frame metrics the cell-plot Config menu can switch on/off. Intensity /
 # membrane-contrast keys are appended at runtime from the recording's channels.
-BASE_FRAME_METRICS = ["area", "perimeter", "circularity", "eccentricity",
-                      "aspect_ratio", "solidity", "major_axis", "minor_axis",
-                      "orientation", "extent", "equiv_diameter", "state_code",
-                      "shape_mode", "speed", "displacement_from_start",
-                      "turning_angle", "iou_prev", "area_change", "nn_dist",
-                      "n_neighbors"]
+BASE_FRAME_METRICS = ["area", "rel_area", "perimeter", "circularity",
+                      "convexity", "eccentricity", "aspect_ratio", "solidity",
+                      "major_axis", "minor_axis", "orientation", "extent",
+                      "equiv_diameter", "state_code", "shape_mode", "speed",
+                      "displacement_from_start", "turning_angle", "iou_prev",
+                      "area_change", "nn_dist", "n_neighbors"]
 
 
 def available_frame_metrics(channel_names=None) -> list:
@@ -264,7 +289,8 @@ def available_frame_metrics(channel_names=None) -> list:
     if channel_names:
         for i, n in enumerate(channel_names):
             nm = n or f"ch{i}"
-            keys += [f"intensity_{nm}", f"membrane_contrast_{nm}"]
+            keys += [f"intensity_{nm}", f"membrane_contrast_{nm}",
+                     f"boundary_grad_{nm}", f"membrane_score_{nm}"]
     return keys
 
 
@@ -299,10 +325,11 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
     cen = np.full((T, 2), np.nan)
     frames: list = []
     recs: list = []
-    want_per = want is None or bool({"perimeter", "circularity"} & want)
+    want_per = want is None or bool({"perimeter", "circularity", "convexity"} & want)
     want_iou = want is None or bool({"iou_prev", "area_change"} & want)
     want_mem = recording is not None and (
-        want is None or any(k.startswith("membrane_contrast_") for k in want))
+        want is None or any(k.startswith(("membrane_contrast_", "boundary_grad_",
+                                          "membrane_score_")) for k in want))
     prev_m = None
     prev_area = 0
     for t in range(T):
@@ -334,6 +361,7 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
             rec["perimeter"] = per_px * (scale or 1.0)
             rec["circularity"] = (4.0 * np.pi * area / (per_px * per_px)
                                   if per_px > 0 else np.nan)
+            rec["convexity"] = _convexity(rows, cols, per_px)
         edge = bool(x0 == 0 or y0 == 0 or x1 >= W - 1 or y1 >= H - 1)
         rec["state_code"] = _state.STATE_CODE[_state.classify_state(
             area, area_um2, sh["eccentricity"], solidity=rec.get("solidity"),
@@ -349,17 +377,18 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
                 rec["iou_prev"] = np.nan
                 rec["area_change"] = np.nan
         if want_mem:
-            ys = slice(max(y0 - 2, 0), min(y1 + 3, H))
-            xs = slice(max(x0 - 2, 0), min(x1 + 3, W))
+            ys = slice(max(y0 - 3, 0), min(y1 + 4, H))
+            xs = slice(max(x0 - 3, 0), min(x1 + 4, W))
             subm = labels[t][ys, xs] == cell_id
-            inner = subm & ~ndimage.binary_erosion(subm)
-            outer = ndimage.binary_dilation(subm) & ~subm
             for c in range(recording.n_channels):
-                key = f"membrane_contrast_{recording.channel_names[c] or f'ch{c}'}"
-                if want is None or key in want:
-                    img = recording.frame(t, c)[ys, xs]
-                    rec[key] = (abs(float(img[inner].mean()) - float(img[outer].mean()))
-                                if inner.any() and outer.any() else np.nan)
+                name = recording.channel_names[c] or f"ch{c}"
+                img = recording.frame(t, c)[ys, xs]
+                for key, fn in (
+                        (f"membrane_contrast_{name}", _membrane.intensity_contrast),
+                        (f"boundary_grad_{name}", _membrane.boundary_confidence),
+                        (f"membrane_score_{name}", _membrane.membrane_score)):
+                    if want is None or key in want:
+                        rec[key] = fn(subm, img)
         if recording is not None:
             for c in range(recording.n_channels):
                 key = f"intensity_{recording.channel_names[c] or f'ch{c}'}"
@@ -377,6 +406,11 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
     times = fr * float(dt_min) if dt_min else fr.astype(float)
     series = {k: (np.array([r.get(k, np.nan) for r in recs], float), _ylabel(k, u))
               for k in recs[0]}
+    if want is None or "rel_area" in want:
+        areas = np.array([r["area"] for r in recs], float)
+        base = np.nanpercentile(areas, 90) if np.isfinite(areas).any() else np.nan
+        series["rel_area"] = (areas / base if base else areas * np.nan,
+                              "rel. area (/90th pct)")
     cen_um = cen * scale if scale else cen
     pres = cen_um[fr]
     speed = np.full(fr.size, np.nan)

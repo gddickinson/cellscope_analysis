@@ -220,6 +220,11 @@ class CellInfoPanel(QtWidgets.QWidget):
         fit = motion.fit_msd(tau, vals)
         if np.isfinite(fit["alpha"]) and len(tau):
             self.fit.setData(np.asarray(tau), 4 * fit["D"] * np.asarray(tau) ** fit["alpha"])
-            self.plot.setTitle(f"α={fit['alpha']:.2f}  D={fit['D']:.3g}  R²={fit['r2']:.2f}")
+            fu = motion.fit_furth(tau, vals)
+            pt = (f"  ·  Fürth P={fu['persistence_time']:.1f} "
+                  f"{'min' if self._dt else 'fr'}"
+                  if np.isfinite(fu["persistence_time"]) else "")
+            self.plot.setTitle(f"α={fit['alpha']:.2f}  D={fit['D']:.3g}  "
+                               f"R²={fit['r2']:.2f}{pt}")
         self.plot.setLabel("left", "MSD (µm²)" if self._cft.get("scaled") else "MSD (px²)")
         self.plot.setLabel("bottom", "lag (min)" if self._dt else "lag (frames)")

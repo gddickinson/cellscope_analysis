@@ -188,9 +188,15 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
 - ✅ **CSV export** (per-frame / per-cell / tracks, optional solidity + edge
   columns) for Origin — `analysis/exporters.py`, **threaded** with progress.
 - ✅ Per-frame **state** (rounded/spread, CellScope rule) — `analysis/state.py`.
-- ✅ Morphometry (`cell_metrics.py`: incl. Crofton perimeter/circularity) +
-  motion (`motion.py`: direction-autocorr persistence, MSD + `fit_msd`, turning
-  angles) — pure, skimage-free, tested.
+- ✅ Morphometry (`cell_metrics.py`: Crofton perimeter/circularity, convexity,
+  rel_area) + motion (`motion.py`: direction-autocorr persistence, MSD `fit_msd`
+  α/D **and Fürth `fit_furth` persistence-time**, turning angles) — pure, tested.
+- ✅ **Membrane/boundary quality** (`membrane.py`): boundary-gradient, intensity/
+  texture contrast, membrane score (per channel).
+- ✅ **CellScope analysis-audit gaps** added: convexity, rel_area, Fürth fit,
+  membrane metrics, density-stratified speed, area-stability + track-quality QC,
+  VAMPIRE eigenshapes/normalised-entropy. (Deferred, documented: per-state
+  segment MSD/straightness, Sarle bimodality — low marginal value.)
 
 ## Good next expansions (evidence-weighted; PIEZO1-focused)
 
