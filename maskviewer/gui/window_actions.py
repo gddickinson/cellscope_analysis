@@ -210,6 +210,26 @@ class WindowActionsMixin:
             self.select_cell(self.selected)
         self.status.showMessage(f"Applied alignment / FOV to {label}", 5000)
 
+    def open_scale_dialog(self):
+        """Project-wide manual pixel-size / time-scale overrides (metadata fix)."""
+        from .scale_dialog import ScaleDialog
+        rec = self.recording
+        ScaleDialog(self.project.px_size, self.project.frame_interval,
+                    rec.um_per_px if rec else None,
+                    rec.time_interval_min if rec else None,
+                    self._apply_scale, self).exec_()
+
+    def _apply_scale(self, px_size, frame_interval):
+        self.project.px_size = px_size
+        self.project.frame_interval = frame_interval
+        if self.entries:
+            self._load_entry(self._current_index())   # reload → re-apply to all metrics
+            if self.selected:
+                self.select_cell(self.selected)
+        self.status.showMessage(
+            f"Scale: {px_size or 'file'} µm/px · {frame_interval or 'file'} min/frame",
+            5000)
+
     def export_csv(self):
         if self.masks is None or self.recording is None:
             QtWidgets.QMessageBox.information(

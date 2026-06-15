@@ -58,6 +58,8 @@ class Project:
     excluded: set = field(default_factory=set)    # recording labels dropped from compare
     overrides: dict = field(default_factory=dict)  # recording label -> group (condition)
     corrections: dict = field(default_factory=dict)  # label -> {shifts, fov} (pre-analysis)
+    px_size: float | None = None         # manual µm/px override (all recordings)
+    frame_interval: float | None = None  # manual min/frame override (all recordings)
 
     def group_of(self, entry):
         """The comparison group of a recording (override wins over its folder)."""
@@ -66,6 +68,21 @@ class Project:
     def correction_for(self, label):
         """Pre-analysis correction (channel shifts + FOV) for a recording, or {}."""
         return self.corrections.get(label, {})
+
+    def scaled(self, rec):
+        """Apply the project-wide manual pixel-size / time-interval overrides to a
+        loaded recording — used when a file's metadata is missing or wrong. Applies
+        to **every** recording in the project; unset (None / 0) keeps file values."""
+        if self.px_size:
+            rec.um_per_px = float(self.px_size)
+        if self.frame_interval:
+            rec.time_interval_min = float(self.frame_interval)
+        return rec
+
+    @property
+    def scale_override(self):
+        """``(px_size, frame_interval)`` for passing into `build_comparison`."""
+        return (self.px_size, self.frame_interval)
 
     def included_entries(self):
         return [e for e in self.entries if e.label not in self.excluded]
@@ -216,7 +233,9 @@ def load_project(path):
     return Project(name, roots, entries, design, path=path,
                    excluded=set(blob.get("excluded", [])),
                    overrides=dict(blob.get("overrides", {})),
-                   corrections=dict(blob.get("corrections", {})))
+                   corrections=dict(blob.get("corrections", {})),
+                   px_size=blob.get("px_size"),
+                   frame_interval=blob.get("frame_interval"))
 
 
 def save_project(project, path):
@@ -224,7 +243,8 @@ def save_project(project, path):
             "arms": project.design.arms, "vehicle": project.design.vehicle,
             "colors": project.design.colors,
             "excluded": sorted(project.excluded), "overrides": project.overrides,
-            "corrections": project.corrections}
+            "corrections": project.corrections, "px_size": project.px_size,
+            "frame_interval": project.frame_interval}
     with open(path, "w") as f:
         json.dump(blob, f, indent=2)
     project.path = path

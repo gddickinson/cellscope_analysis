@@ -34,7 +34,7 @@ def _resolve_channel(rec, channel):
 
 
 def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
-                     piezo_channel=None, corrections=None):
+                     piezo_channel=None, corrections=None, scale_override=None):
     """(per_cell_df, msd_long_df) across all entries with masks.
 
     per_cell_df: per-cell rows + recording + condition. msd_long_df: per-recording
@@ -59,6 +59,12 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
         if masks is None:
             continue
         rec = e.load_recording()
+        if scale_override:                            # manual µm/px + min/frame overrides
+            px, dt = scale_override
+            if px:
+                rec.um_per_px = float(px)
+            if dt:
+                rec.time_interval_min = float(dt)
         # pre-analysis corrections: align fluor channels + crop to the FOV
         _recording.apply_correction(rec, corrections.get(e.label))
         labels = fov_mod.apply_fov(masks.labels, rec.fov) if rec.fov else masks.labels

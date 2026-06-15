@@ -35,9 +35,13 @@ where the data came from. Quick summary below.
 
 - **Recording** `*.ome.tif`: shape `(T, C, H, W)` uint16 (single-channel
   `(T, H, W)` is promoted to `C=1`). **Any channel count works** — 1, 2 or N;
-  the channel/composite UI builds per-channel widgets dynamically. Sidecar
-  `*.ome.json` carries `um_per_px`, `time_interval_min`, `channel_names` (e.g.
-  `["Cy5", "DIC 10x", "None"]`).
+  the channel/composite UI builds per-channel widgets dynamically. Recordings are
+  handled independently, so a project may mix **different image sizes and lengths**
+  — e.g. **single-cell crops** that vary in H×W and only span the frames where the
+  cell is present (the cell may even appear partway through). Sidecar `*.ome.json`
+  carries `um_per_px`, `time_interval_min`, `channel_names` (e.g.
+  `["Cy5", "DIC 10x", "None"]`); when that metadata is missing or wrong, set it
+  manually via **Config ▸ Pixel size & time scale…** (applies to all recordings).
 - **Masks** `pipeline_results/masks.npz`: key `labels`, shape `(T, H, W)`
   int32. `0` = background; a positive integer is one cell, **consistent
   across frames** (same ID = same tracked cell over time).
@@ -189,6 +193,12 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   + FOV stored on the `Project`, applied on read: `Recording.frame`/`aligned_channel`
   shift the channel, masks are FOV-cropped) and reach **both display and analysis**
   (the viewer + `compare.build_comparison(corrections=…)`). Raw files are untouched.
+- **Config ▸ Pixel size & time scale** (`gui/scale_dialog.py`): manually set the
+  **µm/px** and/or **min/frame** for when a file's metadata is lost or incorrect.
+  Stored on the `Project` (`px_size` / `frame_interval`), applied to **every**
+  recording (`Project.scaled`) — scale bar, all µm / µm-per-min metrics, and the
+  comparison (`build_comparison(scale_override=…)`); unset = use each file's own
+  metadata.
 - **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
   + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
