@@ -106,11 +106,13 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 *Edge movement ↔ SiR-actin (Cy5) on a real WT-control cell — actin is enriched at
 retracting edges (negative r, highly significant):*
 
-| Edge movement ↔ intensity | Sampling rectangles (coloured by intensity) |
-|---|---|
-| ![edge movement vs Cy5 actin — scatter coloured by movement class with regression + r/R²/p](docs/screenshots/edge_piezo.png) | ![per-sector sampling rectangles on the cell boundary, centres coloured by actin intensity](docs/screenshots/edge_sampling_rectangles.png) |
+| Edge movement ↔ intensity | Sampling rectangles (coloured by intensity) | Edge this frame: intensity |
+|---|---|---|
+| ![edge movement vs Cy5 actin — scatter coloured by movement class with regression + r/R²/p](docs/screenshots/edge_piezo.png) | ![per-sector sampling rectangles on the cell boundary, centres coloured by actin intensity](docs/screenshots/edge_sampling_rectangles.png) | ![the cell boundary this frame coloured by per-sector Cy5 intensity](docs/screenshots/edge_this_frame_intensity.png) |
 
 ![channel alignment & FOV pre-analysis (real WT control) — align the actin (Cy5) channel to DIC and define the field of view inside the black border; non-destructive](docs/screenshots/prep_align_fov.png)
+
+![divisions overlay — parent→daughter links inferred from the masks (cell 8 → cell 11), drawn as an open circle (parent) joined to a diamond (daughter) on a real WT cell](docs/screenshots/division_links.png)
 
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
 
@@ -126,9 +128,10 @@ retracting edges (negative r, highly significant):*
 
 ![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 
-*(Most screenshots use synthetic data. The edge-movement ↔ actin and channel-
-alignment panels above use a **WT-control** recording from the study — baseline only,
-no treatment-comparison data.)*
+*(The single-recording / per-cell panels — overview, cell inspection, population,
+shape modes, edge dynamics, alignment, divisions — use a **WT-control** recording
+from the study (baseline only, no treatment-comparison data). The cross-condition
+Comparison-window screenshots use synthetic data.)*
 
 ## Environment
 
