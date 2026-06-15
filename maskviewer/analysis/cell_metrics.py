@@ -20,6 +20,7 @@ from . import state as _state
 from . import motion as _motion
 from . import neighbors as _nbr
 from . import membrane as _membrane
+from . import contacts as _contacts
 
 # Crofton perimeter weights (identical to scikit-image's regionprops perimeter,
 # neighborhood=4) so circularity is comparable to the wider literature.
@@ -171,16 +172,19 @@ def regionprops_frame(labels2d: np.ndarray, um_per_px: float | None = None,
 
 def per_frame_records(labels: np.ndarray, um_per_px: float | None = None,
                       dt_min: float | None = None,
-                      with_solidity: bool = False, progress_cb=None) -> list:
+                      with_solidity: bool = False, progress_cb=None,
+                      with_contacts: bool = True) -> list:
     """Flat list of per-(cell, frame) row dicts across a (T, H, W) stack.
 
     ``progress_cb(done, total)`` is called after each frame if given (for a GUI
-    progress bar); it must be cheap and thread-safe.
+    progress bar); it must be cheap and thread-safe. ``with_contacts`` adds the
+    cell–cell contact columns (interface extent + free/point/extensive class).
     """
     labels = np.asarray(labels)
     T = labels.shape[0]
     scale = float(um_per_px) if um_per_px else 1.0
     nn_key = f"nn_dist_{'um' if um_per_px else 'px'}"
+    clen_key = f"contact_length_{'um' if um_per_px else 'px'}"
     rows: list[dict] = []
     for t in range(T):
         props = regionprops_frame(labels[t], um_per_px, with_solidity,
@@ -188,6 +192,7 @@ def per_frame_records(labels: np.ndarray, um_per_px: float | None = None,
         ids = sorted(props)
         nn, cnt = _nbr.frame_nn([props[i]["centroid_y"] for i in ids],
                                 [props[i]["centroid_x"] for i in ids], scale)
+        fc = _contacts.frame_contacts(labels[t], scale) if with_contacts else None
         for j, lab in enumerate(ids):
             row = {"frame": int(t)}
             if dt_min:
@@ -195,6 +200,14 @@ def per_frame_records(labels: np.ndarray, um_per_px: float | None = None,
             row.update(props[lab])
             row[nn_key] = float(nn[j])
             row["n_neighbors"] = int(cnt[j])
+            if fc is not None:
+                cr = fc.get(lab)
+                if cr is not None:
+                    row["n_contacts"] = int(cr["n_contacts"])
+                    row["contact_fraction"] = float(cr["contact_fraction"])
+                    row["max_contact_fraction"] = float(cr["max_contact_fraction"])
+                    row[clen_key] = float(cr["contact_length"])
+                    row["contact_state"] = cr["contact_class"]
             rows.append(row)
         if progress_cb:
             progress_cb(t + 1, T)
@@ -269,6 +282,11 @@ def _ylabel(key: str, u: str) -> str:
             "area_change": "relative area change",
             "nn_dist": f"NN distance ({u})",
             "n_neighbors": f"neighbours (≤{int(_nbr.DEFAULT_RADIUS_UM)} {u})",
+            "contact_fraction": "boundary in contact (fraction)",
+            "max_contact_fraction": "largest contact (fraction)",
+            "n_contacts": "cells in contact (count)",
+            "contact_length": f"contact interface ({u})",
+            "contact_state_code": "contact (0=free,1=point,2=extensive)",
             }.get(key, key.replace("_", " "))
 
 
@@ -279,7 +297,9 @@ BASE_FRAME_METRICS = ["area", "rel_area", "perimeter", "circularity",
                       "major_axis", "minor_axis", "orientation", "extent",
                       "equiv_diameter", "state_code", "shape_mode", "speed",
                       "displacement_from_start", "turning_angle", "iou_prev",
-                      "area_change", "nn_dist", "n_neighbors"]
+                      "area_change", "nn_dist", "n_neighbors",
+                      "contact_fraction", "n_contacts", "contact_length",
+                      "contact_state_code"]
 
 
 def available_frame_metrics(channel_names=None) -> list:
@@ -327,6 +347,9 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
     recs: list = []
     want_per = want is None or bool({"perimeter", "circularity", "convexity"} & want)
     want_iou = want is None or bool({"iou_prev", "area_change"} & want)
+    want_contact = want is None or bool(
+        {"contact_fraction", "n_contacts", "contact_length",
+         "max_contact_fraction", "contact_state_code"} & want)
     want_mem = recording is not None and (
         want is None or any(k.startswith(("membrane_contrast_", "boundary_grad_",
                                           "membrane_score_")) for k in want))
@@ -376,6 +399,14 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
             else:
                 rec["iou_prev"] = np.nan
                 rec["area_change"] = np.nan
+        if want_contact:                          # cell–cell contact (needs the full frame)
+            cr = _contacts.frame_contacts(labels[t], scale or 1.0).get(cell_id)
+            if cr is not None:
+                rec["contact_fraction"] = cr["contact_fraction"]
+                rec["max_contact_fraction"] = cr["max_contact_fraction"]
+                rec["n_contacts"] = cr["n_contacts"]
+                rec["contact_length"] = cr["contact_length"]
+                rec["contact_state_code"] = cr["contact_code"]
         if want_mem:
             ys = slice(max(y0 - 3, 0), min(y1 + 4, H))
             xs = slice(max(x0 - 3, 0), min(x1 + 4, W))

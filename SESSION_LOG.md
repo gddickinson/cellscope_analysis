@@ -5,6 +5,49 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Cell–cell contact detection + classification (new analysis)
+
+The analysis was missing any measure of when cells **physically touch** (only
+centroid-proximity `neighbors.py` existed). New `analysis/contacts.py` measures
+the actual shared-membrane interface and classifies it.
+
+**Method** (masks-only, pure/GUI-free): per frame, two cells are in contact where
+a boundary pixel of one lies within `DEFAULT_GAP_PX` (1.5 px) of a boundary pixel
+of the other — found via a KD-tree over all boundary pixels (calibrated on real
+masks: touching cells sit edge-to-edge, boundary pixels 1.0 px apart). Per cell:
+`contact_fraction` (boundary engaged with any other cell), `n_contacts`,
+`contact_length` (interface µm), `max_contact_fraction`, and a **class** —
+`free` / `point` / `extensive` — split on `EXTENSIVE_FRAC` (0.25) of the largest
+single interface (`classify_contact`). `contact_summary` aggregates per track
+(time-in-class fractions + means).
+
+**Integrated everywhere** the existing metrics flow:
+- per-frame CSV (`per_frame_records` → contact columns; `with_contacts` toggle).
+- per-cell summary (`exporters.per_cell_table`): `mean/median_contact_fraction`,
+  `mean_n_contacts`, `mean_contact_length_um`, `frac_in_contact` /
+  `frac_point_contact` / `frac_extensive_contact` — which **auto-appear as
+  Comparison-window readouts** (numeric per-cell cols → `compare.aggregate`).
+- Cell-Info plot series + Config metric menu (`cell_frame_table`,
+  `BASE_FRAME_METRICS`): contact_fraction / n_contacts / contact_length /
+  contact_state_code.
+- **Colour-by** (`display_panel` + `colorby`): Contact fraction, Contact count
+  (continuous + units bar), Contact class (categorical free/point/extensive,
+  `CONTACT_COLOR`).
+- `metric_docs` entries + units (`n_contacts` → count) → tooltips + Help reference.
+
+Real data: WT/DMSO cells spend ~18–20% of their time in contact (mostly point;
+`frac_extensive` ~0.01–0.02); the single-cell KO recording has none. Verified the
+colour-by-contact-class overlay on Pos60 frame 68 (cells 8/11/7 = blue point
+contact). Tests: +10 (`tests/test_contacts.py` — classification, extensive/point/
+free geometry, gap tolerance, summary fractions, table + cell-info flow).
+`pytest` **90 passed**; all files < 500 lines (cell_metrics 481).
+
+Follow-ups (noted, not done): a dedicated contact overlay drawing the shared
+interface lines; contact-event dynamics (formation/breakage duration + frequency
+over a track) à la the edge-event detector.
+
+---
+
 ## 2026-06-15 — Fix reported regressions (division, edge views) + 8 review-confirmed bugs
 
 Three user-reported regressions on Pos60-DMSO + the bugs an adversarial multi-agent

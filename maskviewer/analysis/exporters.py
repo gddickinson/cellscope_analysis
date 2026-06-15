@@ -79,7 +79,9 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
     speed_u = f"{u}_per_min" if dt_min else f"{u}_per_frame"
     agg_cols = ["area_px", "area_um2", f"perimeter_{u}", "circularity",
                 "eccentricity", "aspect_ratio", "major_axis_px", "minor_axis_px",
-                "extent", "solidity", f"nn_dist_{u}", "n_neighbors"]
+                "extent", "solidity", f"nn_dist_{u}", "n_neighbors",
+                "contact_fraction", "n_contacts", "max_contact_fraction",
+                f"contact_length_{u}"]
     rows = []
     for cid in sorted(cents):
         cen = cents[cid]
@@ -113,6 +115,12 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
             n = cls.size
             row["frac_rounded"] = float((cls == "rounded").sum() / n) if n else np.nan
             row["frac_spread"] = float((cls == "spread").sum() / n) if n else np.nan
+        if "contact_state" in getattr(sub, "columns", []):   # time-in-contact-class
+            cs = sub["contact_state"].to_numpy()
+            n = cs.size
+            row["frac_in_contact"] = float((cs != "free").sum() / n) if n else np.nan
+            row["frac_point_contact"] = float((cs == "point").sum() / n) if n else np.nan
+            row["frac_extensive_contact"] = float((cs == "extensive").sum() / n) if n else np.nan
         m = motion.motion_summary(cen * scale, dt_min)
         row[f"net_disp_{u}"] = m["net_disp"]
         row[f"total_path_{u}"] = m["total_path"]

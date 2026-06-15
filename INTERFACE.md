@@ -308,12 +308,13 @@ Read this before opening source files. Update it when modules change.
 - **cell_metrics.py** — morphometry (no skimage; perimeter via a Crofton
   estimate matching skimage): `regionprops_frame` (area, centroid, bbox, axes,
   eccentricity, aspect ratio, orientation, extent, edge flag, state, optional
-  solidity / perimeter+circularity), `per_frame_records` (+ nearest-neighbour
-  columns, `progress_cb`), `centroid_history`, `cell_series`, and
-  `cell_frame_table` (per-frame series for ONE cell — shape, perimeter,
+  solidity / perimeter+circularity), `per_frame_records` (+ nearest-neighbour +
+  **cell–cell contact** columns, `progress_cb`), `centroid_history`, `cell_series`,
+  and `cell_frame_table` (per-frame series for ONE cell — shape, perimeter,
   circularity, **convexity**, **rel_area**, state, speed, displacement, turning,
-  consecutive IoU, area-change, nearest-neighbour, and per-channel intensity /
-  membrane-contrast / **boundary-gradient** / **membrane-score**). `metrics=`
+  consecutive IoU, area-change, nearest-neighbour, **contact fraction / count /
+  class**, and per-channel intensity / membrane-contrast / **boundary-gradient** /
+  **membrane-score**). `metrics=`
   selects which series to compute. `available_frame_metrics` / `metric_label` /
   `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
 - **motion.py** — centroid-track motion: `instantaneous_speed`,
@@ -328,6 +329,13 @@ Read this before opening source files. Update it when modules change.
   `STATE_COLOR`.
 - **neighbors.py** — `frame_nn`: per-cell nearest-neighbour distance + count of
   neighbours within a radius (`DEFAULT_RADIUS_UM`), centroid-to-centroid.
+- **contacts.py** — cell–cell **contact** (shared-boundary interface, *not*
+  centroid proximity): `frame_contacts` (per-cell contact fraction / count /
+  interface length / class from boundary-pixel adjacency within `DEFAULT_GAP_PX`
+  via a KD-tree), `classify_contact` → free / point / extensive (`CONTACT_CODE`,
+  `CONTACT_COLOR`, split on `EXTENSIVE_FRAC`), `contacts_over_time`,
+  `contact_summary` (per-cell time-in-class + means). Surfaced as per-frame plot
+  metrics, colour-by, CSV columns, and comparison readouts.
 - **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`

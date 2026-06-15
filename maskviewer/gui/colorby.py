@@ -12,12 +12,14 @@ from __future__ import annotations
 import numpy as np
 
 from .image_view import scalar_label_lut
-from ..analysis import cell_metrics, state as cell_state, neighbors, motion
+from ..analysis import (cell_metrics, state as cell_state, neighbors, motion,
+                        contacts as cell_contacts)
 
 CMAP = {"area": "viridis", "perimeter": "viridis", "extent": "plasma",
         "eccentricity": "coolwarm", "circularity": "coolwarm",
         "solidity": "coolwarm", "aspect_ratio": "plasma",
         "nn_dist": "cividis", "n_neighbors": "cividis",
+        "contact_fraction": "inferno", "n_contacts": "cividis",
         "speed": "magma", "shape_mode": "tab10"}
 
 
@@ -29,6 +31,8 @@ def _label(mode, um, dt):
             "aspect_ratio": "aspect ratio", "solidity": "solidity",
             "extent": "extent", "nn_dist": f"NN distance ({u})",
             "n_neighbors": "neighbour count", "speed": f"mean speed ({spd})",
+            "contact_fraction": "boundary in contact (fraction)",
+            "n_contacts": "cells in contact (count)",
             "track": "track length (frames)"}.get(mode, mode)
 
 
@@ -86,6 +90,17 @@ def overlay_lut(win, lab):
                 lut[cid] = (*cell_state.STATE_COLOR.get(r["state"],
                                                         (130, 130, 130)), 255)
         return lut, None                               # categorical → no bar
+    if mode in ("contact_state", "contact_fraction", "n_contacts"):
+        fc = cell_contacts.frame_contacts(lab, float(um) if um else 1.0)
+        if mode == "contact_state":                    # categorical → no bar
+            lut = np.zeros((mx + 1, 4), dtype=np.ubyte)
+            for cid, r in fc.items():
+                if 0 < cid < lut.shape[0]:
+                    lut[cid] = (*cell_contacts.CONTACT_COLOR[r["contact_class"]], 255)
+            return lut, None
+        key = "contact_fraction" if mode == "contact_fraction" else "n_contacts"
+        vals = {cid: float(r[key]) for cid, r in fc.items()}
+        return _continuous(vals, mx, CMAP[mode], _label(mode, um, dt))
     if mode == "track":
         win._ensure_track_len()
         return _continuous(win._track_len, mx, "magma", _label(mode, um, dt))

@@ -285,6 +285,12 @@ vehicle (batch) effect is large. These read the CellScope IC295 artifacts via
   computed/offered (persisted, immediate recompute). `cell_frame_table(metrics=)`
   skips unselected/expensive ones.
 - ✅ **Nearest-neighbour** (`analysis/neighbors.py`) — plot + CSV + colour-by.
+- ✅ **Cell–cell contact** (`analysis/contacts.py`) — shared-boundary *interface*
+  (not centroid proximity): per-frame contact fraction / count / interface length
+  + a **free / point / extensive** class (boundary-pixel adjacency, KD-tree). Flows
+  to the per-frame & per-cell CSV, the Cell-Info plot, **colour-by** (incl. the
+  categorical contact class), and the **Comparison window** (per-recording
+  `frac_in_contact` / `frac_extensive_contact` / `mean_contact_fraction` …).
 - ✅ **Colour the main display by any calculated metric** (`gui/colorby.py`) +
   a **units colour bar**.
 - ✅ **Population tab** (`analysis/population.py`) — all-cells time series /
