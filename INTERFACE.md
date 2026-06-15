@@ -45,6 +45,11 @@ Read this before opening source files. Update it when modules change.
   3-channel** synthetic recordings and runs each through the viewer (channel switch
   + composite), the pre-analysis dialog (auto-align + auto-FOV + apply), the
   edge↔intensity panel, and `build_comparison` — proving nothing assumes two channels.
+- **scripts/smoke_edgecases.py** — adversarial headless smoke for the classic crash
+  sources: the Comparison window with **empty / over-filtered** data, hide-all-groups,
+  exclude-all-recordings; the viewer with **invalid cell selections**, out-of-range /
+  negative frames, rapid overlay toggling, and the intensity edge-map with no fluor —
+  asserting none throw. Synthetic / sample data only.
 - **scripts/smoke_singlecell.py** — headless smoke generating **single-cell crops of
   varying H×W and frame count** (incl. a cell appearing partway through) and driving
   the viewer + edge analysis + Population/Cell-table computes + `build_comparison`
