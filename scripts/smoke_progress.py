@@ -79,6 +79,15 @@ def main():
     assert win.cell_table._df is not None and not win.cell_table._df.empty
     drive_compute(app, win, win.shape, "Shape modes")     # may yield no model on tiny data
 
+    # zoom-to-cell (UX): select a cell, frame the canvas on it (must not raise)
+    cid = int(win.cell_table._df["cell_id"].iloc[0])
+    win.select_cell(cid)
+    before = win.canvas.vb.viewRange()
+    win.zoom_to_cell()
+    app.processEvents()
+    assert win.canvas.vb.viewRange() != before, "zoom-to-cell did not change the view"
+    print(f"  zoom-to-cell OK (cell {cid})")
+
     # Comparison window: real threaded build_comparison drives its bottom bar
     from maskviewer.gui.compare_window import CompareWindow
     cw = CompareWindow(proj)

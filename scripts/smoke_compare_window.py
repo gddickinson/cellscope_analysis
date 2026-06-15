@@ -88,6 +88,13 @@ def drive(win, label):
     # units reached the headers + axes
     assert "µm²" in win.rec_table.horizontalHeaderItem(3).text(), \
         win.rec_table.horizontalHeaderItem(3).text()
+    # multivariate phenotype dialog (PERMANOVA + LORO AUC) builds + populates
+    from maskviewer.gui.compare_tables import multivariate_dialog
+    md = multivariate_dialog(win, compare_mod.aggregate(win._filtered()),
+                             win.project.design)
+    assert md.findChildren(QtWidgets.QTableWidget)[0].rowCount() > 0, \
+        f"{label}: multivariate dialog empty"
+    md.close()
 
     # filters (now in the Filters… dialog): quality / state / min-cells / crowding /
     # edge — each must not crash and keep some data
@@ -288,6 +295,14 @@ def main():
         win._filters_dlg.grab().save(shot.replace(".png", "_filters.png"))
         win._filters_dlg.close()
         print(f"  saved screenshot → {shot.replace('.png', '_filters.png')}")
+        from maskviewer.gui.compare_tables import multivariate_dialog
+        md = multivariate_dialog(win, compare_mod.aggregate(win._filtered()),
+                                 win.project.design)
+        md.resize(580, 320)
+        app.processEvents()
+        md.grab().save(shot.replace(".png", "_multivariate.png"))
+        md.close()
+        print(f"  saved screenshot → {shot.replace('.png', '_multivariate.png')}")
 
     eshot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--editshot=")), None)
     if eshot:                                         # clean editor, before any edits

@@ -29,16 +29,17 @@ Read this before opening source files. Update it when modules change.
   exercises the **filters** (frames / quality / cells-per-rec / state / crowding /
   edge via the Filters… dialog), the right **Stats / Histogram / Data** tabs +
   units, the **bars view + plot-style dialog (style / fits / msd-points / groups /
-  background / legend / filter annotation) + shift-right-click + save/load results**,
-  the **Groups & Comparisons editor** (exclude / regroup / add-comparison / control
-  / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
-  `set_project`. `--shot=PATH` (also writes `_msd` / `_histogram` / `_style` /
-  `_filters` variants) / `--editshot=PATH` (re)write the screenshots.
+  background / legend / filter annotation) + shift-right-click + save/load results
+  + multivariate dialog**, the **Groups & Comparisons editor** (exclude / regroup /
+  add-comparison / control / vehicle / reset), and verifies
+  `ViewerWindow.open_compare_window` / `set_project`. `--shot=PATH` (also writes
+  `_msd` / `_histogram` / `_style` / `_filters` / `_multivariate` variants) /
+  `--editshot=PATH` (re)write the screenshots.
 - **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
   unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
   Population / Cell-table / Shape computes through the off-thread runner (asserting
-  progress ticks + applied results) and the Comparison window's threaded compute,
-  plus the busy-guard.
+  progress ticks + applied results), **zoom-to-cell**, and the Comparison window's
+  threaded compute, plus the busy-guard.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -94,7 +95,7 @@ Read this before opening source files. Update it when modules change.
   `set_base(img, levels, lut)`, `set_base_layers([...])` (additive composite of
   several channels), `set_overlay(...)`, `set_colorbar(legend)` (units colour bar
   for colour-by, via a `ColorBarItem`), emits `cellHovered(int)` +
-  `cellClicked(int)`, `zoom`/`autorange`.
+  `cellClicked(int)`, `zoom` / `autorange` / `focus(bbox)` (frame a pixel bbox).
 - **colorby.py** — `overlay_lut(win, lab)` → `(label-LUT, legend)` for the
   current colour-by metric (legend = lo/hi/cmap/units for the colour bar).
 - **overlays.py** — `Overlays`: scale bar, frame/time text, cell-ID labels,
@@ -142,7 +143,7 @@ Read this before opening source files. Update it when modules change.
   (Compute/recompute · **lags** (compute-time MSD lag count; cache keyed by it) ·
   **Groups…** (opens `DesignEditor`) · Metric · Y ·
   **Control** (editable for single-arm designs) · MSD stat · OLS · **Results ▾**
-  (save / load computed results · export CSVs) · **Style…** · **Help**) + a
+  (multivariate test · save / load results · export CSVs) · **Style…** · **Help**) + a
   **Filters…** button (opens the `FilterMixin` dialog: frames / track-quality /
   cells-per-recording / state / nearest-neighbour crowding / distance-from-edge).
   Left tabbed plots — **Distributions** (strip / box+Bonferroni / bars /
@@ -163,8 +164,10 @@ Read this before opening source files. Update it when modules change.
 - **compare_tables.py** — `StatsTablesMixin`: fills the right-panel **Stats** +
   **Data** tables (`_update_stats`, `_fill_data`, `_set_table`); `ResultsIOMixin`:
   **save / load** the computed results (`_save_results`/`_load_results` →
-  `compare.save_results`/`load_results`, restoring design + exclusions) + CSV
-  **`_export`**; `show_metrics_help(parent)`. Split out to keep `compare_window` small.
+  `compare.save_results`/`load_results`, restoring design + exclusions), CSV
+  **`_export`**, and `_show_multivariate`; `multivariate_dialog`/`show_multivariate`
+  (PERMANOVA + LORO-AUC table) + `show_metrics_help(parent)`. Split out to keep
+  `compare_window` small.
 - **compare_filters.py** — `FilterMixin`: builds the cell/recording filter widgets,
   lays them out in a non-modal **Filters…** dialog, and applies them in `_filtered`
   (min frames · track-quality · min cells/recording · state · NN distance min/max ·
@@ -225,8 +228,9 @@ Read this before opening source files. Update it when modules change.
   `set_project` to adopt a different dataset, and `open_compare_window`), the
   lazy+cached heavy-compute providers (`_population_table` / `_shape_modes_model`,
   `progress_cb`-aware), **`run_task`** (off-thread compute → status-bar bar/ETA),
-  + the remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
-  `viewer_window` small.
+  **`zoom_to_cell`** (frame the canvas on the selected cell — View ▸ Zoom to Cell /
+  `Z` / remote `zoom_cell`), + the remote-control handlers
+  (`remote_state/set/cmd/screenshot`); keeps `viewer_window` small.
 - **remote.py** — `RemoteControl`: optional localhost HTTP self-drive
   (`MASKVIEWER_REMOTE=<port>`); marshals commands to the GUI thread; for headless
   agent driving + screenshots.
@@ -299,9 +303,11 @@ Read this before opening source files. Update it when modules change.
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
   `per_condition_summary` (per-group n / mean / SEM / median over recordings —
-  the Data tab), `save_results` / `load_results` (pickle the computed per-cell +
-  MSD frames + meta for reload-without-recompute). Per-arm KW / Bonferroni reuse
-  `feature_tables.arm_tests`.
+  the Data tab), `multivariate_contrasts` (per-arm **PERMANOVA p + leave-one-
+  recording-out AUC** over all metrics, reusing `multivariate.py` — the
+  multivariate phenotype in the GUI), `save_results` / `load_results` (pickle the
+  computed per-cell + MSD frames + meta for reload-without-recompute). Per-arm KW /
+  Bonferroni reuse `feature_tables.arm_tests`.
   `build_comparison` also merges in the **state-segmented** per-cell metrics
   (`state_metrics`) so the GUI can reproduce the original analysis.
 - **state_metrics.py** — `per_cell_state_metrics`: per-cell metrics computed
@@ -353,7 +359,9 @@ Read this before opening source files. Update it when modules change.
   generic single-arm), `regroup` exclude/override, effective conditions +
   `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides.
 - **test_compare_extras.py** — `metric_docs` units / labels / per-state suffix /
-  `comparison_doc` + `compare.per_condition_summary` (units + per-group summary).
+  `comparison_doc`; `compare.per_condition_summary`, `ensemble_by_condition`
+  (bin/max-lag), `multivariate_contrasts`, `save_results`/`load_results`, the
+  border-distance metric.
 - **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
   straightness on synthetic straight tracks, end-to-end per-cell state metrics on
   a moving-square stack, and the speed cap.

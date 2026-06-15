@@ -26,7 +26,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   characteristic (shape, perimeter, circularity, convexity, state, speed,
   displacement, turning, IoU, nearest-neighbour, per-channel intensity / membrane
   metrics) + MSD (log/linear, α/D + Fürth persistence-time) + direction
-  autocorrelation.
+  autocorrelation. **Zoom to Cell** (`Z`) frames the view on the selected cell —
+  handy in a large sparse field of view.
 - **Membrane dynamics** — protrusion/retraction **kymograph** + a per-frame edge
   map coloured by edge velocity, with event detection.
 - **Shape modes** — VAMPIRE-style clustering (mode shapes, fractions, entropy,
@@ -46,7 +47,10 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   used; the right panel is tabbed — **Stats** (per-contrast p / Bonferroni /
   Cohen's d / covariate-adjusted OLS + per-arm KW + vehicle) · **Histogram**
   (per-cell distribution by group) · **Data** (per-recording + per-group tables,
-  unit-tagged). It offers **whole-track** metrics and **state-segmented** ones
+  unit-tagged). A **multivariate phenotype test** (Results ▾) reports per-arm
+  **PERMANOVA p + leave-one-recording-out AUC** over all metrics — catching
+  separation single metrics miss. It offers **whole-track** metrics and
+  **state-segmented** ones
   (`mean_speed_spread`, `persistence_spread`, …) that reproduce the original
   CellScope state-aware analysis. A **Help** button + per-metric tooltips explain
   every metric, and every graph is **stylable** — a **Style…** button (or
@@ -85,6 +89,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 ![the per-graph plot-style options (Style… / shift-right-click)](docs/screenshots/comparison_style.png)
 
 ![the cell / recording filters (Filters…)](docs/screenshots/comparison_filters.png)
+
+![multivariate phenotype test — PERMANOVA + leave-one-recording-out AUC per arm](docs/screenshots/comparison_multivariate.png)
 
 ![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 

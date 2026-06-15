@@ -139,8 +139,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   error bars** (plus a **compute-time MSD lag count** in the toolbar — recompute,
   cache keyed by it), plus
   a **filter annotation** that labels graphs + tables with the active filters; the
-  Distributions tab adds a **Bars (mean ± SEM)** view. **Results ▾** saves / loads
-  the computed results (reload without recompute) + exports CSVs.
+  Distributions tab adds a **Bars (mean ± SEM)** view. **Results ▾** runs a
+  **multivariate phenotype test** (PERMANOVA + leave-one-recording-out AUC over all
+  metrics — the headline KO-vs-WT result, now in the GUI), saves / loads the
+  computed results (reload without recompute), and exports CSVs.
   Driven by the loaded project's **Design**; click a point to load that recording
   in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
   Toolbar **Groups…** opens the **Groups & Comparisons editor**
@@ -169,7 +171,8 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
   throughout the GUI.
 - **Menus**: File (open recording / **open+save projects** / **Recent Projects** /
-  **Export CSV** Ctrl+E / screenshot), View (zoom), Image (auto/reset/colormap/
+  **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
+  — frame the canvas on the selected cell, handy in a large sparse FOV), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
 Status bar shows frame/time/scale/cell-count + hovered/selected cell, plus a

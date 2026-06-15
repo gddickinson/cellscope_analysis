@@ -64,6 +64,14 @@ class ResultsIOMixin:
         self._refresh_control_combo()
         self._on_done((per_cell, msd), cached=True)      # refresh combos + replot
 
+    def _show_multivariate(self):
+        if self._per_cell is None:
+            return
+        pc = self._filtered()
+        if pc is None or pc.empty:
+            return
+        show_multivariate(self, compare.aggregate(pc), self.project.design)
+
     def _export(self):
         if self._per_cell is None:
             return
@@ -83,6 +91,44 @@ class ResultsIOMixin:
             self._msd.to_csv(os.path.join(d, "comparison_ensemble_msd.csv"),
                              index=False)
         QtWidgets.QMessageBox.information(self, "Exported", f"CSVs written to {d}")
+
+
+def show_multivariate(parent, per_rec, design):
+    """Modal table of per-arm PERMANOVA p + leave-one-recording-out AUC."""
+    multivariate_dialog(parent, per_rec, design).exec_()
+
+
+def multivariate_dialog(parent, per_rec, design):
+    """Build (don't show) the multivariate-results dialog."""
+    rows = compare.multivariate_contrasts(per_rec, arms=design.arms)
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Multivariate phenotype (recording = unit)")
+    dlg.resize(580, 360)
+    lay = QtWidgets.QVBoxLayout(dlg)
+    lay.addWidget(QtWidgets.QLabel(
+        "PERMANOVA + leave-one-recording-out classifier AUC over <i>all</i> metrics "
+        "— detects multivariate separation that single-metric tests can miss "
+        "(permutation tests; recording = experimental unit)."))
+    cols = ["arm", "contrast", "n ctrl", "n test", "# metrics", "PERMANOVA p", "LORO AUC"]
+    keys = ["arm", "contrast", "n_ctrl", "n_test", "n_features", "permanova_p", "loro_auc"]
+    tbl = QtWidgets.QTableWidget(len(rows), len(cols))
+    tbl.setHorizontalHeaderLabels(cols)
+    tbl.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+    for ri, r in enumerate(rows):
+        for ci, k in enumerate(keys):
+            v = r.get(k)
+            item = QtWidgets.QTableWidgetItem()
+            if isinstance(v, str) or v is None:
+                item.setText("" if v is None else v)
+            else:
+                item.setData(QtCore.Qt.DisplayRole, round(float(v), 4))
+            tbl.setItem(ri, ci, item)
+    tbl.resizeColumnsToContents()
+    lay.addWidget(tbl, 1)
+    btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+    btns.rejected.connect(dlg.reject)
+    lay.addWidget(btns)
+    return dlg
 
 
 def show_metrics_help(parent):

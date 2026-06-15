@@ -274,6 +274,41 @@ def per_condition_summary(per_recording, metric):
     return out
 
 
+def multivariate_contrasts(per_recording, arms=None):
+    """Per-arm multivariate separation: PERMANOVA p + leave-one-recording-out AUC
+    over ALL numeric per-recording metrics (z-scored). Recording = unit. Surfaces
+    the multivariate phenotype that single-metric tests can miss (e.g. KO vs WT).
+    Returns [{arm, contrast, n_ctrl, n_test, n_features, permanova_p, loro_auc}];
+    p/auc are None when a contrast has < 2 recordings/group or < 2 usable metrics.
+    """
+    from . import feature_tables, multivariate as mv
+    use_arms = feature_tables.ARMS if arms is None else arms
+    if per_recording is None or per_recording.empty:
+        return []
+    cols = metric_columns(per_recording)
+    out = []
+    for arm, spec in use_arms.items():
+        ctrl = spec["control"]
+        for t in [c for c in spec["conditions"] if c != ctrl]:
+            sub = per_recording[per_recording["condition"].isin([ctrl, t])]
+            g = sub["condition"]
+            n_c, n_t = int((g == ctrl).sum()), int((g == t).sum())
+            row = {"arm": arm, "contrast": f"{t} vs {ctrl}", "n_ctrl": n_c,
+                   "n_test": n_t, "n_features": 0, "permanova_p": None,
+                   "loro_auc": None}
+            feats = [c for c in cols
+                     if np.isfinite(sub[c].to_numpy(float)).all()
+                     and float(np.nanstd(sub[c].to_numpy(float))) > 0]
+            if n_c >= 2 and n_t >= 2 and len(feats) >= 2:
+                X = sub[feats].to_numpy(float)
+                X = (X - X.mean(0)) / X.std(0)
+                row["n_features"] = len(feats)
+                row["permanova_p"] = float(mv.permanova(X, g.to_numpy())[1])
+                row["loro_auc"] = float(mv.loro_auc(X, (g == t).to_numpy(int))[0])
+            out.append(row)
+    return out
+
+
 def by_condition(per_recording, metric):
     """{condition: [per-recording values]} for arm tests (recording = unit)."""
     out = {}

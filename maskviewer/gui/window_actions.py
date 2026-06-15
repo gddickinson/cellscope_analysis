@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 
+import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from .export_dialog import CSVExportDialog
@@ -253,7 +254,27 @@ class WindowActionsMixin:
             self._on_overlay_toggle(q.get("key"), q.get("on", "1") == "1")
         elif action == "autorange":
             self.canvas.autorange()
+        elif action == "zoom_cell":
+            self.zoom_to_cell()
         return self.remote_state()
+
+    def zoom_to_cell(self):
+        """Frame the canvas on the selected cell — useful in a large sparse FOV."""
+        if self.masks is None or not self.selected:
+            self.statusBar().showMessage("Select a cell first.", 4000)
+            return
+        cid, T = int(self.selected), self.masks.labels.shape[0]
+        order = [self.timeline.value()] + [self.timeline.value() + d
+                                           for s in range(1, T)
+                                           for d in (s, -s)]
+        for t in order:
+            if 0 <= t < T:
+                lab = self.masks.frame(t)
+                ys, xs = np.where(lab == cid)
+                if ys.size:
+                    self.canvas.focus(ys.min(), ys.max(), xs.min(), xs.max())
+                    return
+        self.statusBar().showMessage(f"Cell {cid} not found.", 4000)
 
     def remote_screenshot(self, path, what):
         widget = self.canvas if what == "canvas" else self
@@ -304,5 +325,5 @@ class WindowActionsMixin:
             "← / →   step frame\n"
             "Space   play / pause\n"
             "Ctrl+O   open recording      Ctrl+E   export CSV\n"
-            "Ctrl+=, Ctrl+-, Ctrl+0   zoom in / out / fit\n"
+            "Ctrl+=, Ctrl+-, Ctrl+0   zoom in / out / fit      Z   zoom to cell\n"
             "Ctrl+Shift+A   auto contrast      Ctrl+Shift+P   screenshot")

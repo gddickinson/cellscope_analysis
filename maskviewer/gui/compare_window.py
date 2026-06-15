@@ -117,6 +117,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
                                     "or export them as CSVs")
         self.results_btn.setPopupMode(QtWidgets.QToolButton.InstantPopup)
         rmenu = QtWidgets.QMenu(self.results_btn)
+        rmenu.addAction("Multivariate test…", self._show_multivariate)
+        rmenu.addSeparator()
         rmenu.addAction("Save results…", self._save_results)
         rmenu.addAction("Load results…", self._load_results)
         rmenu.addSeparator()

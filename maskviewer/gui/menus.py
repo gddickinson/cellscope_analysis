@@ -48,6 +48,8 @@ def build_menubar(win):
     v.addAction(_act(win, "Zoom &In", lambda: win.canvas.zoom(0.8), "Ctrl+="))
     v.addAction(_act(win, "Zoom &Out", lambda: win.canvas.zoom(1.25), "Ctrl+-"))
     v.addAction(_act(win, "Zoom to &Fit", win.canvas.autorange, "Ctrl+0"))
+    v.addAction(_act(win, "Zoom to &Cell", win.zoom_to_cell, "Z",
+                     "Frame the view on the selected cell"))
 
     im = mb.addMenu("&Image")
     im.addAction(_act(win, "&Auto Contrast", win.adjust.auto, "Ctrl+Shift+A"))

@@ -5,6 +5,35 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Self-drive test pass → multivariate test + zoom-to-cell
+
+Drove the GUI on the **real 48-recording IC295 dataset** via the self-drive remote
+(`MASKVIEWER_REMOTE`, offscreen): loaded recordings, composite Cy5+DIC, colour-by
+metrics + units bar, threaded Population/Shape/Cell-table computes (progress bar),
+cell selection, screenshots — all good. Two improvements fell out:
+
+- **Analysis — multivariate phenotype test in the GUI** (`compare.multivariate_contrasts`
+  + `compare_tables.multivariate_dialog`, Results ▾ ▸ *Multivariate test*): per-arm
+  **PERMANOVA p + leave-one-recording-out AUC** over all per-recording metrics,
+  reusing `multivariate.py`. Surfaces the headline KO-vs-WT multivariate phenotype
+  (previously script-only).
+- **UX — Zoom to Cell** (`ImageCanvas.focus`, `WindowActionsMixin.zoom_to_cell`,
+  View ▸ Zoom to Cell / `Z` / remote `zoom_cell`): frames the canvas on the selected
+  cell — in the real 2048² FOV cells are tiny dots, so this was the clearest pain
+  point. Verified via the remote on real data (scale bar 200 µm → 20 µm).
+
+Tests: `pytest` **47 passed** (multivariate_contrasts + ensemble bin/max-lag +
+save/load + border-distance); compare smoke adds the multivariate dialog +
+`_multivariate.png`; progress smoke adds zoom-to-cell. Both GUI smokes green; all
+files < 500 lines. (Screenshots stay synthetic — public-repo policy; real data used
+only for validation.)
+
+Next ideas (not yet done): per-cell-pooled (cell=unit) stats toggle in the
+Comparison window; SiR-actin (Cy5) cortical-intensity-vs-edge-velocity correlation;
+a menu bar for the increasingly busy Comparison toolbar; double-click-to-zoom.
+
+---
+
 ## 2026-06-14 — Compute-time MSD lag count exposed
 
 Followed the display-time max-lag with the **compute-time** one:
