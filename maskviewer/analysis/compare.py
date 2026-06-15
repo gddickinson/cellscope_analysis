@@ -40,12 +40,13 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
     per_cell_df: per-cell rows + recording + condition. msd_long_df: per-recording
     ensemble MSD (mean over cells) in long form (recording, condition, tau, msd) up
     to ``max_lag`` lags. ``piezo_channel`` (channel name or index) → also add
-    per-cell **edge ↔ cortical-fluorescence** correlation columns
-    (`edge_piezo_corr` etc., via `edge_piezo`). ``progress_cb(done, total)`` is
-    called per recording; returning False cancels. Recordings w/o masks/cells skip.
+    per-cell **edge-movement ↔ fluorescence-intensity** columns (`edge_piezo_corr`
+    = Pearson r, `edge_piezo_slope`, `piezo_protr_minus_retr`; via `edge_intensity`,
+    the faithful ``cell_edge_analysis`` reproduction). ``progress_cb(done, total)``
+    is called per recording; returning False cancels. Recordings w/o cells skip.
     """
     import pandas as pd
-    from . import edge_piezo
+    from . import edge_intensity
     max_lag = int(max_lag) if max_lag and max_lag > 0 else MAX_LAG
     parts, msd_rows = [], []
     n = len(entries)
@@ -72,15 +73,15 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
         if not sdf.empty:
             df = df.merge(sdf, on="cell_id", how="left")
         ch = _resolve_channel(rec, piezo_channel)
-        if ch is not None:                            # edge ↔ fluorescence per cell
+        if ch is not None:                            # edge movement ↔ intensity
             image = rec.data[:, ch]
             prows = []
             for cid in df["cell_id"]:
-                *_, summ = edge_piezo.edge_fluor_for_cell(
+                *_, summ = edge_intensity.analyze_cell(
                     masks.labels, image, int(cid), rec.um_per_px, rec.time_interval_min)
                 prows.append({"cell_id": int(cid),
-                              "edge_piezo_corr": summ["edge_piezo_pearson"],
-                              "edge_piezo_lag1": summ["edge_piezo_lag1"],
+                              "edge_piezo_corr": summ["edge_move_intensity_r"],
+                              "edge_piezo_slope": summ["edge_move_intensity_slope"],
                               "piezo_protr_minus_retr": summ["piezo_protr_minus_retr"]})
             df = df.merge(pd.DataFrame(prows), on="cell_id", how="left")
         df["recording"] = e.label

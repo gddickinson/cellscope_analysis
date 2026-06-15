@@ -38,7 +38,7 @@ Read this before opening source files. Update it when modules change.
 - **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
   unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
   Population / Cell-table / Shape computes through the off-thread runner (asserting
-  progress ticks + applied results), **zoom-to-cell**, the **edge↔fluorescence**
+  progress ticks + applied results), **zoom-to-cell**, the **edge-movement↔intensity**
   panel + comparison `edge_piezo_corr` metric, and the Comparison window's threaded
   compute, plus the busy-guard. `--shot=PATH` writes the edge-fluor screenshot.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
@@ -125,9 +125,11 @@ Read this before opening source files. Update it when modules change.
     immediately.
   - **edge_panel.py** `EdgePanel` — velocity / radius **kymograph** (angle×time,
     blue=retraction/red=protrusion), a per-frame edge map, **and (with a Fluor
-    channel chosen) a cortical-fluorescence kymograph + an edge-velocity↔fluorescence
-    scatter** (e.g. tagged PIEZO1; `analysis.edge_piezo`), with the Pearson r in the
-    summary; + kymograph CSV export, for the selected cell.
+    channel chosen — PIEZO1, SiR-actin, any signal) the faithful edge-movement ↔
+    intensity views**: a rectangle-intensity kymograph, the **edge-displacement vs
+    intensity scatter** coloured by movement class (with regression line + r/R²/p),
+    and a per-frame **sampling-rectangles** overlay (`analysis.edge_intensity`);
+    the by-movement-type means + Mann-Whitney are in the summary. + CSV export.
   - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
     mode-fraction bars, heterogeneity entropy (lazy compute button). Compute runs
     off-thread (`AsyncComputeMixin`) → status-bar progress + ETA.
@@ -145,7 +147,7 @@ Read this before opening source files. Update it when modules change.
   space (Analysis ▸ Comparison window), opened on the loaded **Project**.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
   (Compute/recompute · **lags** (compute-time MSD lag count; cache keyed by it) ·
-  **fluor** (correlate edge change with a fluorescence channel → `edge_piezo_corr`)
+  **fluor** (correlate edge movement with a fluorescence channel → `edge_piezo_corr`)
   · **Groups…** (opens `DesignEditor`) · Metric · Y ·
   **Control** (editable for single-arm designs) · MSD stat · OLS · **Results ▾**
   (multivariate test · save / load results · export CSVs) · **Style…** · **Help**) + a
@@ -284,11 +286,16 @@ Read this before opening source files. Update it when modules change.
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
   (protrusion/retraction/net/ruffling), `edge_events` (ADAPT-style discrete
   events), `edge_summary_for_cell`.
-- **edge_piezo.py** — edge-change ↔ cortical **fluorescence** (e.g. tagged PIEZO1)
-  correlation: `fluor_kymograph` (per-sector cortical intensity of a channel,
-  matched to the velocity kymograph), `aligned_pairs`, `edge_fluor_correlation`
-  (Pearson + Spearman r, protrusion-vs-retraction intensity, lag-1 'fluorescence
-  leads'), `edge_fluor_for_cell`. Reuses the 72 sectors / present-frame logic.
+- **edge_intensity.py** — edge-movement ↔ **fluorescence-intensity** correlation
+  (tagged PIEZO1, SiR-actin, any signal); a faithful reproduction of the lab's
+  `cell_edge_analysis` pipeline adapted to closed tracked cells. `rectangle_intensity`
+  /`intensity_kymograph` (mean fluorescence in a `depth`×`width` px rectangle reaching
+  **into the cell** along the inward normal per sector), `movement_intensity_pairs`
+  (local radial displacement ↔ rectangle intensity, `past`/`future`),
+  `correlation_summary` (Pearson **r / R² / p / slope**, protruding/retracting/stable
+  counts + mean intensities, protrude−retract Δ, t-test + Mann-Whitney),
+  `rectangles_for_frame` (overlay), `analyze_cell` (end-to-end). Reuses the 72
+  sectors / mid-centroid radial velocity of `edge_dynamics`.
 - **shape_modes.py** — VAMPIRE-style population shape clustering (sklearn):
   `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
   per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
@@ -310,8 +317,9 @@ Read this before opening source files. Update it when modules change.
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
   MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar; optional
-  `piezo_channel` adds per-cell edge↔fluorescence `edge_piezo_corr` columns via
-  `edge_piezo`), `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
+  `piezo_channel` adds per-cell edge-movement↔intensity `edge_piezo_corr` /
+  `edge_piezo_slope` / `piezo_protr_minus_retr` columns via `edge_intensity`),
+  `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
@@ -375,8 +383,9 @@ Read this before opening source files. Update it when modules change.
   `comparison_doc`; `compare.per_condition_summary`, `ensemble_by_condition`
   (bin/max-lag), `multivariate_contrasts`, `save_results`/`load_results`, the
   border-distance metric.
-- **test_edge_piezo.py** — `edge_piezo`: fluorescence kymograph shape/values,
-  correlation sign (synthetic), end-to-end `edge_fluor_for_cell`.
+- **test_edge_intensity.py** — `edge_intensity`: rectangle sampling shape/coverage,
+  correlation sign ±, movement classification + protrude−retract Δ, degenerate
+  inputs, `rectangles_for_frame`, end-to-end `analyze_cell` (synthetic cells).
 - **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
   straightness on synthetic straight tracks, end-to-end per-cell state metrics on
   a moving-square stack, and the speed cap.

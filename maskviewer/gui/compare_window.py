@@ -69,9 +69,9 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
                              "interval) — click Compute to apply (recompute)")
         self.fluor = QtWidgets.QComboBox()
         self.fluor.addItem("(no fluor)")
-        self.fluor.setToolTip("Correlate edge protrusion/retraction with a "
-                              "fluorescence channel (e.g. tagged PIEZO1) per cell "
-                              "→ edge_piezo_corr metric — click Compute to apply")
+        self.fluor.setToolTip("Correlate edge protrusion/retraction with a fluor "
+                              "channel per cell (PIEZO1, SiR-actin, any signal) → "
+                              "edge_piezo_corr metric — click Compute to apply")
         self.metric = QtWidgets.QComboBox()
         self.metric.setToolTip("Primary metric — drives the left plots, the "
                                "histogram, stats and data tables. _spread / "

@@ -5,34 +5,48 @@ change. Most recent first.
 
 ---
 
-## 2026-06-15 — Edge change ↔ PIEZO1 (cortical fluorescence) correlation
+## 2026-06-15 — Edge movement ↔ fluorescence intensity (faithful `cell_edge_analysis`)
 
-New analysis: correlate cell-edge protrusion/retraction with a fluorescence
-channel (e.g. tagged PIEZO1), in the Edge Dynamics tab and as a comparison metric.
+Correlate cell-edge protrusion/retraction with a fluorescence channel (tagged
+PIEZO1, **SiR-actin**, or any signal), in the Edge Dynamics tab and as a comparison
+metric. This is a **faithful reproduction of the lab's `cell_edge_analysis`
+9-step pipeline** (`~/Documents/GitHub/cell_edge_analysis_individual_scripts`),
+adapted to this project's closed, tracked cells.
 
-- **`analysis/edge_piezo.py`** (new): `fluor_kymograph` (per-sector cortical
-  intensity of a channel, matched to the velocity kymograph's 72 sectors),
-  `aligned_pairs`, `edge_fluor_correlation` (Pearson + Spearman r between edge
-  velocity and cortical intensity over all (frame, sector); protrusion-vs-
-  retraction intensity; lag-1 'fluorescence leads'), `edge_fluor_for_cell`.
-- **Edge Dynamics tab**: a **Fluor** channel selector + two new views —
-  *Fluorescence kymograph* and *Edge ↔ fluorescence* scatter (red protrude / blue
-  retract) with the Pearson r; the correlation is added to the summary. The viewer
-  passes the recording channel stack to the panel.
-- **Comparison window**: `build_comparison(piezo_channel=…)` adds a per-cell
-  **`edge_piezo_corr`** (+ lag1 + protrude−retract) column; a **fluor** selector in
-  the toolbar (populated cheaply from the sidecar via `recording.channel_names_of`),
-  threaded via `compare_tables.ComputeWorker`, cache keyed by the channel. The new
-  metric flows into the distribution / stats / multivariate machinery.
+The original works on a single advancing edge `y(x)` (per-x displacement of the
+uppermost edge point, vertical sampling rectangle into the cell, correlate the
+rectangle's mean PIEZO1 intensity with that displacement). Here a cell is a closed
+contour, so the per-x displacement becomes the **per-sector radial edge velocity**
+about the mid-centroid (`edge_dynamics`, translation-removed) and the vertical
+rectangle becomes a rectangle along the **inward normal** at each sector.
 
-No existing edge↔PIEZO1 code was found in the sibling projects to port, so this was
-built on this project's edge_dynamics + membrane machinery. Works on any channel —
-validated on the synthetic sample's fluorescence channel (the IC295 data has no
-tagged PIEZO1).
+- **`analysis/edge_intensity.py`** (new, replaces the earlier approximate
+  `edge_piezo.py`): `rectangle_intensity` / `intensity_kymograph` (mean fluorescence
+  in a `depth`×`width` px rectangle reaching into the cell, coverage-gated),
+  `movement_intensity_pairs` (local displacement ↔ rectangle intensity, `past`/
+  `future`), `correlation_summary` (Pearson **r / R² / p / slope**; protruding/
+  retracting/stable counts + mean intensities split at a displacement threshold;
+  protrude−retract Δ; **t-test + Mann-Whitney** between protruding and retracting),
+  `rectangles_for_frame`, `analyze_cell`.
+- **Edge Dynamics tab**: a **Fluor** selector + new views — *Intensity kymograph*,
+  the *Edge movement ↔ intensity* scatter (points coloured blue=protrude /
+  grey=stable / red=retract, regression line, r/R²/p in the title) and a
+  *Sampling rectangles* overlay (centres coloured by intensity); the by-movement-type
+  means + Mann-Whitney are in the summary.
+- **Comparison window**: `build_comparison(piezo_channel=…)` adds per-cell
+  **`edge_piezo_corr`** (Pearson r), **`edge_piezo_slope`**, **`piezo_protr_minus_retr`**
+  via `edge_intensity.analyze_cell`; **fluor** toolbar selector (channels read cheaply
+  from the sidecar via `recording.channel_names_of`), threaded via
+  `compare_tables.ComputeWorker`, cache keyed by channel. Flows into the
+  distribution / stats / multivariate machinery.
 
-Tests: `pytest` **50 passed** (new `tests/test_edge_piezo.py`); the progress smoke
-drives the edge↔fluor panel + the comparison `edge_piezo_corr` metric and writes
-`docs/screenshots/edge_piezo.png`. Both GUI smokes green; all files < 500 lines.
+Validated on the synthetic sample's fluorescence channel (the IC295 data has no
+tagged PIEZO1; the method is channel-agnostic — SiR-actin Cy5 works identically).
+Tests: `pytest` **53 passed** (new `tests/test_edge_intensity.py`, sign ± /
+classification / degenerate / end-to-end on synthetic deforming cells; removed
+`test_edge_piezo.py`); the progress smoke drives the panel + the comparison metric
+and writes `docs/screenshots/edge_piezo.png`. Both GUI smokes green; all files
+< 500 lines.
 
 ---
 

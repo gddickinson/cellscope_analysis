@@ -1,13 +1,20 @@
-"""Edge-dynamics panel — protrusion/retraction kymographs + a per-frame edge map.
+"""Edge-dynamics panel — protrusion/retraction kymographs, a per-frame edge map,
+and the **edge-movement ↔ fluorescence** analysis (e.g. tagged PIEZO1).
 
 For the selected cell:
   * **Velocity / Radius kymograph** — angle × time heatmaps
     (blue=retraction / red=protrusion; or boundary radius).
-  * **Edge this frame** — the cell's boundary drawn in the current frame, each
-    boundary point coloured by the per-sector edge velocity (RdBu) or its radius
-    (viridis) — a spatial view of where the membrane is advancing/retracting now.
-Plus a protrusion/retraction/ruffling summary and CSV export of the kymograph.
-The heavy lifting is in `analysis.edge_dynamics`; this panel just displays it.
+  * **Intensity kymograph** — per-sector mean fluorescence in a rectangle
+    reaching into the cell from the edge (needs a Fluor channel).
+  * **Edge movement ↔ intensity** — the headline scatter: local edge displacement
+    vs the rectangle fluorescence, points coloured by movement class
+    (blue=protruding / grey=stable / red=retracting), with the regression line and
+    Pearson r / R² / p (faithful reproduction of the lab ``cell_edge_analysis``).
+  * **Sampling rectangles** — the inward sampling rectangles on the current frame,
+    centres coloured by intensity.
+  * **Edge this frame** — the boundary coloured by per-sector velocity / radius.
+Plus a protrusion/retraction summary and CSV export. The maths lives in
+`analysis.edge_dynamics` + `analysis.edge_intensity`; this panel just displays it.
 """
 from __future__ import annotations
 
@@ -16,13 +23,15 @@ import pyqtgraph as pg
 from scipy import ndimage
 from PyQt5 import QtCore, QtWidgets
 
-from ...analysis import edge_dynamics, edge_piezo
+from ...analysis import edge_dynamics, edge_intensity
 from ..plot_export import save_plot
 
-_MODES = ["Velocity kymograph", "Radius kymograph", "Fluorescence kymograph",
-          "Edge ↔ fluorescence", "Edge this frame: velocity",
-          "Edge this frame: radius"]
-_EDGE_FRAME = (4, 5)             # mode indices that draw the per-frame edge map
+_MODES = ["Velocity kymograph", "Radius kymograph", "Intensity kymograph",
+          "Edge movement ↔ intensity", "Edge this frame: velocity",
+          "Edge this frame: radius", "Sampling rectangles"]
+_INTENSITY_KYMO = 2
+_SCATTER = 3
+_EDGE_FRAME = (4, 5, 6)          # mode indices drawn on the current frame
 _NONE = "(none)"
 
 
@@ -44,8 +53,9 @@ class EdgePanel(QtWidgets.QWidget):
         self._vfr = self._vel = self._rfr = self._rad = None
         self._rec = None                # Recording (for the fluorescence channel)
         self._chan_names = None
-        self._pfr = self._piezo = None  # fluorescence kymograph + its summary
-        self._psum = {}
+        self._ifr = self._int = None    # rectangle-intensity kymograph
+        self._disp = self._inten = None  # (displacement, intensity) pairs
+        self._summary = {}              # edge-movement ↔ intensity correlation
         self._lut_div = _lut("RdBu_r")
         self._lut_seq = _lut("viridis")
 
@@ -54,23 +64,26 @@ class EdgePanel(QtWidgets.QWidget):
         self.mode = QtWidgets.QComboBox()
         self.mode.addItems(_MODES)
         self.mode.setToolTip("Kymograph (angle × time), the cell boundary this "
-                             "frame, or edge-velocity ↔ cortical fluorescence")
+                             "frame, or edge movement ↔ fluorescence intensity")
         self.mode.currentIndexChanged.connect(self._replot)
         self.fluor = QtWidgets.QComboBox()
         self.fluor.addItem(_NONE)
-        self.fluor.setToolTip("Fluorescence channel (e.g. tagged PIEZO1) to "
-                              "correlate with edge protrusion/retraction")
+        self.fluor.setToolTip("Fluorescence channel to correlate with edge "
+                              "protrusion/retraction — tagged PIEZO1, SiR-actin "
+                              "(cortical actin), or any fluorescent signal")
         self.fluor.currentIndexChanged.connect(self._on_fluor)
         self.plot = pg.PlotWidget()
         self.plot.setMenuEnabled(False)
         self.plot.getViewBox().invertY(True)
         self.img = pg.ImageItem()
+        self.line = pg.PlotCurveItem()           # regression line / rectangle edges
         self.scatter = pg.ScatterPlotItem(pxMode=True)
         self.plot.addItem(self.img)
+        self.plot.addItem(self.line)
         self.plot.addItem(self.scatter)
         self.summary = QtWidgets.QLabel("")
         self.summary.setWordWrap(True)
-        self.export_btn = QtWidgets.QPushButton("Export kymograph CSV…")
+        self.export_btn = QtWidgets.QPushButton("Export CSV…")
         self.export_btn.clicked.connect(self._export)
         self.export_btn.setEnabled(False)
         self.save_btn = QtWidgets.QPushButton("Save plot…")
@@ -111,8 +124,7 @@ class EdgePanel(QtWidgets.QWidget):
         self._compute_fluor()
         s = edge_dynamics.edge_summary(self._vel)
         ev = edge_dynamics.edge_events(self._vel, dt_min)
-        vu = "µm/min" if (um_per_px and dt_min) else ("µm/frame" if um_per_px
-                                                      else "px/step")
+        vu = self._vel_units()
         tu = "min" if dt_min else "frames"
         self.title.setText(f"Cell {self.cell_id} — edge dynamics")
         txt = (
@@ -128,15 +140,27 @@ class EdgePanel(QtWidgets.QWidget):
         self.export_btn.setEnabled(True)
         self._replot()
 
+    def _vel_units(self):
+        return "µm/min" if (self._um and self._dt) else (
+            "µm/frame" if self._um else "px/step")
+
     def _fluor_summary_html(self):
-        p = self._psum
-        if not p or not np.isfinite(p.get("edge_piezo_pearson", np.nan)):
+        p = self._summary
+        if not p or not np.isfinite(p.get("edge_move_intensity_r", np.nan)):
             return ""
         ch = self.fluor.currentText()
-        return (f"<br><b>{ch}</b> ↔ edge: r = {p['edge_piezo_pearson']:+.2f} "
-                f"(ρ = {p.get('edge_piezo_spearman', float('nan')):+.2f}) · "
-                f"lag-1 r = {p.get('edge_piezo_lag1', float('nan')):+.2f} · "
-                f"protrude−retract = {p.get('piezo_protr_minus_retr', float('nan')):+.1f}")
+        line = (f"<br><b>{ch}</b> ↔ edge movement: r = "
+                f"{p['edge_move_intensity_r']:+.2f} "
+                f"(R² = {p.get('edge_move_intensity_r2', float('nan')):.2f}, "
+                f"p = {p.get('edge_move_intensity_p', float('nan')):.1e}, "
+                f"n = {p.get('n_edge_intensity', 0)})")
+        if np.isfinite(p.get("piezo_protr_minus_retr", np.nan)):
+            line += (f"<br>protruding {p['piezo_at_protrusion']:.0f} "
+                     f"(n={p['n_protruding']}) vs retracting "
+                     f"{p['piezo_at_retraction']:.0f} (n={p['n_retracting']}) · "
+                     f"Δ = {p['piezo_protr_minus_retr']:+.1f} · MWU p = "
+                     f"{p.get('protr_retr_mwu_p', float('nan')):.1e}")
+        return line
 
     def _populate_fluor(self, recording):
         names = list(getattr(recording, "channel_names", []) or [])
@@ -153,43 +177,45 @@ class EdgePanel(QtWidgets.QWidget):
 
     def _fluor_channel(self):
         name = self.fluor.currentText()
-        if name == _NONE or self._rec is None or name not in self._chan_names:
+        if name == _NONE or self._rec is None or name not in (self._chan_names or []):
             return None
         return self._chan_names.index(name)
 
-    def _compute_fluor(self):
-        self._pfr = self._piezo = None
-        self._psum = {}
+    def _channel_stack(self):
         ch = self._fluor_channel()
-        if ch is None or self._labels is None or not self.cell_id:
+        return None if ch is None else self._rec.data[:, ch]
+
+    def _compute_fluor(self):
+        self._ifr = self._int = self._disp = self._inten = None
+        self._summary = {}
+        image = self._channel_stack()
+        if image is None or self._labels is None or not self.cell_id:
             return
-        image = self._rec.data[:, ch]                  # (T, H, W) for this channel
-        self._pfr, self._piezo = edge_piezo.fluor_kymograph(
-            self._labels, image, self.cell_id)
-        self._psum = edge_piezo.edge_fluor_correlation(
-            self._vfr, self._vel, self._pfr, self._piezo)
+        (_, _, self._ifr, self._int, self._disp, self._inten,
+         self._summary) = edge_intensity.analyze_cell(
+            self._labels, image, self.cell_id, self._um, self._dt)
 
     def _on_fluor(self):
         if self.cell_id and self._labels is not None:
             self._compute_fluor()
-            # refresh the summary's correlation line + the plot
             base = self.summary.text().split("<br><b>")[0]
             self.summary.setText(base + self._fluor_summary_html())
             self._replot()
 
     def set_frame(self, t):
         self._frame = t
-        if self.mode.currentIndex() in _EDGE_FRAME:    # edge-this-frame view
+        if self.mode.currentIndex() in _EDGE_FRAME:    # per-frame views
             self._replot()
 
     def clear_cell(self):
         self.cell_id = 0
         self._vel = self._rad = self._labels = None
-        self._pfr = self._piezo = None
-        self._psum = {}
+        self._ifr = self._int = self._disp = self._inten = None
+        self._summary = {}
         self.title.setText("No cell selected")
         self.summary.setText("")
         self.img.clear()
+        self.line.clear()
         self.scatter.clear()
         self.export_btn.setEnabled(False)
 
@@ -198,64 +224,70 @@ class EdgePanel(QtWidgets.QWidget):
         idx = self.mode.currentIndex()
         vb = self.plot.getViewBox()
         vb.setAspectLocked(idx in _EDGE_FRAME)
-        vb.invertY(idx != 3)                           # scatter uses y-up axes
-        if idx in _EDGE_FRAME:
-            self.img.clear()
+        vb.invertY(idx != _SCATTER)                    # scatter uses y-up axes
+        self.img.clear()
+        self.line.clear()
+        self.scatter.clear()
+        if idx == 6:
+            self._draw_rectangles()
+        elif idx in _EDGE_FRAME:
             self._draw_edge_frame(velocity=(idx == 4))
-        elif idx == 3:
-            self.img.clear()
-            self._draw_fluor_scatter()
-        elif idx == 2:
-            self.scatter.clear()
-            self._draw_fluor_kymograph()
+        elif idx == _SCATTER:
+            self._draw_move_intensity_scatter()
+        elif idx == _INTENSITY_KYMO:
+            self._draw_intensity_kymograph()
         else:
-            self.scatter.clear()
             self._draw_kymograph(velocity=(idx == 0))
 
-    def _draw_fluor_kymograph(self):
-        if self._piezo is None or self._piezo.size == 0:
-            self.img.clear()
+    def _need_fluor(self):
+        if self._int is None or self._int.size == 0:
             self.plot.setTitle("select a fluorescence channel (Fluor)")
+            return True
+        return False
+
+    def _draw_intensity_kymograph(self):
+        if self._need_fluor():
             return
-        mat = self._piezo
+        mat = self._int
         self.img.setImage(mat, autoLevels=False)
         lo, hi = float(np.nanmin(mat)), float(np.nanmax(mat))
         self.img.setLookupTable(self._lut_seq)
         self.img.setLevels((lo, hi if hi > lo else lo + 1))
-        y0 = float(self._pfr[0]) * (self._dt or 1.0)
-        y1 = float(self._pfr[-1]) * (self._dt or 1.0)
+        y0 = float(self._ifr[0]) * (self._dt or 1.0)
+        y1 = float(self._ifr[-1]) * (self._dt or 1.0)
         self.img.setRect(QtCore.QRectF(0.0, y0, 360.0, (y1 - y0) or 1.0))
-        self.plot.setTitle(f"{self.fluor.currentText()} cortical intensity")
+        self.plot.setTitle(f"{self.fluor.currentText()} intensity (edge rectangles)")
         self.plot.setLabel("bottom", "angle (deg)")
         self.plot.setLabel("left", "time (min)" if self._dt else "frame")
         self.plot.autoRange()
 
-    def _draw_fluor_scatter(self):
-        self.scatter.clear()
-        if self._piezo is None or self._piezo.size == 0:
+    def _draw_move_intensity_scatter(self):
+        if self._disp is None or self._disp.size == 0:
             self.plot.setTitle("select a fluorescence channel (Fluor)")
             return
-        v, p = edge_piezo.aligned_pairs(self._vfr, self._vel, self._pfr, self._piezo)
-        if v.size == 0:
-            self.plot.setTitle("no overlapping edge / fluorescence data")
-            return
-        brushes = [pg.mkBrush(214, 39, 40, 130) if vv > 0
-                   else pg.mkBrush(31, 119, 180, 130) for vv in v]
-        self.scatter.setData(x=v, y=p, size=4, pen=None, brush=brushes)
-        r = self._psum.get("edge_piezo_pearson", float("nan"))
-        vu = "µm/min" if (self._um and self._dt) else ("µm/frame" if self._um
-                                                       else "px/step")
-        self.plot.setTitle(f"edge velocity vs {self.fluor.currentText()}  "
-                           f"(r = {r:+.2f}; red protrude · blue retract)")
-        self.plot.setLabel("bottom", f"edge velocity ({vu})")
-        self.plot.setLabel("left", "cortical intensity")
+        d, it, p = self._disp, self._inten, self._summary
+        thr = p.get("_threshold", 0.0)
+        brushes = [pg.mkBrush(214, 39, 40, 110) if v > thr else
+                   (pg.mkBrush(31, 119, 180, 110) if v < -thr else
+                    pg.mkBrush(140, 140, 140, 90)) for v in d]
+        self.scatter.setData(x=d, y=it, size=5, pen=None, brush=brushes)
+        slope = p.get("edge_move_intensity_slope", float("nan"))
+        if np.isfinite(slope):
+            xs = np.array([float(d.min()), float(d.max())])
+            self.line.setData(x=xs, y=slope * xs + p.get("_intercept", 0.0),
+                              pen=pg.mkPen("k", width=2, style=QtCore.Qt.DashLine))
+        r = p.get("edge_move_intensity_r", float("nan"))
+        r2 = p.get("edge_move_intensity_r2", float("nan"))
+        self.plot.setTitle(f"edge movement vs {self.fluor.currentText()}  "
+                           f"(r = {r:+.2f}, R² = {r2:.2f}; blue protrude · red retract)")
+        self.plot.setLabel("bottom", f"edge displacement ({self._vel_units()})")
+        self.plot.setLabel("left", "fluorescence intensity")
         self.plot.autoRange()
 
     def _draw_kymograph(self, velocity):
         mat = self._vel if velocity else self._rad
         frames = self._vfr if velocity else self._rfr
         if mat is None or mat.size == 0:
-            self.img.clear()
             return
         self.img.setImage(mat, autoLevels=False)
         if velocity:
@@ -275,14 +307,18 @@ class EdgePanel(QtWidgets.QWidget):
         self.plot.setLabel("left", "time (min)" if self._dt else "frame")
         self.plot.autoRange()
 
+    def _crop_to_cell(self, cy, cx, pad=1.15):
+        if self._half:
+            h = self._half * pad
+            self.plot.setXRange(cx - h, cx + h, padding=0)
+            self.plot.setYRange(cy - h, cy + h, padding=0)
+
     def _draw_edge_frame(self, velocity):
         t = self._frame
         if self._labels is None or t is None:
-            self.scatter.clear()
             return
         m = self._labels[t] == self.cell_id
         if not m.any():
-            self.scatter.clear()
             return
         ry, rx = np.nonzero(m)
         cy, cx = ry.mean(), rx.mean()
@@ -290,7 +326,6 @@ class EdgePanel(QtWidgets.QWidget):
         if velocity:
             hit = np.where(self._vfr == t)[0]
             if hit.size == 0:
-                self.scatter.clear()
                 self.plot.setTitle("no edge velocity for the first tracked frame")
                 return
             row = self._vel[hit[0]]
@@ -311,18 +346,59 @@ class EdgePanel(QtWidgets.QWidget):
         self.scatter.setData(x=bx, y=by, brush=brushes, size=5, pen=None)
         self.plot.setLabel("bottom", "x (px)")
         self.plot.setLabel("left", "y (px)")
-        if self._half:                                 # stable crop, cell centred
-            h = self._half * 1.15
-            self.plot.setXRange(cx - h, cx + h, padding=0)
-            self.plot.setYRange(cy - h, cy + h, padding=0)
+        self._crop_to_cell(cy, cx)
+
+    def _draw_rectangles(self):
+        t = self._frame
+        image = self._channel_stack()
+        if image is None or self._labels is None or t is None:
+            self.plot.setTitle("select a fluorescence channel (Fluor)")
+            return
+        corners, inten = edge_intensity.rectangles_for_frame(
+            self._labels, image, self.cell_id, t)
+        if corners.shape[0] == 0:
+            self.plot.setTitle("no sampling rectangles this frame")
+            return
+        xs, ys = [], []
+        for c in corners:                              # outline each rectangle
+            xs += [c[0, 1], c[1, 1], c[2, 1], c[3, 1], c[0, 1], np.nan]
+            ys += [c[0, 0], c[1, 0], c[2, 0], c[3, 0], c[0, 0], np.nan]
+        self.line.setData(x=np.array(xs), y=np.array(ys),
+                          pen=pg.mkPen(255, 255, 255, 110), connect="finite")
+        centers = corners.mean(axis=1)                 # (m, 2) row, col
+        lo, hi = float(inten.min()), float(inten.max())
+        ci = np.clip((inten - lo) / ((hi - lo) or 1.0) * 255, 0, 255).astype(int)
+        lut = self._lut_seq
+        brushes = [pg.mkBrush(int(lut[i, 0]), int(lut[i, 1]), int(lut[i, 2]))
+                   for i in ci]
+        self.scatter.setData(x=centers[:, 1], y=centers[:, 0], brush=brushes,
+                             size=8, pen=None)
+        self.plot.setTitle(f"{self.fluor.currentText()} sampling rectangles "
+                           "(centres coloured by intensity)")
+        self.plot.setLabel("bottom", "x (px)")
+        self.plot.setLabel("left", "y (px)")
+        m = self._labels[t] == self.cell_id
+        ry, rx = np.nonzero(m)
+        self._crop_to_cell(ry.mean(), rx.mean(), pad=1.3)
 
     def _export(self):
         idx = self.mode.currentIndex()
-        if idx == 2:                                   # fluorescence kymograph
-            mat, frames, tag = self._piezo, self._pfr, "fluor_cortical"
-        elif idx in (1, 5):                            # boundary radius
+        if idx == _SCATTER:                            # (displacement, intensity) pairs
+            if self._disp is None or self._disp.size == 0:
+                return
+            fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Export pairs CSV",
+                f"cell{self.cell_id}_edge_move_intensity.csv", "CSV (*.csv)")
+            if fn:
+                np.savetxt(fn, np.column_stack([self._disp, self._inten]),
+                           delimiter=",", header="edge_displacement,intensity",
+                           comments="")
+            return
+        if idx in (_INTENSITY_KYMO, 6):
+            mat, frames, tag = self._int, self._ifr, "fluor_intensity"
+        elif idx in (1, 5):
             mat, frames, tag = self._rad, self._rfr, "boundary_radius"
-        else:                                          # velocity (0, 4) or scatter (3)
+        else:
             mat, frames, tag = self._vel, self._vfr, "edge_velocity"
         if mat is None or mat.size == 0:
             return

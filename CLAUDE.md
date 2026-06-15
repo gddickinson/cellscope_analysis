@@ -107,10 +107,15 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
 - **Edge Dynamics** dock: velocity/radius kymograph (angle×time) **and a
   per-frame edge map** (the cell's boundary in the current frame coloured by
-  per-sector velocity or radius) + summary + kymograph CSV export. With a **Fluor
-  channel** chosen (e.g. tagged PIEZO1) it also shows a **cortical-fluorescence
-  kymograph** and an **edge-velocity ↔ fluorescence scatter** with the Pearson r
-  (`analysis/edge_piezo.py`) — does the channel track protrusion vs retraction?
+  per-sector velocity or radius) + summary + CSV export. With a **Fluor channel**
+  chosen (tagged PIEZO1, **SiR-actin**, or any fluorescent signal) it adds the
+  **faithful `cell_edge_analysis` reproduction** (`analysis/edge_intensity.py`): a
+  rectangle-intensity kymograph, the **edge-movement ↔ intensity scatter** coloured
+  by movement class (protruding/stable/retracting) with regression line + r/R²/p,
+  and a **sampling-rectangles** overlay — at each edge point a rectangle reaches into
+  the cell and its mean fluorescence is correlated with the local protrusion/
+  retraction (+ protrude-vs-retract means, t-test/Mann-Whitney). Does the channel
+  track where the edge advances vs retracts?
 - **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
   mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
   per-cell plot metric.
@@ -126,8 +131,9 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   per-contrast p / Bonferroni / Cohen's d / optional covariate-adjusted **OLS**
   after frac_spread + density + omnibus KW + vehicle) · **Histogram** (per-cell
   distribution by group) · **Data** (per-recording + per-group tables, unit-tagged).
-  A **fluor channel** selector adds a per-cell **edge ↔ cortical-fluorescence**
-  correlation (`edge_piezo_corr`, e.g. tagged PIEZO1) as a comparison metric.
+  A **fluor channel** selector adds a per-cell **edge-movement ↔ fluorescence**
+  correlation (`edge_piezo_corr` = Pearson r; tagged PIEZO1, SiR-actin, or any
+  signal; via `analysis/edge_intensity.py`) as a comparison metric.
   Offers **whole-track** metrics *and* **state-segmented** ones (`mean_speed_spread`,
   `persistence_spread`, `mean_area_um2_rounded`, … via `analysis/state_metrics.py`)
   that **reproduce the original CellScope `compare/per_recording.csv`** (edge-excluded,

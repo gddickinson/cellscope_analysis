@@ -88,18 +88,18 @@ def main():
     assert win.canvas.vb.viewRange() != before, "zoom-to-cell did not change the view"
     print(f"  zoom-to-cell OK (cell {cid})")
 
-    # edge ↔ fluorescence (PIEZO1-style): correlate edge change with a channel
+    # edge movement ↔ fluorescence (PIEZO1-style): faithful correlation pipeline
     chans = win.recording.channel_names
     win.edge.fluor.setCurrentText(chans[0])               # the sample's fluor channel
     app.processEvents()
-    assert win.edge._piezo is not None and win.edge._piezo.size, "fluor kymograph empty"
+    assert win.edge._int is not None and win.edge._int.size, "intensity kymograph empty"
     for m in range(win.edge.mode.count()):                # all modes incl. fluor views
         win.edge.mode.setCurrentIndex(m); app.processEvents()
     print(f"  edge↔fluor OK (channel '{chans[0]}', "
-          f"r={win.edge._psum.get('edge_piezo_pearson')})")
+          f"r={win.edge._summary.get('edge_move_intensity_r')})")
     shot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--shot=")), None)
     if shot:
-        win.edge.mode.setCurrentText("Edge ↔ fluorescence")
+        win.edge.mode.setCurrentText("Edge movement ↔ intensity")
         win.edge.resize(560, 460); app.processEvents()
         win.edge.grab().save(shot)
         print(f"  saved screenshot → {shot}")

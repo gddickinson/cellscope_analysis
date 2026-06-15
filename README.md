@@ -30,10 +30,13 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   handy in a large sparse field of view.
 - **Membrane dynamics** — protrusion/retraction **kymograph** + a per-frame edge
   map coloured by edge velocity, with event detection. With a **fluorescence
-  channel** (e.g. tagged **PIEZO1**), correlate **edge change ↔ cortical
-  fluorescence** — a cortical-intensity kymograph + an edge-velocity-vs-intensity
-  scatter (Pearson r): is the channel enriched where the membrane protrudes or
-  retracts? Available per cell and as a **cross-treatment comparison metric**.
+  channel** (tagged **PIEZO1**, **SiR-actin**, or any signal), correlate **edge
+  movement ↔ fluorescence intensity** — at each edge point a rectangle reaches into
+  the cell and its mean intensity is plotted against the local protrusion/retraction
+  (scatter coloured by movement class, regression line, **Pearson r / R² / p**, plus
+  protrude-vs-retract means and a t-test/Mann–Whitney). A faithful reproduction of
+  the lab's `cell_edge_analysis` pipeline, adapted to closed tracked cells. Available
+  per cell and as a **cross-treatment comparison metric**.
 - **Shape modes** — VAMPIRE-style clustering (mode shapes, fractions, entropy,
   eigenshapes).
 - **Population** — all cells at once: time series, mean ± SEM/SD, histogram,
@@ -86,7 +89,7 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
-![edge change vs cortical fluorescence (e.g. tagged PIEZO1) — per-sector scatter + Pearson r](docs/screenshots/edge_piezo.png)
+![edge movement vs fluorescence intensity (tagged PIEZO1 / SiR-actin / any signal) — scatter coloured by movement class with regression + r/R²/p](docs/screenshots/edge_piezo.png)
 
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
 
