@@ -30,6 +30,17 @@ def test_estimate_shift_subpixel():
     assert abs(dy + 2.5) < 0.7 and abs(dx - 1.5) < 0.7, (dy, dx)
 
 
+def test_estimate_shift_bounded_rejects_far_peak():
+    """A shift beyond max_shift is not selectable (guards against the spurious
+    far phase-correlation peaks that cross-modality data can produce)."""
+    ref = _texture(128, 128, seed=3)
+    mov = ndimage.shift(ref, (40, 30), order=1)
+    dy, dx = reg.estimate_shift(ref, mov, max_shift=12)     # tight cap
+    assert abs(dy) <= 12.5 and abs(dx) <= 12.5, (dy, dx)
+    dy2, dx2 = reg.estimate_shift(ref, mov, max_shift=60)   # generous cap
+    assert abs(dy2 + 40) < 1.0 and abs(dx2 + 30) < 1.0, (dy2, dx2)
+
+
 def test_estimate_shift_flat_is_zero():
     flat = np.ones((32, 32))
     assert reg.estimate_shift(flat, flat) == (0.0, 0.0)

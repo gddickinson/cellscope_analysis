@@ -5,6 +5,37 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Real-data test drive (actin/Cy5) + auto-align robustness fix
+
+Drove the GUI headless on the **real IC295 data** (48 recordings, 2048×2048,
+~97 frames; channels `["Cy5", "DIC 10x", "None"]` — Cy5 = SiR-actin) to exercise
+the new edge analysis + alignment and check nothing is broken.
+
+- **Everything renders/runs on real data**: per-channel + DIC/Cy5 composite,
+  the edge-movement↔intensity scatter + sampling-rectangle overlay + intensity
+  kymograph, off-thread Population / Cell-table / Shape computes, cell-info + MSD,
+  colour-by, and `build_comparison(piezo_channel="Cy5")`.
+- **Biology checks out**: edge movement ↔ actin(Cy5) gives a strong, highly
+  significant **negative** correlation (actin enriched at **retracting** edges;
+  protruding-vs-retracting intensity hugely different) — the headline the edge
+  analysis was built for, on real data.
+- **Bug found + fixed**: `registration.estimate_shift` returned a spurious far
+  peak (≈ −270, −360 px) on the real cross-modality DIC↔Cy5 pair, which *destroyed*
+  the correlation when applied. Fixed by **bounding the phase-correlation peak
+  search to ±`max_shift`** (default `min(100, min(H,W)//4)`; channel offsets are
+  small). Auto-align now finds the **real ~(−4, −11) px DIC↔actin offset**, and
+  applying it *strengthens* the correlation (r −0.41 → −0.51) — confirming the
+  actin/DIC misalignment is real and that correcting it improves the analysis.
+  New test `test_estimate_shift_bounded_rejects_far_peak`.
+
+README screenshots for the edge-analysis + alignment panels now use a **real
+WT-control** recording's actin (Cy5) channel (`edge_piezo.png`,
+`edge_sampling_rectangles.png`, `prep_align_fov.png`) — baseline only, **no
+treatment-comparison data** (the comparison screenshots stay synthetic).
+`pytest` **64 passed**; all three GUI smokes green; all files < 500 lines.
+
+---
+
 ## 2026-06-15 — Pre-analysis: channel alignment + FOV; any channel count
 
 Two non-destructive pre-analysis tools (the actin channel was noticed slightly

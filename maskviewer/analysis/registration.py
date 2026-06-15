@@ -40,10 +40,19 @@ def _parabolic(c, i):
     return 0.0 if denom == 0 else 0.5 * (ym1 - yp1) / denom
 
 
-def estimate_shift(ref, mov):
+def _max_shift(shape, max_shift):
+    if max_shift is not None:
+        return int(max_shift)
+    return min(100, min(shape) // 4)                 # sane channel-offset cap
+
+
+def estimate_shift(ref, mov, max_shift=None):
     """(dy, dx) bringing ``mov`` onto ``ref`` via gradient phase-correlation.
 
-    Returns ``(0.0, 0.0)`` when either image has no gradient structure."""
+    Channel offsets are small, so the correlation peak is searched only within
+    ``±max_shift`` px (default ``min(100, min(H,W)//4)``) — this rejects the
+    spurious far peaks that cross-modality (DIC↔fluorescence) data can otherwise
+    produce. Returns ``(0.0, 0.0)`` when either image has no gradient structure."""
     a, b = _prep(ref), _prep(mov)
     if a.std() == 0 or b.std() == 0:
         return 0.0, 0.0
@@ -52,11 +61,17 @@ def estimate_shift(ref, mov):
     cross = fa * np.conj(fb)
     cross /= np.abs(cross) + 1e-12
     corr = np.fft.irfft2(cross, s=a.shape)
-    py, px = np.unravel_index(int(np.argmax(corr)), corr.shape)
+    h, w = a.shape
+    ms = _max_shift((h, w), max_shift)
+    # restrict the peak to wrapped displacements within ±ms on each axis
+    dist_y = np.minimum(np.arange(h), h - np.arange(h))
+    dist_x = np.minimum(np.arange(w), w - np.arange(w))
+    allowed = (dist_y[:, None] <= ms) & (dist_x[None, :] <= ms)
+    py, px = np.unravel_index(int(np.argmax(np.where(allowed, corr, -np.inf))),
+                              corr.shape)
     # sub-pixel refine along each axis through the peak
     dy = py + _parabolic(corr[:, px], py)
     dx = px + _parabolic(corr[py, :], px)
-    h, w = a.shape
     if dy > h / 2:                                   # unwrap to a signed shift
         dy -= h
     if dx > w / 2:
@@ -90,7 +105,8 @@ def _projection(stack):
     return stack
 
 
-def estimate_stack_shift(ref_stack, mov_stack):
+def estimate_stack_shift(ref_stack, mov_stack, max_shift=None):
     """(dy, dx) aligning the ``mov`` channel stack onto the ``ref`` channel stack,
     estimated on their mean projections (robust to per-frame noise)."""
-    return estimate_shift(_projection(ref_stack), _projection(mov_stack))
+    return estimate_shift(_projection(ref_stack), _projection(mov_stack),
+                          max_shift=max_shift)
