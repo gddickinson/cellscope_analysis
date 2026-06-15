@@ -45,6 +45,11 @@ Read this before opening source files. Update it when modules change.
   3-channel** synthetic recordings and runs each through the viewer (channel switch
   + composite), the pre-analysis dialog (auto-align + auto-FOV + apply), the
   edge↔intensity panel, and `build_comparison` — proving nothing assumes two channels.
+- **scripts/smoke_singlecell.py** — headless smoke generating **single-cell crops of
+  varying H×W and frame count** (incl. a cell appearing partway through) and driving
+  the viewer + edge analysis + Population/Cell-table computes + `build_comparison`
+  across the mixed project, plus the manual **pixel-size / time-scale override**
+  (apply + save/load) — proving nothing assumes a fixed shape / length / frame-0 start.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -78,9 +83,11 @@ Read this before opening source files. Update it when modules change.
   control); `ensure_colors(design, groups)` assigns palette colours to new
   groups. `from_entries`, `from_data_roots` (discover + auto-design),
   `load_project`/`save_project` (small JSON, incl. excluded/overrides + per-recording
-  **`corrections`** = channel shifts + FOV; `correction_for(label)`). Decouples the
-  app from the hard-coded IC295 design so any dataset (any treatments / counts /
-  groupings) loads + compares correctly. GUI-free.
+  **`corrections`** = channel shifts + FOV; `correction_for(label)`; + project-wide
+  **`px_size`** / **`frame_interval`** manual scale overrides — `scaled(rec)` applies
+  them to every recording, `scale_override` = `(px_size, frame_interval)`). Decouples
+  the app from the hard-coded IC295 design so any dataset (any treatments / counts /
+  groupings / **image sizes / lengths**) loads + compares correctly. GUI-free.
 
 ### maskviewer/io/  — load data (GUI-free)
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
@@ -181,6 +188,11 @@ Read this before opening source files. Update it when modules change.
   `registration`) + manual dy/dx, **Auto-detect FOV** (via `fov`) + manual rectangle,
   a live overlay preview (reference grey + align-channel magenta + FOV box), and
   Apply → writes a non-destructive correction onto the project (`on_apply`).
+- **scale_dialog.py** — `ScaleDialog(QDialog)`: **Config ▸ Pixel size & time scale** —
+  per-field override checkboxes + spinboxes for µm/px + min/frame, prefilled from the
+  project override or the current file. Apply → `window_actions._apply_scale` stores
+  `px_size`/`frame_interval` on the project + reloads (all recordings). For files with
+  missing/wrong metadata.
 - **compare_tables.py** — `ComputeWorker` (off-thread `build_comparison`: lag count
   + optional fluorescence channel + project `corrections`); `corrections_tag` (cache
   key fingerprint); `StatsTablesMixin`: fills the right-panel **Stats** +
@@ -231,8 +243,9 @@ Read this before opening source files. Update it when modules change.
   Folder / Open Project File / Save Project As / Recent Projects** / Export CSV /
   screenshots) / View / Image / Analysis (**Comparison window…** `Ctrl+Shift+C`
   + **Channel Alignment & FOV…** → `open_prep_dialog` + Export CSV) /
-  **Config** (Cell-plot-metrics checkable submenu, rebuilt per
-  recording; **Comparison plot options…** → `open_compare_plot_options`) / Window /
+  **Config** (**Pixel size & time scale…** → `open_scale_dialog`; Cell-plot-metrics
+  checkable submenu, rebuilt per recording; **Comparison plot options…** →
+  `open_compare_plot_options`) / Window /
   Help (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
   a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
@@ -248,9 +261,10 @@ Read this before opening source files. Update it when modules change.
   `run_task`), falling back to synchronous compute when none is set (tests/headless).
 - **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers
   (incl. **project** open-folder / open-file / save-as / recent-projects +
-  `set_project` to adopt a different dataset, `open_compare_window`, and
+  `set_project` to adopt a different dataset, `open_compare_window`,
   **`open_prep_dialog`** / `_apply_correction` — store a recording's channel
-  alignment + FOV on the project and reload to apply it), the
+  alignment + FOV on the project and reload to apply it — and **`open_scale_dialog`** /
+  `_apply_scale` — store the project-wide µm/px + min/frame overrides + reload), the
   lazy+cached heavy-compute providers (`_population_table` / `_shape_modes_model`,
   `progress_cb`-aware), **`run_task`** (off-thread compute → status-bar bar/ETA),
   **`zoom_to_cell`** (frame the canvas on the selected cell — View ▸ Zoom to Cell /
@@ -347,7 +361,8 @@ Read this before opening source files. Update it when modules change.
   MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar; optional
   `piezo_channel` adds per-cell edge-movement↔intensity `edge_piezo_corr` /
   `edge_piezo_slope` / `piezo_protr_minus_retr` columns via `edge_intensity`;
-  optional `corrections` applies each recording's channel alignment + FOV crop),
+  optional `corrections` applies each recording's channel alignment + FOV crop;
+  optional `scale_override` = (µm/px, min/frame) overrides every recording's metadata),
   `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
   τ-bin + max-lag display controls),
@@ -407,7 +422,8 @@ Read this before opening source files. Update it when modules change.
   straightness, CSV table shapes + writing.
 - **test_project.py** — Project/Design model (GUI-free): auto-design (IC295 +
   generic single-arm), `regroup` exclude/override, effective conditions +
-  `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides.
+  `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides, and the
+  **scale override** (`scaled`/`scale_override` + corrections persistence).
 - **test_compare_extras.py** — `metric_docs` units / labels / per-state suffix /
   `comparison_doc`; `compare.per_condition_summary`, `ensemble_by_condition`
   (bin/max-lag), `multivariate_contrasts`, `save_results`/`load_results`, the

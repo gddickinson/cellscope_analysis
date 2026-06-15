@@ -70,8 +70,7 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.fluor = QtWidgets.QComboBox()
         self.fluor.addItem("(no fluor)")
         self.fluor.setToolTip("Correlate edge protrusion/retraction with a fluor "
-                              "channel per cell (PIEZO1, SiR-actin, any signal) → "
-                              "edge_piezo_corr metric — click Compute to apply")
+                              "channel per cell → edge_piezo_corr (Compute to apply)")
         self.metric = QtWidgets.QComboBox()
         self.metric.setToolTip("Primary metric — drives the left plots, the "
                                "histogram, stats and data tables. _spread / "
@@ -350,8 +349,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
     def _cache_path(self):
         fl = self._fluor_choice()
         ch = "_" + "".join(c if c.isalnum() else "" for c in fl) if fl else ""
-        return os.path.join(PROJECT_ROOT, "analysis_out", f"_compare_{self._safe}"
-            f"_lag{self.lags.value()}{ch}{corrections_tag(self.project.corrections)}.pkl")
+        return os.path.join(PROJECT_ROOT, "analysis_out", f"_compare_{self._safe}_lag"
+            f"{self.lags.value()}{ch}{corrections_tag(self.project.corrections, self.project.scale_override)}.pkl")
 
     def _compute(self):
         if self._thread is not None and self._thread.isRunning():
@@ -372,7 +371,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.busy.start(f"Measuring {len(self.project.entries)} recordings")
         self._thread = QtCore.QThread(self)
         self._worker = ComputeWorker(self.project.entries, self.lags.value(),
-                                     self._fluor_choice(), self.project.corrections)
+                                     self._fluor_choice(), self.project.corrections,
+                                     self.project.scale_override)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.busy.update)

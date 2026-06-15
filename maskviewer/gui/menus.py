@@ -76,6 +76,9 @@ def build_menubar(win):
     win.metrics_menu.setToolTipsVisible(True)
     win._rebuild_metrics_menu()
     cfg.addSeparator()
+    cfg.addAction(_act(win, "Pixel size & &time scale…", win.open_scale_dialog,
+                       tip="Manually set µm/px + min/frame for ALL recordings "
+                           "(use when file metadata is missing or wrong)"))
     cfg.addAction(_act(win, "Comparison &plot options…", win.open_compare_plot_options,
                        tip="Fonts, sizes, axes, bins, trendlines… for the "
                            "Comparison-window graphs"))

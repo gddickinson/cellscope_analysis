@@ -20,12 +20,14 @@ _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
               "Cohen d", "OLS β", "OLS p"]
 
 
-def corrections_tag(corrections):
-    """Short stable fingerprint of the project's pre-analysis corrections, for
-    keying the compute cache (alignment / FOV changes ⇒ different results)."""
-    if not corrections:
+def corrections_tag(corrections, scale=None):
+    """Short stable fingerprint of the project's pre-analysis corrections + manual
+    scale overrides, for keying the compute cache (alignment / FOV / pixel-size /
+    time-scale changes ⇒ different results)."""
+    if not corrections and not (scale and any(scale)):
         return ""
-    digest = hashlib.md5(json.dumps(corrections, sort_keys=True).encode())
+    blob = {"c": corrections or None, "s": list(scale) if scale else None}
+    digest = hashlib.md5(json.dumps(blob, sort_keys=True).encode())
     return "_c" + digest.hexdigest()[:6]
 
 
@@ -35,12 +37,14 @@ class ComputeWorker(QtCore.QObject):
     progress = QtCore.pyqtSignal(int, int)
     done = QtCore.pyqtSignal(object)
 
-    def __init__(self, entries, max_lag=0, piezo_channel=None, corrections=None):
+    def __init__(self, entries, max_lag=0, piezo_channel=None, corrections=None,
+                 scale_override=None):
         super().__init__()
         self.entries = entries
         self.max_lag = max_lag
         self.piezo_channel = piezo_channel
         self.corrections = corrections or {}
+        self.scale_override = scale_override
         self.cancel = False
 
     def run(self):
@@ -48,6 +52,7 @@ class ComputeWorker(QtCore.QObject):
             res = compare.build_comparison(
                 self.entries, max_lag=self.max_lag,
                 piezo_channel=self.piezo_channel, corrections=self.corrections,
+                scale_override=self.scale_override,
                 progress_cb=lambda i, n: (self.progress.emit(i, n)
                                           or not self.cancel))
         except Exception as exc:                          # surface, don't crash

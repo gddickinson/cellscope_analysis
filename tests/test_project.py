@@ -79,3 +79,30 @@ def test_save_load_roundtrip_preserves_groups(tmp_path):
     assert q.excluded == {"GOF__1"}
     assert q.overrides == {"KO__0": "KO_fast"}
     assert q.design.arms == p.design.arms
+
+
+class _Rec:
+    def __init__(self, um, dt):
+        self.um_per_px = um
+        self.time_interval_min = dt
+
+
+def test_scale_override_applies_and_persists(tmp_path):
+    p = _project(["WT", "KO"])
+    # unset → file metadata untouched
+    assert p.scale_override == (None, None)
+    r = _Rec(0.65, 10.0)
+    p.scaled(r)
+    assert (r.um_per_px, r.time_interval_min) == (0.65, 10.0)
+    # set → overrides every recording, independent fields
+    p.px_size, p.frame_interval = 0.25, 2.0
+    p.scaled(r)
+    assert (r.um_per_px, r.time_interval_min) == (0.25, 2.0)
+    assert p.scaled(_Rec(9, 9)).um_per_px == 0.25
+    # corrections + scale survive save/load
+    p.corrections = {"WT__0": {"shifts": {"0": [1.0, -2.0]}, "fov": [1, 9, 2, 8]}}
+    fp = os.path.join(tmp_path, "proj.json")
+    projmod.save_project(p, fp)
+    q = projmod.load_project(fp)
+    assert q.px_size == 0.25 and q.frame_interval == 2.0
+    assert q.correction_for("WT__0")["fov"] == [1, 9, 2, 8]

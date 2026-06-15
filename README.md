@@ -52,7 +52,11 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 - **Projects** — load any dataset (any treatments / recording counts) via
   **File ▸ Open Project Folder** (auto-derives the experimental *design* — arms,
   controls, vehicle, colours), save/reopen it as a small **project file**, and
-  switch between **Recent Projects** without restarting.
+  switch between **Recent Projects** without restarting. Recordings are analysed
+  independently, so a project may mix **different image sizes and lengths** —
+  e.g. **single-cell crops** that vary in shape and span only the frames where the
+  cell is present. **Config ▸ Pixel size & time scale** sets µm/px + min/frame
+  manually (for all recordings) when a file's metadata is missing or wrong.
 - **Comparison window** — a dedicated space (**Analysis ▸ Comparison window**,
   `Ctrl+Shift+C`) for cross-recording / treatment analysis (**recording =
   experimental unit**): tabbed **Distributions** (strip / box+Bonferroni /

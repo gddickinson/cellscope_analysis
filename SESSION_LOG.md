@@ -5,6 +5,32 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Single-cell crops (varying shape/length) + manual scale overrides
+
+For a new experiment style that crops one cell per field — recordings vary in H×W
+and length (only the frames where the cell is present, sometimes appearing partway
+through) — and to handle files whose metadata is missing/wrong.
+
+- **Single-cell crops work as-is**: recordings are analysed independently, so a
+  project can mix arbitrary shapes/lengths. Verified (not just assumed) by the new
+  `scripts/smoke_singlecell.py`, which generates 4 crops (5–12 frames, 48×56 …
+  120×96, one cell appearing only in frames 2–8) and drives the viewer (channel +
+  composite at each shape), the edge-movement↔intensity panel, off-thread
+  Population/Cell-table computes, and `build_comparison` across the mixed project —
+  no fixed-shape / fixed-length / present-from-frame-0 assumptions surfaced.
+- **Manual pixel-size + time-scale overrides** (`gui/scale_dialog.py`, **Config ▸
+  Pixel size & time scale…**): per-field override of **µm/px** and **min/frame**,
+  stored on the `Project` (`px_size` / `frame_interval`) and applied to **every**
+  recording (`Project.scaled`) — scale bar, all µm / µm-per-min metrics, and the
+  comparison (`build_comparison(scale_override=…)`, `ComputeWorker`, cache key via
+  `corrections_tag`). Unset = use each file's own metadata. Persists in the project
+  JSON. `window_actions.open_scale_dialog` / `_apply_scale`; reloads to re-apply.
+
+Tests: `pytest` **65 passed** (new `test_scale_override_applies_and_persists`);
+four GUI smokes green (incl. `smoke_singlecell`); all files < 500 lines.
+
+---
+
 ## 2026-06-15 — Real-data test drive (actin/Cy5) + auto-align robustness fix
 
 Drove the GUI headless on the **real IC295 data** (48 recordings, 2048×2048,

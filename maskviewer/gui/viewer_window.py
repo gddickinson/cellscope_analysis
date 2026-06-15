@@ -192,6 +192,8 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
             self.status.showMessage(f"Load failed: {exc}", 8000)
             self.recording = self.masks = None
             return
+        # manual pixel-size / time-scale overrides (apply to every recording)
+        self.project.scaled(self.recording)
         # pre-analysis corrections (channel alignment + FOV crop), non-destructive
         from ..io import recording as _rec
         from ..analysis import fov as _fov
