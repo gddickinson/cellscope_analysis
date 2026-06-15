@@ -5,6 +5,19 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Edge Dynamics: plot every per-sector metric on the edge-this-frame map
+
+The "edge this frame" map (the cell boundary coloured by a per-sector metric) now
+offers **all** available per-sector metrics, not just velocity + radius: added
+**Edge this frame: intensity** (boundary coloured by the per-sector rectangle
+fluorescence at the current frame, when a Fluor channel is chosen). `_draw_edge_frame`
+takes a `metric` ("velocity" / "radius" / "intensity"); modes/indices reorganised
+(`_FRAME_METRIC`, `_RECTANGLES`), CSV export + frame-redraw handle the new mode.
+Verified on the sample: all three colour the 89 boundary points; intensity is empty
+(prompt) without a channel. `pytest` 74 passed; GUI smokes green; edge_panel 431 lines.
+
+---
+
 ## 2026-06-15 — Direction persistence: DiPer ensemble autocorrelation by condition
 
 Incorporated the **DiPer** (Gorelik & Gautreau 2014) directional-persistence

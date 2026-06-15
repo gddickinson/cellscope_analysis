@@ -28,10 +28,13 @@ from ..plot_export import save_plot
 
 _MODES = ["Velocity kymograph", "Radius kymograph", "Intensity kymograph",
           "Edge movement ↔ intensity", "Edge this frame: velocity",
-          "Edge this frame: radius", "Sampling rectangles"]
+          "Edge this frame: radius", "Edge this frame: intensity",
+          "Sampling rectangles"]
 _INTENSITY_KYMO = 2
 _SCATTER = 3
-_EDGE_FRAME = (4, 5, 6)          # mode indices drawn on the current frame
+_RECTANGLES = 7
+_EDGE_FRAME = (4, 5, 6, 7)       # mode indices drawn on the current frame
+_FRAME_METRIC = {4: "velocity", 5: "radius", 6: "intensity"}
 _NONE = "(none)"
 
 
@@ -228,10 +231,10 @@ class EdgePanel(QtWidgets.QWidget):
         self.img.clear()
         self.line.clear()
         self.scatter.clear()
-        if idx == 6:
+        if idx == _RECTANGLES:
             self._draw_rectangles()
         elif idx in _EDGE_FRAME:
-            self._draw_edge_frame(velocity=(idx == 4))
+            self._draw_edge_frame(_FRAME_METRIC[idx])
         elif idx == _SCATTER:
             self._draw_move_intensity_scatter()
         elif idx == _INTENSITY_KYMO:
@@ -313,7 +316,9 @@ class EdgePanel(QtWidgets.QWidget):
             self.plot.setXRange(cx - h, cx + h, padding=0)
             self.plot.setYRange(cy - h, cy + h, padding=0)
 
-    def _draw_edge_frame(self, velocity):
+    def _draw_edge_frame(self, metric):
+        """Colour the cell's boundary this frame by a per-sector metric:
+        ``velocity`` (RdBu), ``radius`` or ``intensity`` (viridis)."""
         t = self._frame
         if self._labels is None or t is None:
             return
@@ -323,19 +328,31 @@ class EdgePanel(QtWidgets.QWidget):
         ry, rx = np.nonzero(m)
         cy, cx = ry.mean(), rx.mean()
         by, bx = np.nonzero(m & ~ndimage.binary_erosion(m))
-        if velocity:
+        n = edge_dynamics.N_SECTORS
+        sect = ((np.arctan2(by - cy, bx - cx) + np.pi) / (2 * np.pi) * n).astype(int) % n
+        if metric == "velocity":
             hit = np.where(self._vfr == t)[0]
             if hit.size == 0:
+                self.scatter.clear()
                 self.plot.setTitle("no edge velocity for the first tracked frame")
                 return
-            row = self._vel[hit[0]]
-            sect = ((np.arctan2(by - cy, bx - cx) + np.pi) / (2 * np.pi)
-                    * row.size).astype(int) % row.size
-            val = row[sect]
+            val = self._vel[hit[0]][sect]
             vmax = float(np.nanmax(np.abs(self._vel))) or 1.0
             lut, lo, hi = self._lut_div, -vmax, vmax
             self.plot.setTitle("edge velocity (blue retract · red protrude)")
-        else:
+        elif metric == "intensity":
+            hit = np.array([]) if self._int is None or self._ifr is None \
+                else np.where(self._ifr == t)[0]
+            if self._need_fluor() or hit.size == 0:
+                self.scatter.clear()
+                if self._int is not None and self._int.size:
+                    self.plot.setTitle("no intensity for this frame")
+                return
+            val = self._int[hit[0]][sect]
+            lut = self._lut_seq
+            lo, hi = float(np.nanmin(self._int)), float(np.nanmax(self._int))
+            self.plot.setTitle(f"{self.fluor.currentText()} intensity (this frame)")
+        else:                                          # radius (per-point distance)
             val = np.sqrt((by - cy) ** 2 + (bx - cx) ** 2) * (self._um or 1.0)
             lut, lo, hi = self._lut_seq, float(np.nanmin(val)), float(np.nanmax(val))
             self.plot.setTitle("boundary radius")
@@ -394,11 +411,11 @@ class EdgePanel(QtWidgets.QWidget):
                            delimiter=",", header="edge_displacement,intensity",
                            comments="")
             return
-        if idx in (_INTENSITY_KYMO, 6):
+        if idx in (_INTENSITY_KYMO, 6, _RECTANGLES):   # intensity kymo / edge-int / rects
             mat, frames, tag = self._int, self._ifr, "fluor_intensity"
-        elif idx in (1, 5):
+        elif idx in (1, 5):                            # radius kymo / edge-radius
             mat, frames, tag = self._rad, self._rfr, "boundary_radius"
-        else:
+        else:                                          # velocity kymo / edge-velocity
             mat, frames, tag = self._vel, self._vfr, "edge_velocity"
         if mat is None or mat.size == 0:
             return

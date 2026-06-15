@@ -125,8 +125,9 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   consecutive IoU, area-change, **nearest-neighbour** dist/count, per-channel
   intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
 - **Edge Dynamics** dock: velocity/radius kymograph (angle×time) **and a
-  per-frame edge map** (the cell's boundary in the current frame coloured by
-  per-sector velocity or radius) + summary + CSV export. With a **Fluor channel**
+  per-frame edge map** (the cell's boundary in the current frame coloured by any
+  per-sector metric — velocity, radius, or fluorescence intensity) + summary + CSV
+  export. With a **Fluor channel**
   chosen (tagged PIEZO1, **SiR-actin**, or any fluorescent signal) it adds the
   **faithful `cell_edge_analysis` reproduction** (`analysis/edge_intensity.py`): a
   rectangle-intensity kymograph, the **edge-movement ↔ intensity scatter** coloured
