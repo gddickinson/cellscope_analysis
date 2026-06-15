@@ -5,6 +5,29 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Filter annotations, scatter-fit redesign, MSD-lag clarity
+
+- **Filter annotations**: a `show_filter_note` option (graph options) labels the
+  graphs (appended to each plot title via `compare_plots.set_filter_note`) and the
+  tables (Stats omnibus + a Data-tab note) with the active filters when any are
+  applied. `FilterMixin._filter_note` builds the summary; tables use
+  `_table_filter_note` (group-visibility excluded — tables show all groups).
+- **Scatter-fit redesign**: the model combo + fit checkboxes conflicted (a fit
+  only drew when the combo was off "none"). Replaced with **two combos** — model
+  (`fit_kind`: none / linear / polynomial-2 / polynomial-3 / power / exponential /
+  log) × target (`fit_target`: all data / per group / both) + a ±SE-band checkbox.
+  Added **polynomial (multiparameter) fits** (`_fit_xy` via `np.polyfit` degree
+  2/3); power/exp/log stay linearised.
+- **Ensemble-MSD lag**: clarified there is no hard-coded 50 — τ = lag × frame
+  interval (min = one interval, e.g. 10 min; 30 lags). A 50 only appears when the
+  **τ-bin** option is set; binning now positions each bin at the **mean** of the
+  real lags it holds (never below the smallest lag).
+
+Tests: `pytest` **45 passed**; the compare smoke exercises the filter annotation,
+every fit model, and group visibility. Both GUI smokes green; all files < 500.
+
+---
+
 ## 2026-06-14 — Comparison graph options expanded + save/load results
 
 A big batch of Comparison-window graph options + results persistence.

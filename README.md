@@ -52,9 +52,11 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   every metric, and every graph is **stylable** — a **Style…** button (or
   **shift-right-click a plot**) sets fonts, marker/line sizes, fill opacity, grid,
   log axes, histogram bins, bars-vs-points, **trendlines**, **scatter fit lines**
-  (linear/power/exp/log, per-group + all, ±SE band), **background colour**, a
-  **legend**, **which groups are shown**, and ensemble-MSD **τ-bin / linear axis /
-  point markers** (persisted; also via main-window **Config ▸ Comparison plot
+  (linear / polynomial / power / exp / log; all-data / per-group / both; ±SE band),
+  **background colour**, a
+  **legend**, **which groups are shown**, ensemble-MSD **τ-bin / linear axis /
+  point markers**, and a **filter annotation** that labels graphs + tables when
+  filtering is active (persisted; also via main-window **Config ▸ Comparison plot
   options**). **Results ▾** saves / loads the computed comparison results
   (reload without recompute) or exports CSVs. Background compute + per-project
   cache; click a point → load that recording in the viewer.

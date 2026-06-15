@@ -32,6 +32,15 @@ def _conds(per, design):
 
 _BG = {"black": "k", "white": "w", "grey": (60, 60, 60), "default": None}
 
+_FILTER_NOTE = ""           # appended to plot titles when filters are active
+
+
+def set_filter_note(note):
+    """Set the 'filtered: …' suffix appended to every plot title (set once per
+    replot by the window; '' clears it)."""
+    global _FILTER_NOTE
+    _FILTER_NOTE = note or ""
+
 
 def _axes(plot, style, left=None, bottom=None, title=None, logx=False, logy=False):
     """Apply background / fonts / grid / log-mode shared by every plot."""
@@ -45,6 +54,8 @@ def _axes(plot, style, left=None, bottom=None, title=None, logx=False, logy=Fals
     if bottom is not None:
         plot.setLabel("bottom", bottom, **{"font-size": fs, "color": fg})
     if title is not None:
+        if _FILTER_NOTE:
+            title = f"{title}  ·  filtered: {_FILTER_NOTE}"
         plot.setTitle(title, size=fs, color=fg)
     plot.showGrid(x=style.grid, y=style.grid, alpha=0.3)
     f = QtGui.QFont()
@@ -73,22 +84,36 @@ def _pick(sp, pick_cb):
         sp.sigClicked.connect(lambda _s, pts: pts and pick_cb(str(pts[0].data())))
 
 
+_POLY_DEG = {"linear": 1, "polynomial (2)": 2, "polynomial (3)": 3}
+
+
 def _fit_xy(x, y, kind):
     """(xs, ys, lo, hi) for a least-squares fit + ±1 std-error band, or None.
-    kind ∈ linear / log / exponential / power (fit in the linearising space)."""
+
+    Polynomial (linear / poly-2 / poly-3) is fit directly (multiparameter);
+    power / exponential / log are fit in their linearising space. ``lo``/``hi``
+    are the centre ± residual standard error.
+    """
     ok = np.isfinite(x) & np.isfinite(y)
     if kind in ("log", "power"):
         ok &= x > 0
     if kind in ("exponential", "power"):
         ok &= y > 0
     x, y = x[ok], y[ok]
-    if x.size < 3 or np.ptp(x) == 0:
+    if x.size < 2 or np.ptp(x) == 0:
         return None
-    X = np.log(x) if kind in ("log", "power") else x
+    xs = np.linspace(x.min(), x.max(), 80)
+    if kind in _POLY_DEG:                            # multiparameter polynomial fit
+        deg = min(_POLY_DEG[kind], x.size - 1)
+        coef = np.polyfit(x, y, deg)
+        ys = np.polyval(coef, xs)
+        resid = y - np.polyval(coef, x)
+        se = float(resid.std(ddof=deg + 1)) if x.size > deg + 1 else 0.0
+        return xs, ys, ys - se, ys + se
+    X = np.log(x) if kind in ("log", "power") else x   # linearised 2-param models
     Y = np.log(y) if kind in ("exponential", "power") else y
-    a, b = np.polyfit(X, Y, 1)                      # Y = a·X + b
+    a, b = np.polyfit(X, Y, 1)
     se = float((Y - (a * X + b)).std(ddof=2)) if X.size > 2 else 0.0
-    xs = np.linspace(x.min(), x.max(), 60)
     Xs = np.log(xs) if kind in ("log", "power") else xs
     Ys = a * Xs + b
     lo, hi = Ys - se, Ys + se
@@ -312,6 +337,12 @@ def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
     style = style or PlotStyle()
     if mx not in per_rec.columns or my not in per_rec.columns:
         return
+    # fit is driven by two combos: the model (fit_kind, none = off) and the
+    # target (fit_target: all data / per group / both) — no conflicting toggles
+    kind = style.fit_kind
+    tgt = style.fit_target
+    fit_groups = kind != "none" and tgt in ("per group", "both")
+    fit_all = kind != "none" and tgt in ("all data", "both")
     for cond in compare.order_conditions(per_rec["condition"].unique(),
                                          order=design.condition_order()):
         sub = per_rec[per_rec["condition"] == cond]
@@ -326,9 +357,9 @@ def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
             _pick(sp, pick_cb)
             plot.addItem(sp)
             _legend_entry(plot, cond, col, style)
-        if style.fit_kind != "none" and style.fit_groups:
+        if fit_groups:
             _draw_fit(plot, sub[mx].to_numpy(float), sub[my].to_numpy(float),
-                      style.fit_kind, col, style)
+                      kind, col, style)
     x = per_rec[mx].to_numpy(float)
     y = per_rec[my].to_numpy(float)
     ok = np.isfinite(x) & np.isfinite(y)
@@ -337,8 +368,10 @@ def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
         from scipy.stats import spearmanr
         rho, p = spearmanr(x[ok], y[ok])
         title += f"   (Spearman ρ={rho:.2f}, p={p:.3f})"
-    if style.fit_kind != "none" and (style.fit_all or not style.fit_groups):
-        _draw_fit(plot, x, y, style.fit_kind, (255, 215, 0), style)
+    if kind != "none":
+        title += f"   · {kind} fit"
+    if fit_all:
+        _draw_fit(plot, x, y, kind, (255, 215, 0), style)
     _axes(plot, style, left=metric_docs.axis_label(my), bottom=metric_docs.axis_label(mx),
           logx=style.log_x, logy=style.log_y, title=title)
 

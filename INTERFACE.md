@@ -28,7 +28,8 @@ Read this before opening source files. Update it when modules change.
   table on fake multi-arm + single-arm data, checks the editable control combo,
   exercises the **filters** (frames / quality / cells-per-rec / state / crowding /
   edge via the Filters… dialog), the right **Stats / Histogram / Data** tabs +
-  units, the **bars view + plot-style dialog (incl. trendline) + shift-right-click**,
+  units, the **bars view + plot-style dialog (style / fits / msd-points / groups /
+  background / legend / filter annotation) + shift-right-click + save/load results**,
   the **Groups & Comparisons editor** (exclude / regroup / add-comparison / control
   / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
   `set_project`. `--shot=PATH` (also writes `_msd` / `_histogram` / `_style` /
@@ -175,16 +176,20 @@ Read this before opening source files. Update it when modules change.
   bands/lines; honours τ-binning, linear/log axis, and optional point markers +
   per-point error bars), `scatter` (X-vs-Y + Spearman, clickable, optional
   per-group / all-data **fit lines** with ±SE band — `_fit_xy`/`_draw_fit`),
-  `histogram` (per-cell distribution by group). `_trend` connects per-group
+  `histogram` (per-cell distribution by group). `_fit_xy` handles polynomial
+  (linear / poly-2 / poly-3, multiparameter) + linearised power/exp/log fits;
+  `_draw_fit` draws them with an optional ±SE band. `_trend` connects per-group
   centres on the categorical plots; `_legend_entry` registers coloured legend
   items. Colours + order from the `Design`; axes labelled with units. Every
   function takes a `PlotStyle`, applied via the shared `_axes` helper (which also
-  sets the **background** + contrasting foreground).
+  sets the **background** + contrasting foreground and appends a
+  **`set_filter_note`** "filtered: …" suffix to every title when filters are active).
 - **plot_style.py** — `PlotStyle` (dataclass of render options — fonts / marker+line
   size / fill opacity / grid / log axes / **background** / **legend** / histogram
   bins+bars / **MSD τ-bin + linear axis + point markers** / **trendline** /
-  **scatter fit** (linear/power/exp/log, per-group/all, ±SE band); QSettings-
-  persisted) + `PlotStyleDialog` (non-modal live editor, incl. a dynamic **Show
+  **scatter fit** (two combos: model = linear / polynomial-2 / polynomial-3 /
+  power / exponential / log, applied to all-data / per-group / both, + ±SE band) /
+  **filter annotation**; QSettings-persisted) + `PlotStyleDialog` (non-modal live editor, incl. a dynamic **Show
   groups** visibility section via `set_groups`) + `PlotStyleMixin` (opens the editor
   from a toolbar button **or shift-right-click on any plot**, refreshes the group
   list via `_style_groups`, saves + replots).

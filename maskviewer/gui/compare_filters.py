@@ -117,6 +117,33 @@ class FilterMixin:
             w.setValue(0)
         self.state_sel.setCurrentIndex(0)
 
+    def _filter_note(self, groups=True):
+        """Short human summary of the active filters (or '' when none), for the
+        graph/table annotations. ``groups`` includes hidden-group info (graphs
+        only — the Stats/Data tables still show every group)."""
+        p = []
+        if self.min_frames.value() > 1:
+            p.append(f"frames≥{self.min_frames.value()}")
+        if self.min_quality.value() > 0:
+            p.append(f"quality≥{self.min_quality.value():g}")
+        if self.min_cells.value() > 0:
+            p.append(f"≥{self.min_cells.value()} cells/rec")
+        if self.state_sel.currentText() != "all cells":
+            p.append(self.state_sel.currentText())
+        if self.min_border.value() > 0:
+            p.append(f"≥{self.min_border.value():g}µm from edge")
+        if self.min_nn.value() > 0:
+            p.append(f"NN≥{self.min_nn.value():g}µm")
+        if self.max_nn.value() > 0:
+            p.append(f"NN≤{self.max_nn.value():g}µm")
+        if self.min_neighbors.value() > 0:
+            p.append(f"nbrs≥{self.min_neighbors.value():g}")
+        if self.max_neighbors.value() > 0:
+            p.append(f"nbrs≤{self.max_neighbors.value():g}")
+        if groups and getattr(self, "hidden_groups", None):
+            p.append("hidden: " + ",".join(sorted(self.hidden_groups)))
+        return " · ".join(p)
+
     # -- application -----------------------------------------------------
     @staticmethod
     def _col(pc, base):
