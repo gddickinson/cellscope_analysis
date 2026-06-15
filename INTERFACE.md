@@ -139,7 +139,8 @@ Read this before opening source files. Update it when modules change.
 - **compare_window.py** — `CompareWindow(QMainWindow)`: the dedicated comparison
   space (Analysis ▸ Comparison window), opened on the loaded **Project**.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
-  (Compute/recompute · **Groups…** (opens `DesignEditor`) · Metric · Y ·
+  (Compute/recompute · **lags** (compute-time MSD lag count; cache keyed by it) ·
+  **Groups…** (opens `DesignEditor`) · Metric · Y ·
   **Control** (editable for single-arm designs) · MSD stat · OLS · **Results ▾**
   (save / load computed results · export CSVs) · **Style…** · **Help**) + a
   **Filters…** button (opens the `FilterMixin` dialog: frames / track-quality /
@@ -292,7 +293,8 @@ Read this before opening source files. Update it when modules change.
   vs state-segmented, filters, stats).
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
-  MSD), `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
+  MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar),
+  `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),

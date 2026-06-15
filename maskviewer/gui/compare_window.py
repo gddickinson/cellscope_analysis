@@ -34,16 +34,18 @@ class _Worker(QtCore.QObject):
     progress = QtCore.pyqtSignal(int, int)
     done = QtCore.pyqtSignal(object)
 
-    def __init__(self, entries):
+    def __init__(self, entries, max_lag=0):
         super().__init__()
         self.entries = entries
+        self.max_lag = max_lag
         self.cancel = False
 
     def run(self):
         try:
             res = compare.build_comparison(
-                self.entries, progress_cb=lambda i, n: (self.progress.emit(i, n)
-                                                        or not self.cancel))
+                self.entries, max_lag=self.max_lag,
+                progress_cb=lambda i, n: (self.progress.emit(i, n)
+                                          or not self.cancel))
         except Exception as exc:                          # surface, don't crash
             res = exc
         self.done.emit(res)
@@ -78,6 +80,12 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.compute_btn.clicked.connect(self._compute)
         self.recompute = QtWidgets.QCheckBox("ignore cache")
         self.recompute.setToolTip("Recompute from masks instead of the cached result")
+        self.lags = QtWidgets.QSpinBox()
+        self.lags.setRange(5, 300)
+        self.lags.setValue(compare.MAX_LAG)
+        self.lags.setPrefix("lags ")
+        self.lags.setToolTip("Number of MSD lags computed (max τ = lags × frame "
+                             "interval) — click Compute to apply (recompute)")
         self.metric = QtWidgets.QComboBox()
         self.metric.setToolTip("Primary metric — drives the left plots, the "
                                "histogram, stats and data tables. _spread / "
@@ -130,7 +138,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
-        for w in (self.compute_btn, self.recompute, self.groups_btn, self.filters_btn):
+        for w in (self.compute_btn, self.recompute, self.lags, self.groups_btn,
+                  self.filters_btn):
             bar.addWidget(w)
         bar.addSeparator()
         for lbl, w in (("Metric", self.metric), ("Y", self.metric_y),
@@ -274,9 +283,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
     def set_project(self, project):
         self.project = project
         self._per_cell = self._msd = None
-        safe = "".join(c if c.isalnum() else "_" for c in project.name)[:40]
-        self._cache = os.path.join(PROJECT_ROOT, "analysis_out",
-                                   f"_compare_{safe}.pkl")
+        self._safe = "".join(c if c.isalnum() else "_" for c in project.name)[:40]
+        self._cache = self._cache_path()
         for p in (self.dist_plot, self.msd_plot, self.scatter_plot, self.hist_plot):
             p.clear()
         self._hist_legend.clear()
@@ -335,6 +343,10 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self._replot()
 
     # -- compute ---------------------------------------------------------
+    def _cache_path(self):
+        return os.path.join(PROJECT_ROOT, "analysis_out",
+                            f"_compare_{self._safe}_lag{self.lags.value()}.pkl")
+
     def _compute(self):
         if self._thread is not None and self._thread.isRunning():
             if self._worker:
@@ -342,6 +354,7 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
             return
         if not self.project.entries:
             return
+        self._cache = self._cache_path()              # cache is keyed by lag count
         if os.path.exists(self._cache) and not self.recompute.isChecked():
             try:
                 with open(self._cache, "rb") as f:
@@ -352,7 +365,7 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.compute_btn.setText("Cancel")
         self.busy.start(f"Measuring {len(self.project.entries)} recordings")
         self._thread = QtCore.QThread(self)
-        self._worker = _Worker(self.project.entries)
+        self._worker = _Worker(self.project.entries, self.lags.value())
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.busy.update)

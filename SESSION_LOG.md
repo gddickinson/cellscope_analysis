@@ -5,6 +5,17 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Compute-time MSD lag count exposed
+
+Followed the display-time max-lag with the **compute-time** one:
+`compare.build_comparison(max_lag=…)` parameterises the previously-hardcoded
+`MAX_LAG=30`, and the Comparison-window toolbar gained a **lags** spin box (read
+at Compute; lets the MSD reach longer τ, which the display cap can't). The
+per-project pickle cache is now keyed by lag count (`_compare_<name>_lag<N>.pkl`)
+so changing it recomputes cleanly. `pytest` 46 passed; smokes green.
+
+---
+
 ## 2026-06-14 — Ensemble-MSD max-lag display option
 
 Exposed the ensemble-MSD lag count as a plot option: `PlotStyle.msd_max_lag`

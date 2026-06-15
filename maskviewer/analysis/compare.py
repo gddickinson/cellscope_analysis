@@ -22,15 +22,16 @@ MAX_LAG = 30                      # lags for the ensemble-MSD-by-condition curve
 _SKIP = {"cell_id", "first_frame", "last_frame"}
 
 
-def build_comparison(entries, progress_cb=None, with_solidity=False):
+def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG):
     """(per_cell_df, msd_long_df) across all entries with masks.
 
     per_cell_df: per-cell rows + recording + condition. msd_long_df: per-recording
-    ensemble MSD (mean over cells) in long form (recording, condition, tau, msd).
-    ``progress_cb(done, total)`` is called per recording; returning False cancels.
-    Recordings without masks/cells are skipped.
+    ensemble MSD (mean over cells) in long form (recording, condition, tau, msd) up
+    to ``max_lag`` lags. ``progress_cb(done, total)`` is called per recording;
+    returning False cancels. Recordings without masks/cells are skipped.
     """
     import pandas as pd
+    max_lag = int(max_lag) if max_lag and max_lag > 0 else MAX_LAG
     parts, msd_rows = [], []
     n = len(entries)
     for i, e in enumerate(entries):
@@ -60,15 +61,15 @@ def build_comparison(entries, progress_cb=None, with_solidity=False):
         parts.append(df)
         scale = rec.um_per_px or 1.0
         dt = rec.time_interval_min or 1.0
-        mat = np.full((len(cents), MAX_LAG), np.nan)
+        mat = np.full((len(cents), max_lag), np.nan)
         for j, cen in enumerate(cents.values()):
-            _, vals = motion.msd(cen * scale, rec.time_interval_min, max_lag=MAX_LAG)
+            _, vals = motion.msd(cen * scale, rec.time_interval_min, max_lag=max_lag)
             mat[j, :vals.size] = vals
         import warnings
         with warnings.catch_warnings():               # all-NaN lag columns are fine
             warnings.simplefilter("ignore", RuntimeWarning)
-            ens = np.nanmean(mat, axis=0) if mat.shape[0] else np.full(MAX_LAG, np.nan)
-        for k in range(MAX_LAG):
+            ens = np.nanmean(mat, axis=0) if mat.shape[0] else np.full(max_lag, np.nan)
+        for k in range(max_lag):
             if np.isfinite(ens[k]):
                 msd_rows.append({"recording": e.label, "condition": e.condition or "?",
                                  "tau": (k + 1) * dt, "msd": float(ens[k])})

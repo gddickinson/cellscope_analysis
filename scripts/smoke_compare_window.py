@@ -20,6 +20,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt5 import QtWidgets, QtCore, QtGui                     # noqa: E402
 from maskviewer import project as projmod                      # noqa: E402
+from maskviewer.analysis import compare as compare_mod         # noqa: E402
 from maskviewer.io.dataset import Entry                        # noqa: E402
 from maskviewer.gui.compare_window import CompareWindow        # noqa: E402
 
@@ -231,6 +232,11 @@ def main():
     assert not win.control.isEnabled(), "multi-arm control combo should be disabled"
     win._on_done((*fake_data(ic.conditions),), cached=True)
     drive(win, "multi-arm")
+
+    # compute-time MSD lag count is exposed + keys the per-project cache
+    win.lags.setValue(20)
+    assert "lag20" in win._cache_path(), "lag count not in cache key"
+    win.lags.setValue(compare_mod.MAX_LAG)
 
     # save / load comparison results (patch the file dialogs)
     import tempfile
