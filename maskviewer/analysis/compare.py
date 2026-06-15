@@ -84,22 +84,31 @@ def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0):
 
     stat='mean' → mean ± SEM; stat='median' → median + bootstrap 95% CI (over
     recordings). Recording = unit (each recording contributes one MSD curve).
-    ``bin_min`` > 0 coarsens the lag axis: each τ is snapped to the centre of a
-    ``bin_min``-wide bin and the MSD values within it are pooled (smooths noisy
-    long lags) — a display-time rebinning, no recompute.
+    ``bin_min`` > 0 coarsens the lag axis: lags are grouped into ``bin_min``-wide
+    bins and pooled (smooths noisy long lags); each bin is plotted at the *mean*
+    of the real lags it holds (so the x never drops below the smallest lag) — a
+    display-time rebinning, no recompute. With ``bin_min`` = 0 the native lags
+    (one frame interval apart) are used unchanged.
     """
     out = {}
     if msd_long is None or msd_long.empty:
         return out
-    if bin_min and bin_min > 0:
+    binned = bool(bin_min and bin_min > 0)
+    if binned:
         msd_long = msd_long.copy()
-        msd_long["tau"] = (np.floor(msd_long["tau"] / bin_min) + 0.5) * bin_min
+        msd_long["_bin"] = np.floor(msd_long["tau"] / bin_min).astype(int)
     rng = np.random.default_rng(0)
     for cond, g in msd_long.groupby("condition"):
-        taus = np.sort(g["tau"].unique())
-        centre, lo, hi = [], [], []
-        for tau in taus:
-            v = g[g["tau"] == tau]["msd"].to_numpy(float)
+        if binned:
+            buckets = [(float(sub["tau"].mean()), sub)
+                       for _, sub in g.groupby("_bin")]
+            buckets.sort()
+        else:
+            buckets = [(t, g[g["tau"] == t]) for t in np.sort(g["tau"].unique())]
+        taus, centre, lo, hi = [], [], [], []
+        for tau, sub in buckets:
+            taus.append(tau)
+            v = sub["msd"].to_numpy(float)
             v = v[np.isfinite(v)]
             if v.size == 0:
                 centre.append(np.nan); lo.append(np.nan); hi.append(np.nan)
@@ -115,7 +124,7 @@ def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0):
                 mean = float(v.mean())
                 sem = float(v.std(ddof=1) / np.sqrt(v.size)) if v.size > 1 else 0.0
                 centre.append(mean); lo.append(mean - sem); hi.append(mean + sem)
-        out[cond] = (taus, np.array(centre), np.array(lo), np.array(hi))
+        out[cond] = (np.array(taus), np.array(centre), np.array(lo), np.array(hi))
     return out
 
 

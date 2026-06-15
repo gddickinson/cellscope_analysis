@@ -35,10 +35,10 @@ class PlotStyle:
     msd_points: bool = False      # draw markers + error bars at each MSD lag
     background: str = "default"   # plot background: default / black / white / grey
     legend: bool = False          # show a per-group legend on the graphs
-    fit_kind: str = "none"        # scatter fit: none / linear / power / exponential / log
-    fit_all: bool = False         # fit a single line over all points
-    fit_groups: bool = False      # fit one line per group
+    fit_kind: str = "none"        # scatter fit model (none → no fit; see _FITS)
+    fit_target: str = "all data"  # fit "all data" / "per group" / "both"
     fit_ci: bool = False          # ± std-error band around each fit
+    show_filter_note: bool = True  # annotate graphs/tables when filters are active
 
     def to_dict(self):
         return asdict(self)
@@ -68,18 +68,19 @@ class PlotStyleDialog(QtWidgets.QDialog):
               ("hist_bins", "Histogram bins", 5, 120),
               ("msd_bin_min", "Ensemble-MSD τ bin (min, 0=off)", 0, 240)]
     _COMBOS = [("background", "Background", ["default", "black", "white", "grey"]),
-               ("fit_kind", "Scatter fit", ["none", "linear", "power",
-                                            "exponential", "log"])]
+               ("fit_kind", "Scatter fit model",
+                ["none", "linear", "polynomial (2)", "polynomial (3)",
+                 "power", "exponential", "log"]),
+               ("fit_target", "  …applied to", ["all data", "per group", "both"])]
     _CHECKS = [("grid", "Grid"),
                ("legend", "Show legend"),
+               ("show_filter_note", "Annotate graphs/tables when filtered"),
                ("log_x", "Log X (scatter)"),
                ("log_y", "Log Y (distributions / scatter)"),
                ("msd_log", "Ensemble-MSD log-log axes (else linear)"),
                ("msd_points", "Ensemble-MSD points + error bars"),
                ("show_points", "Show individual points (box / bars)"),
                ("trendline", "Trendline (connect group means)"),
-               ("fit_all", "Scatter fit over all points"),
-               ("fit_groups", "Scatter fit per group"),
                ("fit_ci", "Scatter fit ± std-error band"),
                ("hist_density", "Histogram density (else cell counts)"),
                ("hist_bars", "Histogram filled bars (else step curve)")]

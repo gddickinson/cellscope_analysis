@@ -248,6 +248,10 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
     def _build_data_tab(self):
         w = QtWidgets.QWidget()
         lay = QtWidgets.QVBoxLayout(w)
+        self.data_note = QtWidgets.QLabel("")
+        self.data_note.setWordWrap(True)
+        self.data_note.setVisible(False)
+        lay.addWidget(self.data_note)
         lay.addWidget(QtWidgets.QLabel("<b>Per recording</b> (unit) — current metric"))
         self.rec_table = self._mk_table()
         lay.addWidget(self.rec_table, 2)
@@ -418,6 +422,9 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
             keep = set(per_rec[per_rec["n_cells"] >= self.min_cells.value()]["recording"])
             per_rec = per_rec[per_rec["recording"].isin(keep)]
             pc = pc[pc["recording"].isin(keep)]
+        # annotate every plot title when filters/visibility are active
+        compare_plots.set_filter_note(
+            self._filter_note() if self.style.show_filter_note else "")
         # graph subset: hidden groups are dropped from the plots (display only —
         # the Stats / Data tables still cover every group)
         hg = self.hidden_groups

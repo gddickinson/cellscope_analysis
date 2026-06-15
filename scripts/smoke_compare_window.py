@@ -100,6 +100,15 @@ def drive(win, label):
     win.min_neighbors.setValue(0.0)
     win.max_neighbors.setValue(0.0)
     assert win.rec_table.rowCount() > 0, f"{label}: filters emptied everything"
+    # filter annotation on graphs + tables (controlled by the option)
+    assert win._filter_note(), f"{label}: empty filter note"
+    assert "filtered" in win.omnibus.text().lower(), f"{label}: stats not annotated"
+    assert "filtered" in win.data_note.text().lower(), f"{label}: data tab not annotated"
+    win.style.show_filter_note = False
+    win._replot()
+    assert "filtered" not in win.omnibus.text().lower(), f"{label}: note not toggled off"
+    win.style.show_filter_note = True
+    win._replot()
     win.min_cells.setValue(99999)                     # drop all recordings
     win._reset_filters()                              # back to defaults
 
@@ -123,17 +132,17 @@ def drive(win, label):
     # background / legend / fits / msd points + bins + linear axis
     sd._widgets["background"].setCurrentText("white")
     sd._widgets["legend"].setChecked(True)
-    sd._widgets["fit_kind"].setCurrentText("linear")
-    sd._widgets["fit_groups"].setChecked(True)
-    sd._widgets["fit_all"].setChecked(True)
+    sd._widgets["fit_kind"].setCurrentText("power")       # multiparameter-ish models
+    sd._widgets["fit_target"].setCurrentText("both")
     sd._widgets["fit_ci"].setChecked(True)
     sd._widgets["msd_points"].setChecked(True)
     sd._widgets["msd_bin_min"].setValue(20)
     sd._widgets["msd_log"].setChecked(False)
     app.processEvents()
     assert (win.style.background == "white" and win.style.legend
-            and win.style.fit_kind == "linear" and win.style.msd_points
-            and win.style.msd_bin_min == 20 and not win.style.msd_log)
+            and win.style.fit_kind == "power" and win.style.fit_target == "both"
+            and win.style.msd_points and win.style.msd_bin_min == 20
+            and not win.style.msd_log)
     win.tabs.setCurrentIndex(2); app.processEvents()      # scatter (fits + CI)
     win.tabs.setCurrentIndex(1); app.processEvents()      # msd (points / bins / linear)
     win.tabs.setCurrentIndex(0); app.processEvents()
@@ -146,6 +155,17 @@ def drive(win, label):
     gboxes[0].setChecked(True)
     app.processEvents()
     assert not win.hidden_groups
+    # scatter fit driven by the model combo (none = off); every model renders
+    win.tabs.setCurrentIndex(2)
+    win.style.fit_kind, win.style.fit_target, win.style.fit_ci = "none", "all data", False
+    win._replot(); app.processEvents()
+    n_off = len(win.scatter_plot.listDataItems())
+    for k in ("linear", "polynomial (2)", "polynomial (3)", "power", "exponential", "log"):
+        win.style.fit_kind = k
+        win._replot(); app.processEvents()
+        assert len(win.scatter_plot.listDataItems()) > n_off, f"{label}: {k} fit drew nothing"
+    win.style.fit_kind = "none"
+    win.tabs.setCurrentIndex(0)
     # shift-right-click a plot opens the style dialog (event filter consumes it)
     ev = QtGui.QMouseEvent(QtCore.QEvent.MouseButtonPress, QtCore.QPointF(5, 5),
                            QtCore.Qt.RightButton, QtCore.Qt.RightButton,

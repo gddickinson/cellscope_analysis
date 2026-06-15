@@ -101,6 +101,13 @@ def show_metrics_help(parent):
 
 
 class StatsTablesMixin:
+    def _table_filter_note(self):
+        """Filter summary for the tables (group-visibility excluded — tables show
+        every group); '' when the annotation option is off or nothing is filtered."""
+        if getattr(self, "style", None) is None or not self.style.show_filter_note:
+            return ""
+        return self._filter_note(groups=False)
+
     def _update_stats(self, per_rec, metric):
         d = self.project.design
         bc = compare.by_condition(per_rec, metric)
@@ -116,6 +123,9 @@ class StatsTablesMixin:
         txt = f"omnibus KW ({len(bc)} conditions): {feature_tables.stars(kw)}"
         if d.vehicle:
             txt += f"  ·  vehicle {d.vehicle[0]}–{d.vehicle[1]}: {feature_tables.stars(veh)}"
+        note = self._table_filter_note()
+        if note:
+            txt += f"<br><i>filtered: {note}</i>"
         self.omnibus.setText(txt)
         rows = []
         for arm, spec in d.arms.items():
@@ -132,6 +142,10 @@ class StatsTablesMixin:
 
     def _fill_data(self, per_rec, pc, metric):
         """Per-recording + per-group tables (the Data tab), with unit headers."""
+        note = self._table_filter_note()
+        if getattr(self, "data_note", None) is not None:
+            self.data_note.setText(f"<i>filtered: {note}</i>" if note else "")
+            self.data_note.setVisible(bool(note))
         conds = compare.order_conditions(per_rec["condition"].unique(),
                                          order=self.project.design.condition_order())
         u = metric_docs.column_units(metric)
