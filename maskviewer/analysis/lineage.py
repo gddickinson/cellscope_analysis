@@ -14,6 +14,8 @@ from __future__ import annotations
 import numpy as np
 from scipy import ndimage
 
+from . import cell_metrics
+
 
 def present_ids(labels) -> set:
     """Set of track label IDs that appear anywhere in the mask stack."""
@@ -95,40 +97,95 @@ def _touches_border(lab, cid) -> bool:
                 or (lab[:, 0] == cid).any() or (lab[:, -1] == cid).any())
 
 
-def infer_divisions(labels, prox_factor: float = 1.0) -> list:
-    """Division events inferred from the mask track topology alone — no
-    ``divisions.json``.
+def _clip01(x):
+    return float(max(0.0, min(1.0, x)))
 
-    A division is a **daughter track that first appears adjacent to a parent track
-    present in the previous frame**: the new cell emerges from within / touching the
-    parent's footprint (centroid distance ≤ ``prox_factor``·(rₚ+r_d), the cells'
-    equivalent radii), and is **not** first seen touching the image border (a track
-    that enters the field of view is migrating in, not dividing). Geometry only, but
-    every event references real, surviving track IDs, so it is always consistent with
-    the cleaned masks. Returns ``[{parent, daughter, frame, score(nan),
-    parent_centroid, daughter_centroid}]`` (the shape the GUI consumes)."""
+
+def _circularity(lab, cid, cy, cx, area) -> float:
+    """Cropped circularity (4π·area / perimeter²) of one cell — a roundedness proxy
+    for the 'balled' division cue. Computed on a small crop around the cell."""
+    if area < 8:
+        return 0.0
+    r = int(2.0 * (area / np.pi) ** 0.5) + 4
+    y0, y1 = max(0, int(cy) - r), min(lab.shape[0], int(cy) + r + 1)
+    x0, x1 = max(0, int(cx) - r), min(lab.shape[1], int(cx) + r + 1)
+    m = lab[y0:y1, x0:x1] == cid
+    a = int(m.sum())
+    per = cell_metrics._perimeter(m) if a >= 8 else 0.0
+    return float(min(4.0 * np.pi * a / (per * per), 1.0)) if per > 0 else 0.0
+
+
+_DIV_CUES = ("prox", "swell", "balled", "persist", "mass")
+
+
+def _score_division(labels, geom, spans, p, d, f0, last_d, dist, r_d, r_p,
+                    window, min_persist) -> dict:
+    """Five [0,1] cues for a parent→daughter candidate (the original detector's
+    signature, computed from the masks): proximity, parent area-swelling, parent
+    balled/rounded, daughter persistence, ½-mass split."""
+    rsum = r_d + r_p
+    prox = _clip01(1.0 - dist / (2.0 * rsum)) if rsum > 0 else 0.0
+    fp0, fp1 = spans[p]                                # parent life → baseline area
+    life = [geom[t][p][2] for t in range(fp0, fp1 + 1) if p in geom[t]]
+    base = float(np.median(life)) if life else 0.0
+    win = [t for t in range(max(0, f0 - window), f0) if p in geom[t]]
+    peak = max((geom[t][p][2] for t in win), default=base)
+    swell = _clip01(((peak / base) - 1.0) / 0.5) if base > 0 else 0.0
+    balled = float(np.mean([_circularity(labels[t], p, *geom[t][p])
+                            for t in win])) if win else 0.0
+    persist = _clip01((last_d - f0 + 1) / float(min_persist))
+    a_p_prev = geom[f0 - 1][p][2]
+    ratio = (geom[f0][d][2] / a_p_prev) if a_p_prev > 0 else 0.0
+    mass = _clip01(1.0 - 2.0 * abs(ratio - 0.5))
+    return {"prox": prox, "swell": swell, "balled": balled,
+            "persist": persist, "mass": mass}
+
+
+def infer_divisions(labels, prox_factor=1.0, window=4, min_persist=5,
+                    score_threshold=0.5, return_all=False) -> list:
+    """Division events inferred + **scored** from the masks alone — the cue set the
+    original pipeline detector used, recomputed in-project on the cleaned label stack
+    (no ``divisions.json``, so no stale/removed IDs).
+
+    A candidate is a **daughter track that first appears adjacent to a parent present
+    the previous frame** (centroid distance ≤ ``prox_factor``·(rₚ+r_d)), **not** first
+    seen touching the image border (entering the FOV ≠ dividing). Each candidate is
+    scored on five cues, each ∈ [0,1] (``score`` = their mean), kept when
+    ``score ≥ score_threshold``:
+      * **prox** — how close the daughter emerges to the parent;
+      * **swell** — the parent's area swelling before the split (window peak ÷ life
+        baseline);
+      * **balled** — how rounded the parent is in the pre-split ``window`` (circularity);
+      * **persist** — how long the daughter then survives (vs ``min_persist``);
+      * **mass** — daughter:parent area near ½ (a mass split).
+    Every event carries ``score`` + the sub-cues and references real surviving tracks.
+    ``return_all=True`` also returns sub-threshold candidates (for inspection/tuning)."""
     labels = np.asarray(labels)
     if labels.ndim != 3 or labels.shape[0] < 2:
         return []
     geom = _frame_geometry(labels)
     spans = track_spans(labels)
     events = []
-    for d, (f0, _last) in sorted(spans.items()):
+    for d, (f0, last_d) in sorted(spans.items()):
         if f0 == 0 or d not in geom[f0] or _touches_border(labels[f0], d):
             continue
         cy, cx, a_d = geom[f0][d]
         r_d = (a_d / np.pi) ** 0.5
-        best, best_dist = None, np.inf
+        best, best_dist, r_p = None, np.inf, 0.0
         for p, (pcy, pcx, a_p) in geom[f0 - 1].items():
-            if p == d:
-                continue
+            rp = (a_p / np.pi) ** 0.5
             dist = float(np.hypot(cy - pcy, cx - pcx))
-            if dist <= prox_factor * (r_d + (a_p / np.pi) ** 0.5) and dist < best_dist:
-                best, best_dist = p, dist
-        if best is not None:
-            pcy, pcx, _ = geom[f0 - 1][best]
-            events.append({"parent": int(best), "daughter": int(d),
-                           "frame": int(f0), "score": float("nan"),
-                           "parent_centroid": [pcy, pcx],
-                           "daughter_centroid": [cy, cx]})
+            if p != d and dist <= prox_factor * (r_d + rp) and dist < best_dist:
+                best, best_dist, r_p = p, dist, rp
+        if best is None:
+            continue
+        cues = _score_division(labels, geom, spans, best, d, f0, last_d,
+                               best_dist, r_d, r_p, window, min_persist)
+        score = float(np.mean([cues[k] for k in _DIV_CUES]))
+        if score < score_threshold and not return_all:
+            continue
+        pcy, pcx, _ = geom[f0 - 1][best]
+        events.append({"parent": int(best), "daughter": int(d), "frame": int(f0),
+                       "score": score, **cues,
+                       "parent_centroid": [pcy, pcx], "daughter_centroid": [cy, cx]})
     return events
