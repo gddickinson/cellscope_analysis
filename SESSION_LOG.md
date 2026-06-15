@@ -5,6 +5,19 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Divisions overlay: parent→daughter links
+
+The Divisions overlay now draws each division as a **parent→daughter link** — a line
+from the parent (open circle) to the daughter (diamond) at the division's frame —
+instead of two undifferentiated diamonds. `overlays.update_overlay` takes
+`division_links` = `((parent_y,parent_x),(daughter_y,daughter_x))` pairs (built in
+`viewer_window._update_overlays` from the masks-derived `self.divisions`); new
+`div_link` / `div_parent` items. Verified on real Pos60-DMSO: the 8→11 division at
+frame 68 draws a circle on cell 8 linked to a diamond on cell 11. `pytest` 71 passed;
+all four GUI smokes green; files < 500 lines.
+
+---
+
 ## 2026-06-15 — Lineage derived from masks; no pre-cleaning artifacts in any metric
 
 Principle (from the phantom-division bug): **the loaded mask label stack is the

@@ -115,7 +115,8 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   any calculated metric** (Cell ID / state / area / perimeter / circularity /
   eccentricity / aspect ratio / solidity / extent / nearest-neighbour /
   neighbour count / mean speed / track length / shape mode), overlay toggles
-  (scale bar, frame/time, cell IDs, track trails).
+  (scale bar, frame/time, cell IDs, track trails, **division links** =
+  parent→daughter connectors).
 - **Cell Info** dock: click a cell → summary + plot any *enabled* per-frame
   characteristic (area, perimeter, circularity, eccentricity, aspect ratio,
   solidity, axes, orientation, extent, state, speed, displacement, turning,
