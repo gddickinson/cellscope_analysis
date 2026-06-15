@@ -51,9 +51,13 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   CellScope state-aware analysis. A **Help** button + per-metric tooltips explain
   every metric, and every graph is **stylable** — a **Style…** button (or
   **shift-right-click a plot**) sets fonts, marker/line sizes, fill opacity, grid,
-  log axes, histogram bins, bars-vs-points, **trendlines**, … (persisted).
-  Background compute + per-project cache; click a point → load that recording in
-  the viewer.
+  log axes, histogram bins, bars-vs-points, **trendlines**, **scatter fit lines**
+  (linear/power/exp/log, per-group + all, ±SE band), **background colour**, a
+  **legend**, **which groups are shown**, and ensemble-MSD **τ-bin / linear axis /
+  point markers** (persisted; also via main-window **Config ▸ Comparison plot
+  options**). **Results ▾** saves / loads the computed comparison results
+  (reload without recompute) or exports CSVs. Background compute + per-project
+  cache; click a point → load that recording in the viewer.
 - **Groups & Comparisons editor** (Comparison window ▸ **Groups…**) — assign
   recordings to **groups**, **include/exclude** any recording, define which groups
   form each **comparison** and which is the **control**, and set the vehicle pair.

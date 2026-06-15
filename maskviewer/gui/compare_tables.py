@@ -7,12 +7,82 @@ tab's per-recording + per-group tables (unit-tagged). GUI-thread only.
 """
 from __future__ import annotations
 
+import os
+
 from PyQt5 import QtCore, QtWidgets
 
 from ..analysis import compare, feature_tables, metric_docs
+from .. import project as projmod
 
 _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
               "Cohen d", "OLS β", "OLS p"]
+
+
+class ResultsIOMixin:
+    """Save / load the computed comparison results + CSV export (compare_window)."""
+
+    def _save_results(self):
+        if self._per_cell is None:
+            return
+        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save comparison results", f"{self.project.name}.cmp",
+            "Comparison results (*.cmp)")
+        if not fn:
+            return
+        meta = {"name": self.project.name, "design": self.project.design.to_dict(),
+                "excluded": sorted(self.project.excluded),
+                "overrides": self.project.overrides}
+        compare.save_results(fn, self._per_cell, self._msd, meta)
+        self.status.showMessage(f"Saved comparison results → {fn}", 5000)
+
+    def _load_results(self):
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load comparison results", "", "Comparison results (*.cmp *.pkl)")
+        if not fn:
+            return
+        try:
+            blob = compare.load_results(fn)
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Load failed", str(exc))
+            return
+        self._apply_loaded_results(blob)
+        self.status.showMessage(f"Loaded comparison results from {fn}", 5000)
+
+    def _apply_loaded_results(self, blob):
+        """Adopt a saved (per_cell, msd) + design into the window (no recompute)."""
+        per_cell, msd = blob.get("per_cell"), blob.get("msd")
+        if per_cell is None or getattr(per_cell, "empty", True):
+            QtWidgets.QMessageBox.warning(self, "Empty", "No results in that file.")
+            return
+        meta = blob.get("meta", {})
+        d = meta.get("design")
+        if d:
+            self.project.design = projmod.Design(d.get("arms", {}), d.get("vehicle"),
+                                                 d.get("colors", {}))
+        self.project.excluded = set(meta.get("excluded", []))
+        self.project.overrides = dict(meta.get("overrides", {}))
+        self._refresh_control_combo()
+        self._on_done((per_cell, msd), cached=True)      # refresh combos + replot
+
+    def _export(self):
+        if self._per_cell is None:
+            return
+        d = QtWidgets.QFileDialog.getExistingDirectory(self, "Export comparison CSVs")
+        if not d:
+            return
+        import pandas as pd
+        pc = self._filtered()
+        per_rec = compare.aggregate(pc)
+        pc.to_csv(os.path.join(d, "comparison_per_cell.csv"), index=False)
+        per_rec.to_csv(os.path.join(d, "comparison_per_recording.csv"), index=False)
+        summ = compare.per_condition_summary(per_rec, self.metric.currentText())
+        if summ:
+            pd.DataFrame(summ).to_csv(
+                os.path.join(d, "comparison_per_group_summary.csv"), index=False)
+        if self._msd is not None and not self._msd.empty:
+            self._msd.to_csv(os.path.join(d, "comparison_ensemble_msd.csv"),
+                             index=False)
+        QtWidgets.QMessageBox.information(self, "Exported", f"CSVs written to {d}")
 
 
 def show_metrics_help(parent):

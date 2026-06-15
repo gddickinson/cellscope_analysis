@@ -20,7 +20,7 @@ from PyQt5 import QtCore, QtWidgets
 from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
-from .compare_tables import StatsTablesMixin, show_metrics_help
+from .compare_tables import StatsTablesMixin, ResultsIOMixin, show_metrics_help
 from .compare_filters import FilterMixin
 from .plot_style import PlotStyle, PlotStyleMixin
 from ..analysis import compare, metric_docs
@@ -49,7 +49,7 @@ class _Worker(QtCore.QObject):
         self.done.emit(res)
 
 
-class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
+class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixin,
                     QtWidgets.QMainWindow):
     recordingPicked = QtCore.pyqtSignal(str)
 
@@ -65,6 +65,7 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
         self._settings = QtCore.QSettings("cellscope_analysis", "compare")
         self.style = PlotStyle.from_settings(self._settings)
         self._style_dialog = None
+        self.hidden_groups = set()       # groups hidden from the graphs (display only)
 
         self._build_ui()
         self.set_project(project)
@@ -102,8 +103,17 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
         self.stat.setToolTip("Ensemble-MSD band: mean ± SEM, or median + "
                              "bootstrap 95% CI (over recordings)")
         self.stat.currentIndexChanged.connect(self._replot)
-        export = QtWidgets.QPushButton("Export…")
-        export.clicked.connect(self._export)
+        self.results_btn = QtWidgets.QToolButton()
+        self.results_btn.setText("Results ▾")
+        self.results_btn.setToolTip("Save / load the computed comparison results, "
+                                    "or export them as CSVs")
+        self.results_btn.setPopupMode(QtWidgets.QToolButton.InstantPopup)
+        rmenu = QtWidgets.QMenu(self.results_btn)
+        rmenu.addAction("Save results…", self._save_results)
+        rmenu.addAction("Load results…", self._load_results)
+        rmenu.addSeparator()
+        rmenu.addAction("Export CSVs…", self._export)
+        self.results_btn.setMenu(rmenu)
         self.groups_btn = QtWidgets.QPushButton("Groups…")
         self.groups_btn.setToolTip("Assign recordings to groups, pick controls, "
                                    "include/exclude — applies instantly")
@@ -129,7 +139,7 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
             bar.addWidget(w)
         bar.addWidget(self.ols)
         bar.addSeparator()
-        bar.addWidget(export)
+        bar.addWidget(self.results_btn)
         bar.addWidget(self.style_btn)
         bar.addWidget(self.help_btn)
         self.addToolBar(bar)
@@ -185,6 +195,28 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
         # shift-right-click any plot → the plot-style dialog
         self._install_style_filters([self.dist_plot, self.msd_plot,
                                      self.scatter_plot, self.hist_plot])
+        self._legends = {
+            self.dist_plot: self.dist_plot.addLegend(offset=(-10, 10)),
+            self.scatter_plot: self.scatter_plot.addLegend(offset=(-10, 10)),
+            self.msd_plot: self.msd_plot.addLegend(offset=(-10, 10)),
+            self.hist_plot: self._hist_legend}
+
+    def _style_groups(self):
+        """(conditions, hidden-set, design) for the graph-options Show-groups list."""
+        if self._per_cell is not None and not self._per_cell.empty:
+            pc = self.project.regroup(self._per_cell)
+            conds = compare.order_conditions(pc["condition"].unique(),
+                                             order=self.project.design.condition_order())
+        else:
+            conds = self.project.conditions
+        return conds, self.hidden_groups, self.project.design
+
+    def _prep_legend(self, plot):
+        lg = self._legends.get(plot)
+        if lg is not None:
+            lg.clear()
+            lg.setVisible(self.style.legend)
+            lg.setLabelTextColor("k" if self.style.background == "white" else "w")
 
     # -- right-panel tabs ------------------------------------------------
     def _build_stats_tab(self):
@@ -386,42 +418,50 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
             keep = set(per_rec[per_rec["n_cells"] >= self.min_cells.value()]["recording"])
             per_rec = per_rec[per_rec["recording"].isin(keep)]
             pc = pc[pc["recording"].isin(keep)]
+        # graph subset: hidden groups are dropped from the plots (display only —
+        # the Stats / Data tables still cover every group)
+        hg = self.hidden_groups
+        gpr = per_rec[~per_rec["condition"].isin(hg)] if (per_rec is not None and hg) else per_rec
+        gpc = pc[~pc["condition"].isin(hg)] if (pc is not None and hg) else pc
         tab = self.tabs.currentIndex()
         if tab == 1:
             self.msd_plot.clear()
+            self._prep_legend(self.msd_plot)
             self.msd_plot.setLogMode(x=False, y=False)
             stat = "median" if self.stat.currentText().startswith("median") else "mean"
             msd = self._filtered_msd()
-            if msd is not None and per_rec is not None:
-                msd = msd[msd["recording"].isin(set(per_rec["recording"]))]
+            if msd is not None and gpr is not None:
+                msd = msd[msd["recording"].isin(set(gpr["recording"]))]
             compare_plots.ensemble_msd(self.msd_plot, msd, design, stat, style=self.style)
-        elif per_rec is not None and metric in per_rec.columns:
+        elif gpr is not None and metric in gpr.columns:
             if tab == 2:
                 self.scatter_plot.clear()
-                compare_plots.scatter(self.scatter_plot, per_rec, metric,
+                self._prep_legend(self.scatter_plot)
+                compare_plots.scatter(self.scatter_plot, gpr, metric,
                                       self.metric_y.currentText(), design, self._pick,
                                       style=self.style)
             else:
                 self.dist_plot.clear()
+                self._prep_legend(self.dist_plot)
                 kind = self.dist_kind.currentIndex()
                 if kind == 1:
-                    compare_plots.box(self.dist_plot, per_rec, metric, design,
+                    compare_plots.box(self.dist_plot, gpr, metric, design,
                                       style=self.style)
                 elif kind == 2:
-                    compare_plots.superplot(self.dist_plot, pc, per_rec, metric,
+                    compare_plots.superplot(self.dist_plot, gpc, gpr, metric,
                                             design, style=self.style)
                 elif kind == 3:
-                    compare_plots.bars(self.dist_plot, per_rec, metric, design,
+                    compare_plots.bars(self.dist_plot, gpr, metric, design,
                                        style=self.style)
                 else:
-                    compare_plots.strip(self.dist_plot, per_rec, metric, design,
+                    compare_plots.strip(self.dist_plot, gpr, metric, design,
                                         self._pick, style=self.style)
-        # right panel (stats + histogram + data) always tracks the current metric
+        # right panel: Stats / Data over ALL groups; histogram shows the visible set
         if per_rec is not None and metric and metric in per_rec.columns:
             self._update_stats(per_rec, metric)
             self.hist_plot.clear()
-            self._hist_legend.clear()
-            compare_plots.histogram(self.hist_plot, pc, metric, design, style=self.style)
+            self._prep_legend(self.hist_plot)
+            compare_plots.histogram(self.hist_plot, gpc, metric, design, style=self.style)
             self._fill_data(per_rec, pc, metric)
 
     # -- misc ------------------------------------------------------------
@@ -430,23 +470,3 @@ class CompareWindow(StatsTablesMixin, PlotStyleMixin, FilterMixin,
 
     def _save_current_plot(self):
         save_plot(self._current_plot(), self, "comparison.png")
-
-    def _export(self):
-        if self._per_cell is None:
-            return
-        d = QtWidgets.QFileDialog.getExistingDirectory(self, "Export comparison CSVs")
-        if not d:
-            return
-        import pandas as pd
-        pc = self._filtered()
-        per_rec = compare.aggregate(pc)
-        pc.to_csv(os.path.join(d, "comparison_per_cell.csv"), index=False)
-        per_rec.to_csv(os.path.join(d, "comparison_per_recording.csv"), index=False)
-        summ = compare.per_condition_summary(per_rec, self.metric.currentText())
-        if summ:
-            pd.DataFrame(summ).to_csv(
-                os.path.join(d, "comparison_per_group_summary.csv"), index=False)
-        if self._msd is not None and not self._msd.empty:
-            self._msd.to_csv(os.path.join(d, "comparison_ensemble_msd.csv"),
-                             index=False)
-        QtWidgets.QMessageBox.information(self, "Exported", f"CSVs written to {d}")

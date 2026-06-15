@@ -129,10 +129,14 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   speed-capped, segment-gated per rounded/spread frames). A **Help** button + per-column
   tooltips explain every metric (`metric_docs.comparison_tooltip` / `as_html`).
   Every graph is **stylable** (`gui/plot_style.py`): a **Style…** button — or
-  **shift-right-click any plot** — opens a live editor for fonts, marker/line
-  sizes, fill opacity, grid, log axes, histogram bins, bars-vs-step, **trendlines**
-  (scatter fit / connect group means) (persisted via QSettings); the Distributions
-  tab adds a **Bars (mean ± SEM)** view.
+  **shift-right-click any plot**, or main-viewer **Config ▸ Comparison plot
+  options** — opens a live editor (persisted via QSettings) for fonts, marker/line
+  sizes, fill opacity, **background colour**, **legend**, grid, log axes,
+  **which groups are shown**, histogram bins/bars, **trendlines** (connect group
+  means), **scatter fit lines** (linear/power/exp/log, per-group + all, ±SE band),
+  and ensemble-MSD **τ-bin size / linear axis / point markers + error bars**; the
+  Distributions tab adds a **Bars (mean ± SEM)** view. **Results ▾** saves / loads
+  the computed results (reload without recompute) + exports CSVs.
   Driven by the loaded project's **Design**; click a point to load that recording
   in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
   Toolbar **Groups…** opens the **Groups & Comparisons editor**

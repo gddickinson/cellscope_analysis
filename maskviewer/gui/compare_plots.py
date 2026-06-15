@@ -30,21 +30,37 @@ def _conds(per, design):
                                     order=design.condition_order())
 
 
+_BG = {"black": "k", "white": "w", "grey": (60, 60, 60), "default": None}
+
+
 def _axes(plot, style, left=None, bottom=None, title=None, logx=False, logy=False):
-    """Apply fonts / grid / log-mode shared by every plot."""
+    """Apply background / fonts / grid / log-mode shared by every plot."""
+    bg = _BG.get(style.background)
+    if bg is not None:
+        plot.setBackground(bg)
+    fg = "k" if style.background == "white" else "w"
     fs = f"{style.font_size}pt"
     if left is not None:
-        plot.setLabel("left", left, **{"font-size": fs})
+        plot.setLabel("left", left, **{"font-size": fs, "color": fg})
     if bottom is not None:
-        plot.setLabel("bottom", bottom, **{"font-size": fs})
+        plot.setLabel("bottom", bottom, **{"font-size": fs, "color": fg})
     if title is not None:
-        plot.setTitle(title, size=fs)
+        plot.setTitle(title, size=fs, color=fg)
     plot.showGrid(x=style.grid, y=style.grid, alpha=0.3)
     f = QtGui.QFont()
     f.setPointSize(style.font_size)
-    plot.getAxis("left").setStyle(tickFont=f)
-    plot.getAxis("bottom").setStyle(tickFont=f)
+    for ax in ("left", "bottom"):
+        axis = plot.getAxis(ax)
+        axis.setStyle(tickFont=f)
+        axis.setPen(fg)
+        axis.setTextPen(fg)
     plot.setLogMode(x=logx, y=logy)
+
+
+def _legend_entry(plot, name, col, style):
+    """Register a coloured legend entry (an empty named curve) when legend is on."""
+    if style.legend:
+        plot.plot([], [], name=name, pen=pg.mkPen(col, width=max(2, style.line_width)))
 
 
 def _ticks(plot, conds):
@@ -55,6 +71,43 @@ def _ticks(plot, conds):
 def _pick(sp, pick_cb):
     if pick_cb:
         sp.sigClicked.connect(lambda _s, pts: pts and pick_cb(str(pts[0].data())))
+
+
+def _fit_xy(x, y, kind):
+    """(xs, ys, lo, hi) for a least-squares fit + ±1 std-error band, or None.
+    kind ∈ linear / log / exponential / power (fit in the linearising space)."""
+    ok = np.isfinite(x) & np.isfinite(y)
+    if kind in ("log", "power"):
+        ok &= x > 0
+    if kind in ("exponential", "power"):
+        ok &= y > 0
+    x, y = x[ok], y[ok]
+    if x.size < 3 or np.ptp(x) == 0:
+        return None
+    X = np.log(x) if kind in ("log", "power") else x
+    Y = np.log(y) if kind in ("exponential", "power") else y
+    a, b = np.polyfit(X, Y, 1)                      # Y = a·X + b
+    se = float((Y - (a * X + b)).std(ddof=2)) if X.size > 2 else 0.0
+    xs = np.linspace(x.min(), x.max(), 60)
+    Xs = np.log(xs) if kind in ("log", "power") else xs
+    Ys = a * Xs + b
+    lo, hi = Ys - se, Ys + se
+    if kind in ("exponential", "power"):
+        return xs, np.exp(Ys), np.exp(lo), np.exp(hi)
+    return xs, Ys, lo, hi
+
+
+def _draw_fit(plot, x, y, kind, col, style):
+    r = _fit_xy(np.asarray(x, float), np.asarray(y, float), kind)
+    if r is None:
+        return
+    xs, ys, lo, hi = r
+    if style.fit_ci:
+        top = plot.plot(xs, hi, pen=None)
+        bot = plot.plot(xs, lo, pen=None)
+        plot.addItem(pg.FillBetweenItem(top, bot,
+                                        brush=pg.mkBrush(*col, max(25, style.fill_alpha // 2))))
+    plot.plot(xs, ys, pen=pg.mkPen(col, width=style.line_width, style=QtCore.Qt.DashLine))
 
 
 def _trend(plot, centres, style):
@@ -86,6 +139,7 @@ def strip(plot, per_rec, metric, design, pick_cb=None, style=None):
         sp.addPoints(spots)
         _pick(sp, pick_cb)
         plot.addItem(sp)
+        _legend_entry(plot, cond, col, style)
         vals = np.array([s["pos"][1] for s in spots])
         mean = vals.mean()
         centres[i] = mean
@@ -117,6 +171,7 @@ def box(plot, per_rec, metric, design, style=None):
         q1, med, q3 = np.percentile(v, [25, 50, 75])
         centres[i] = med
         col = _rgb(design.color(cond))
+        _legend_entry(plot, cond, col, style)
         pen = pg.mkPen(col, width=lw)
         for x0, y0, x1, y1 in [(i - .25, q1, i + .25, q1), (i - .25, q3, i + .25, q3),
                                (i - .25, q1, i - .25, q3), (i + .25, q1, i + .25, q3)]:
@@ -159,6 +214,7 @@ def bars(plot, per_rec, metric, design, style=None):
         if v.size == 0:
             continue
         col = _rgb(design.color(cond))
+        _legend_entry(plot, cond, col, style)
         mean = float(v.mean())
         centres[i] = mean
         sem = float(v.std(ddof=1) / np.sqrt(v.size)) if v.size > 1 else 0.0
@@ -188,6 +244,7 @@ def superplot(plot, per_cell, per_rec, metric, design, style=None):
     centres = [np.nan] * len(conds)
     for i, cond in enumerate(conds):
         cc = per_cell[per_cell["condition"] == cond]
+        _legend_entry(plot, cond, _rgb(design.color(cond)), style)
         for ri, rec in enumerate(cc["recording"].unique()):
             v = cc[cc["recording"] == rec][metric].to_numpy(float)
             v = v[np.isfinite(v)]
@@ -218,25 +275,37 @@ def ensemble_msd(plot, msd, design, stat, style=None):
     if msd is None or msd.empty:
         plot.setTitle("no ensemble MSD (recompute to build it)")
         return
-    ens = compare.ensemble_by_condition(msd, stat=stat)
+    ens = compare.ensemble_by_condition(msd, stat=stat, bin_min=style.msd_bin_min)
+    log = style.msd_log
     eps = 1e-9                       # log axes need strictly-positive values
     for cond in compare.order_conditions(ens, order=design.condition_order()):
         tau, centre, lo, hi = ens[cond]
-        keep = np.isfinite(tau) & np.isfinite(centre) & (centre > 0)
+        keep = np.isfinite(tau) & np.isfinite(centre) & (not log or centre > 0)
         if keep.sum() < 1:
             continue
-        tau, centre = tau[keep], np.maximum(centre[keep], eps)
-        lo, hi = np.maximum(lo[keep], eps), np.maximum(hi[keep], eps)
+        tau, centre, lo, hi = tau[keep], centre[keep], lo[keep], hi[keep]
+        if log:                      # clamp the band so the log transform is defined
+            centre, lo, hi = (np.maximum(centre, eps), np.maximum(lo, eps),
+                              np.maximum(hi, eps))
         col = _rgb(design.color(cond))
         # add the band's bound curves to the plot (pen=None) so they inherit its
         # log mode — a bare FillBetweenItem over loose curves renders misaligned
         top = plot.plot(tau, hi, pen=None)
         bot = plot.plot(tau, lo, pen=None)
         plot.addItem(pg.FillBetweenItem(top, bot, brush=pg.mkBrush(*col, style.fill_alpha)))
-        plot.plot(tau, centre, pen=pg.mkPen(col, width=style.line_width))
+        plot.plot(tau, centre, pen=pg.mkPen(col, width=style.line_width), name=cond)
+        if style.msd_points:
+            # markers + per-point error bars drawn as PlotDataItems so they share
+            # the plot's log mode (ErrorBarItem/ScatterPlotItem would not)
+            plot.plot(tau, centre, pen=None, symbol="o", symbolSize=style.point_size,
+                      symbolBrush=pg.mkBrush(*col, 235), symbolPen=pg.mkPen("k"))
+            for k in range(len(tau)):
+                plot.plot([tau[k], tau[k]], [lo[k], hi[k]],
+                          pen=pg.mkPen(col, width=style.line_width))
     band = "median + 95% CI" if stat == "median" else "mean ± SEM"
-    _axes(plot, style, left="MSD (µm²)", bottom="lag τ (min)", logx=True, logy=True,
-          title=f"ensemble MSD by condition ({band})")
+    binned = f" · {style.msd_bin_min}-min bins" if style.msd_bin_min else ""
+    _axes(plot, style, left="MSD (µm²)", bottom="lag τ (min)", logx=log, logy=log,
+          title=f"ensemble MSD by condition ({band}{binned})")
 
 
 def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
@@ -249,12 +318,17 @@ def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
         spots = [{"pos": (float(r[mx]), float(r[my])), "data": r["recording"]}
                  for _, r in sub.iterrows()
                  if np.isfinite(r[mx]) and np.isfinite(r[my])]
+        col = _rgb(design.color(cond))
         if spots:
             sp = pg.ScatterPlotItem(size=style.point_size, pen=pg.mkPen("k"),
-                                    brush=pg.mkBrush(*_rgb(design.color(cond)), 220))
+                                    brush=pg.mkBrush(*col, 220))
             sp.addPoints(spots)
             _pick(sp, pick_cb)
             plot.addItem(sp)
+            _legend_entry(plot, cond, col, style)
+        if style.fit_kind != "none" and style.fit_groups:
+            _draw_fit(plot, sub[mx].to_numpy(float), sub[my].to_numpy(float),
+                      style.fit_kind, col, style)
     x = per_rec[mx].to_numpy(float)
     y = per_rec[my].to_numpy(float)
     ok = np.isfinite(x) & np.isfinite(y)
@@ -263,12 +337,8 @@ def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
         from scipy.stats import spearmanr
         rho, p = spearmanr(x[ok], y[ok])
         title += f"   (Spearman ρ={rho:.2f}, p={p:.3f})"
-    if style.trendline and ok.sum() >= 2:
-        a, b = np.polyfit(x[ok], y[ok], 1)
-        xr = np.array([x[ok].min(), x[ok].max()])
-        plot.plot(xr, a * xr + b,
-                  pen=pg.mkPen((255, 215, 0), width=style.line_width,
-                               style=QtCore.Qt.DashLine))
+    if style.fit_kind != "none" and (style.fit_all or not style.fit_groups):
+        _draw_fit(plot, x, y, style.fit_kind, (255, 215, 0), style)
     _axes(plot, style, left=metric_docs.axis_label(my), bottom=metric_docs.axis_label(mx),
           logx=style.log_x, logy=style.log_y, title=title)
 
@@ -296,12 +366,13 @@ def histogram(plot, per_cell, metric, design, style=None):
             continue
         h, _ = np.histogram(v, bins=edges, density=style.hist_density)
         col = _rgb(design.color(cond))
+        _legend_entry(plot, cond, col, style)
         if style.hist_bars:
             plot.addItem(pg.BarGraphItem(x=centres, height=h, width=width,
                                          brush=pg.mkBrush(*col, style.fill_alpha),
                                          pen=pg.mkPen(col)))
         else:
-            plot.addItem(pg.PlotCurveItem(centres, h, name=cond, fillLevel=0,
+            plot.addItem(pg.PlotCurveItem(centres, h, fillLevel=0,
                                           pen=pg.mkPen(col, width=style.line_width),
                                           brush=pg.mkBrush(*col, style.fill_alpha)))
     _axes(plot, style, left="density" if style.hist_density else "cells",

@@ -5,6 +5,35 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Comparison graph options expanded + save/load results
+
+A big batch of Comparison-window graph options + results persistence.
+
+- **Ensemble MSD**: `PlotStyle.msd_bin_min` (τ-bin width, `compare.ensemble_by_condition`
+  rebins display-time), `msd_log` (log-log ↔ **linear axes**), `msd_points`
+  (markers + per-point error bars, drawn as log-safe `PlotDataItem`s).
+- **Group visibility**: a dynamic **Show groups** section in the style dialog
+  (`PlotStyleDialog.set_groups`) → `CompareWindow.hidden_groups`; hidden groups
+  drop from the **graphs** only (Stats / Data still cover all).
+- **Background colour** (`PlotStyle.background`: default/black/white/grey, applied
+  with a contrasting foreground in `_axes`) + **legend** (`PlotStyle.legend`,
+  per-plot legends managed by `_prep_legend` + `_legend_entry`).
+- **Scatter fit lines** (`fit_kind` linear/power/exponential/log · `fit_all` ·
+  `fit_groups` · `fit_ci` ±SE band — `_fit_xy`/`_draw_fit`), for individual groups
+  and/or all data.
+- **Save / load comparison results** (`compare.save_results`/`load_results` +
+  `ResultsIOMixin`): a **Results ▾** toolbar menu (Save / Load / Export CSVs) — the
+  computed per-cell + MSD frames (+ design / exclusions) reload without recompute.
+- **Config ▸ Comparison plot options…** in the main viewer opens the style dialog
+  (`open_compare_plot_options`).
+- File-size hygiene: results I/O + CSV export moved into `compare_tables.ResultsIOMixin`.
+
+Tests: `pytest` **45 passed** (new save/load roundtrip). The compare smoke drives
+background / legend / fits / msd-points / τ-bin / linear / group-visibility /
+save-load / the Config entry. Both GUI smokes green; all files < 500 lines.
+
+---
+
 ## 2026-06-14 — Comparison: crowding/edge filters, trendlines, MSD-plot fix
 
 Three Comparison-window improvements.

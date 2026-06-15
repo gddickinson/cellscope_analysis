@@ -171,6 +171,12 @@ class WindowActionsMixin:
         self._task.run(work, done, failed)
 
     # -- comparison window ----------------------------------------------
+    def open_compare_plot_options(self):
+        """Open the Comparison window's plot-style (graph options) editor."""
+        self.open_compare_window()
+        if self._compare_window is not None:
+            self._compare_window._open_style_dialog()
+
     def open_compare_window(self):
         if self._compare_window is None:
             from .compare_window import CompareWindow
