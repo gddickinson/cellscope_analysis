@@ -190,7 +190,11 @@ the immediate sub-folder name is used as the **condition**. The bundled syntheti
 |---|---|
 | Recording | `*.ome.tif`, `(T, C, H, W)` uint16 + `*.ome.json` (`um_per_px`, `time_interval_min`, `channel_names`) |
 | Masks | `masks.npz`, key `labels`, `(T, H, W)` int32 — `0`=bg, positive IDs track-consistent |
-| Divisions | `pipeline_results/divisions.json` (optional) — parent→daughter events |
+
+The **mask label stack is the single analysis input** — every metric (shape, motion,
+edge, state, **lineage / divisions**) is computed from it *in this project*. Pre-cleaning
+pipeline artifacts (e.g. `divisions.json`) are not read, so IDs/edits made before the
+masks were finalised never leak into a result.
 
 **What the data is + how masks were made** — see [`docs/DATA.md`](docs/DATA.md).
 

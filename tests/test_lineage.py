@@ -44,3 +44,44 @@ def test_valid_divisions_empty():
     assert lineage.valid_divisions([], _labels()) == []
     # all events reference missing tracks → nothing survives (the Pos60 case)
     assert lineage.valid_divisions([_div(11, 16, 63), _div(21, 16, 55)], _labels()) == []
+
+
+def _disc(L, t, cid, cy, cx, r):
+    yy, xx = np.ogrid[:L.shape[1], :L.shape[2]]
+    L[t][(yy - cy) ** 2 + (xx - cx) ** 2 <= r * r] = cid
+
+
+def test_infer_divisions_detects_a_split():
+    """A new daughter appearing adjacent to a parent present the previous frame
+    is a division; a cell entering at the border, and a distant new cell, are not."""
+    L = np.zeros((5, 60, 60), np.int32)
+    for t in range(5):
+        _disc(L, t, 1, 30, 20, 8)            # parent: present all frames
+    for t in range(2, 5):
+        _disc(L, t, 2, 30, 34, 7)            # daughter: appears frame 2, beside parent 1
+    for t in range(2, 5):
+        _disc(L, t, 3, 4, 4, 6)              # enters at the border frame 2 → not a division
+    for t in range(3, 5):
+        _disc(L, t, 4, 50, 50, 6)            # distant new cell → not a division
+    ev = lineage.infer_divisions(L)
+    assert len(ev) == 1, ev
+    e = ev[0]
+    assert e["parent"] == 1 and e["daughter"] == 2 and e["frame"] == 2
+    assert lineage.relatives(ev, 1) == ([], [2])
+    assert lineage.relatives(ev, 2) == ([1], [])
+    # every inferred event references real tracks present in the stack
+    ids = lineage.present_ids(L)
+    assert all(e["parent"] in ids and e["daughter"] in ids for e in ev)
+
+
+def test_infer_divisions_none_for_simple_motion():
+    """A single cell translating across frames → no spurious divisions."""
+    L = np.zeros((6, 60, 60), np.int32)
+    for t in range(6):
+        _disc(L, t, 1, 30, 10 + 4 * t, 7)
+    assert lineage.infer_divisions(L) == []
+
+
+def test_infer_divisions_degenerate():
+    assert lineage.infer_divisions(np.zeros((1, 10, 10), np.int32)) == []
+    assert lineage.infer_divisions(np.zeros((4, 10, 10), np.int32)) == []   # empty

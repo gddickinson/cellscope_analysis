@@ -85,9 +85,9 @@ class CellTablePanel(AsyncComputeMixin, QtWidgets.QWidget):
         self.title.setText(f"Per-cell table — {len(self._df)} cells")
 
     def _add_division_columns(self):
-        """Insert parent / daughters columns (label IDs) from divisions.json —
-        a cell with a `parent` is a child; a cell with `daughters` is a parent.
-        Only added when the recording has division events."""
+        """Insert parent / daughters columns (label IDs) from the divisions
+        inferred from the masks — a cell with a `parent` is a child; a cell with
+        `daughters` is a parent. Only added when a real relationship exists."""
         if self._df is None or self._df.empty or not self._divisions:
             return
         present = {int(c) for c in self._df["cell_id"]}     # only real, in-table cells

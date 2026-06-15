@@ -103,7 +103,9 @@ Read this before opening source files. Update it when modules change.
 - **dataset.py** — `discover(roots)` → sorted `[Entry]`; an `Entry`
   (`label`, `condition`, `recording_path`, `mask_path`) loads its recording
   / masks lazily. A folder qualifies if it has a `*.ome.tif` + (ideally)
-  `pipeline_results/masks.npz`.
+  `pipeline_results/masks.npz`. The mask label stack is the **only** analysis
+  input — the pipeline's pre-cleaning `divisions.json` is not read (lineage is
+  derived from the masks; see `analysis.lineage.infer_divisions`).
 
 ### maskviewer/gui/  — PyQt5 + pyqtgraph (dockable workbench)
 - **image_view.py** — `ImageCanvas`: base grayscale `ImageItem` (user LUT +
@@ -432,9 +434,11 @@ Read this before opening source files. Update it when modules change.
 - **test_edge_intensity.py** — `edge_intensity`: rectangle sampling shape/coverage,
   correlation sign ±, movement classification + protrude−retract Δ, degenerate
   inputs, `rectangles_for_frame`, end-to-end `analyze_cell` (synthetic cells).
-- **test_lineage.py** — `lineage.present_ids` / **`valid_divisions`** — division
-  events referencing a track absent from the cleaned masks (the Pos60-DMSO phantom
-  `→16` / `21→` case) are dropped; valid ones survive and drive `relatives`.
+- **test_lineage.py** — `lineage`: `present_ids` / `valid_divisions` (drop events
+  referencing absent tracks — the Pos60-DMSO `→16` / `21→` case), and
+  **`infer_divisions`** (a synthetic split is detected as parent→daughter; a cell
+  entering at the border, a distant new cell, and simple translation are not;
+  degenerate inputs → `[]`).
 - **test_registration_fov.py** — `registration` (integer + sub-pixel shift
   round-trip, **bounded peak rejects a far spurious shift**, flat→0, stack shift,
   no-op) and `fov` (auto-detect border trim, full-frame-when-clean, on a stack,
