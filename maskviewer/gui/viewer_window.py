@@ -373,18 +373,16 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                     for c, r in props.items()}
         if ov["trails"] and self.masks is not None:
             history = self._centroid_history()
-        div_pts = None
+        division_links = None
         if self.canvas.overlays.show["divisions"] and self.divisions:
-            div_pts = []
+            division_links = []
             for d in self.divisions:
-                if d["frame"] == t:
-                    for key in ("parent_centroid", "daughter_centroid"):
-                        c = d.get(key)
-                        if c:
-                            div_pts.append((c[0], c[1]))
+                p, c = d.get("parent_centroid"), d.get("daughter_centroid")
+                if d["frame"] == t and p and c:
+                    division_links.append((tuple(p), tuple(c)))
         self.canvas.overlays.update_overlay(
             info_text=self._info_text(t), centroids=centroids, history=history,
-            frame=t, selected=self.selected, bbox=bbox, division_pts=div_pts)
+            frame=t, selected=self.selected, bbox=bbox, division_links=division_links)
 
     def _info_text(self, t):
         r = self.recording

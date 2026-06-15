@@ -119,7 +119,9 @@ Read this before opening source files. Update it when modules change.
 - **colorby.py** — `overlay_lut(win, lab)` → `(label-LUT, legend)` for the
   current colour-by metric (legend = lo/hi/cmap/units for the colour bar).
 - **overlays.py** — `Overlays`: scale bar, frame/time text, cell-ID labels,
-  track trails, selected-cell highlight; corner items re-anchor on pan/zoom.
+  track trails, selected-cell highlight, and **division links** (a parent→daughter
+  line, parent = open circle, daughter = diamond, at each division's frame); corner
+  items re-anchor on pan/zoom.
 - **luts.py** — `build_lut(colormap, gamma, invert)` → RGBA LUT, `PRESETS`,
   and `DisplayState` (the per-channel levels/colormap/gamma/invert record).
   No Qt import (testable headless).
