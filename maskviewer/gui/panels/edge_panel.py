@@ -183,7 +183,7 @@ class EdgePanel(QtWidgets.QWidget):
 
     def _channel_stack(self):
         ch = self._fluor_channel()
-        return None if ch is None else self._rec.data[:, ch]
+        return None if ch is None else self._rec.aligned_channel(ch)
 
     def _compute_fluor(self):
         self._ifr = self._int = self._disp = self._inten = None

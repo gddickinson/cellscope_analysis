@@ -187,6 +187,29 @@ class WindowActionsMixin:
         self._compare_window.show()
         self._compare_window.raise_()
 
+    def _current_index(self):
+        return max(self.display.recording.currentIndex(), 0)
+
+    def open_prep_dialog(self):
+        """Channel alignment + FOV (non-destructive pre-analysis correction)."""
+        if self.recording is None or not self.entries:
+            return
+        from .prep_dialog import PrepDialog
+        label = self.entries[self._current_index()].label
+        PrepDialog(self.recording, label, self.project.correction_for(label),
+                   self._apply_correction, self).exec_()
+
+    def _apply_correction(self, correction):
+        label = self.entries[self._current_index()].label
+        if not correction.get("shifts") and not correction.get("fov"):
+            self.project.corrections.pop(label, None)
+        else:
+            self.project.corrections[label] = correction
+        self._load_entry(self._current_index())       # reload → re-apply, not cumulative
+        if self.selected:
+            self.select_cell(self.selected)
+        self.status.showMessage(f"Applied alignment / FOV to {label}", 5000)
+
     def export_csv(self):
         if self.masks is None or self.recording is None:
             QtWidgets.QMessageBox.information(

@@ -192,6 +192,12 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
             self.status.showMessage(f"Load failed: {exc}", 8000)
             self.recording = self.masks = None
             return
+        # pre-analysis corrections (channel alignment + FOV crop), non-destructive
+        from ..io import recording as _rec
+        from ..analysis import fov as _fov
+        _rec.apply_correction(self.recording, self.project.correction_for(entry.label))
+        if self.recording.fov and self.masks is not None:
+            self.masks.labels = _fov.apply_fov(self.masks.labels, self.recording.fov)
         self._display = {}
         self.selected = 0
         self._cent_hist = self._track_len = self._mean_speed = None

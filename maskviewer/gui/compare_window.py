@@ -21,7 +21,7 @@ from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
 from .compare_tables import (StatsTablesMixin, ResultsIOMixin, ComputeWorker,
-                             show_metrics_help)
+                             corrections_tag, show_metrics_help)
 from ..io import recording as _recording
 from .compare_filters import FilterMixin
 from .plot_style import PlotStyle, PlotStyleMixin
@@ -350,8 +350,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
     def _cache_path(self):
         fl = self._fluor_choice()
         ch = "_" + "".join(c if c.isalnum() else "" for c in fl) if fl else ""
-        return os.path.join(PROJECT_ROOT, "analysis_out",
-                            f"_compare_{self._safe}_lag{self.lags.value()}{ch}.pkl")
+        return os.path.join(PROJECT_ROOT, "analysis_out", f"_compare_{self._safe}"
+            f"_lag{self.lags.value()}{ch}{corrections_tag(self.project.corrections)}.pkl")
 
     def _compute(self):
         if self._thread is not None and self._thread.isRunning():
@@ -372,7 +372,7 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.busy.start(f"Measuring {len(self.project.entries)} recordings")
         self._thread = QtCore.QThread(self)
         self._worker = ComputeWorker(self.project.entries, self.lags.value(),
-                                     self._fluor_choice())
+                                     self._fluor_choice(), self.project.corrections)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.busy.update)

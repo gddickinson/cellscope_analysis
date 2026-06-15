@@ -57,10 +57,15 @@ class Project:
     path: str | None = None
     excluded: set = field(default_factory=set)    # recording labels dropped from compare
     overrides: dict = field(default_factory=dict)  # recording label -> group (condition)
+    corrections: dict = field(default_factory=dict)  # label -> {shifts, fov} (pre-analysis)
 
     def group_of(self, entry):
         """The comparison group of a recording (override wins over its folder)."""
         return self.overrides.get(entry.label, entry.condition or "?")
+
+    def correction_for(self, label):
+        """Pre-analysis correction (channel shifts + FOV) for a recording, or {}."""
+        return self.corrections.get(label, {})
 
     def included_entries(self):
         return [e for e in self.entries if e.label not in self.excluded]
@@ -210,14 +215,16 @@ def load_project(path):
     name = blob.get("name") or os.path.splitext(os.path.basename(path))[0]
     return Project(name, roots, entries, design, path=path,
                    excluded=set(blob.get("excluded", [])),
-                   overrides=dict(blob.get("overrides", {})))
+                   overrides=dict(blob.get("overrides", {})),
+                   corrections=dict(blob.get("corrections", {})))
 
 
 def save_project(project, path):
     blob = {"name": project.name, "data_roots": project.data_roots,
             "arms": project.design.arms, "vehicle": project.design.vehicle,
             "colors": project.design.colors,
-            "excluded": sorted(project.excluded), "overrides": project.overrides}
+            "excluded": sorted(project.excluded), "overrides": project.overrides,
+            "corrections": project.corrections}
     with open(path, "w") as f:
         json.dump(blob, f, indent=2)
     project.path = path
