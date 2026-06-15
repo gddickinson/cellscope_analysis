@@ -186,7 +186,7 @@ Read this before opening source files. Update it when modules change.
   **`set_filter_note`** "filtered: …" suffix to every title when filters are active).
 - **plot_style.py** — `PlotStyle` (dataclass of render options — fonts / marker+line
   size / fill opacity / grid / log axes / **background** / **legend** / histogram
-  bins+bars / **MSD τ-bin + linear axis + point markers** / **trendline** /
+  bins+bars / **MSD τ-bin + max-lags + linear axis + point markers** / **trendline** /
   **scatter fit** (two combos: model = linear / polynomial-2 / polynomial-3 /
   power / exponential / log, applied to all-data / per-group / both, + ±SE band) /
   **filter annotation**; QSettings-persisted) + `PlotStyleDialog` (non-modal live editor, incl. a dynamic **Show
@@ -293,7 +293,8 @@ Read this before opening source files. Update it when modules change.
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
   MSD), `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
-  `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves),
+  `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
+  τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
   `per_condition_summary` (per-group n / mean / SEM / median over recordings —
   the Data tab), `save_results` / `load_results` (pickle the computed per-cell +

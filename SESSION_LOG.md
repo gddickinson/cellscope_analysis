@@ -5,6 +5,16 @@ change. Most recent first.
 
 ---
 
+## 2026-06-14 — Ensemble-MSD max-lag display option
+
+Exposed the ensemble-MSD lag count as a plot option: `PlotStyle.msd_max_lag`
+(graph options "Ensemble-MSD max lags", 0 = all) caps the number of lags/bins
+shown — `compare.ensemble_by_condition(max_lag=…)` keeps the first N (smallest τ),
+display-time (no recompute; the computed ceiling stays 30 lags). `pytest` 46
+passed (new ensemble_by_condition test); smokes green.
+
+---
+
 ## 2026-06-14 — Filter annotations, scatter-fit redesign, MSD-lag clarity
 
 - **Filter annotations**: a `show_filter_note` option (graph options) labels the

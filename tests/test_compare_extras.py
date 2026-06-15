@@ -66,6 +66,21 @@ def test_border_distance_metric():
     assert abs(df.iloc[0]["min_border_dist_um"] - 49.5 * 0.5) < 1.0
 
 
+def test_ensemble_by_condition_bin_and_maxlag():
+    rows = [{"recording": r, "condition": "WT", "tau": (k + 1) * 10.0,
+             "msd": (k + 1) * 5.0} for r in ("a", "b") for k in range(10)]
+    msd = pd.DataFrame(rows)
+    # native: 10 lags at 10,20,…,100
+    tau, c, lo, hi = compare.ensemble_by_condition(msd)["WT"]
+    assert len(tau) == 10 and tau[0] == 10.0 and tau[-1] == 100.0
+    # max_lag caps to the first N lags
+    tau3 = compare.ensemble_by_condition(msd, max_lag=3)["WT"][0]
+    assert list(tau3) == [10.0, 20.0, 30.0]
+    # binning groups lags; bin x = mean of the real lags it holds (≥ first lag)
+    tb = compare.ensemble_by_condition(msd, bin_min=50)["WT"][0]
+    assert len(tb) < 10 and tb.min() >= 10.0
+
+
 def test_save_load_results_roundtrip(tmp_path):
     pc = pd.DataFrame({"recording": ["a", "b"], "condition": ["WT", "KO"],
                        "cell_id": [1, 2], "mean_area_um2": [100.0, 200.0]})

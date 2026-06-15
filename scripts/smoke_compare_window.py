@@ -137,12 +137,13 @@ def drive(win, label):
     sd._widgets["fit_ci"].setChecked(True)
     sd._widgets["msd_points"].setChecked(True)
     sd._widgets["msd_bin_min"].setValue(20)
+    sd._widgets["msd_max_lag"].setValue(5)
     sd._widgets["msd_log"].setChecked(False)
     app.processEvents()
     assert (win.style.background == "white" and win.style.legend
             and win.style.fit_kind == "power" and win.style.fit_target == "both"
             and win.style.msd_points and win.style.msd_bin_min == 20
-            and not win.style.msd_log)
+            and win.style.msd_max_lag == 5 and not win.style.msd_log)
     win.tabs.setCurrentIndex(2); app.processEvents()      # scatter (fits + CI)
     win.tabs.setCurrentIndex(1); app.processEvents()      # msd (points / bins / linear)
     win.tabs.setCurrentIndex(0); app.processEvents()

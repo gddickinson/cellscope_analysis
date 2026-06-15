@@ -79,7 +79,7 @@ def build_comparison(entries, progress_cb=None, with_solidity=False):
     return per_cell, msd
 
 
-def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0):
+def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0, max_lag=0):
     """{condition: (tau, centre, lo, hi)} ensemble MSD across recordings.
 
     stat='mean' → mean ± SEM; stat='median' → median + bootstrap 95% CI (over
@@ -88,7 +88,8 @@ def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0):
     bins and pooled (smooths noisy long lags); each bin is plotted at the *mean*
     of the real lags it holds (so the x never drops below the smallest lag) — a
     display-time rebinning, no recompute. With ``bin_min`` = 0 the native lags
-    (one frame interval apart) are used unchanged.
+    (one frame interval apart) are used unchanged. ``max_lag`` > 0 keeps only the
+    first ``max_lag`` lags/bins (drops noisy long τ) — also display-time.
     """
     out = {}
     if msd_long is None or msd_long.empty:
@@ -124,7 +125,9 @@ def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0):
                 mean = float(v.mean())
                 sem = float(v.std(ddof=1) / np.sqrt(v.size)) if v.size > 1 else 0.0
                 centre.append(mean); lo.append(mean - sem); hi.append(mean + sem)
-        out[cond] = (np.array(taus), np.array(centre), np.array(lo), np.array(hi))
+        n = max_lag if (max_lag and max_lag > 0) else None     # keep first N lags
+        out[cond] = (np.array(taus[:n]), np.array(centre[:n]),
+                     np.array(lo[:n]), np.array(hi[:n]))
     return out
 
 
