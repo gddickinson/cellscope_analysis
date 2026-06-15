@@ -300,7 +300,8 @@ def ensemble_msd(plot, msd, design, stat, style=None):
     if msd is None or msd.empty:
         plot.setTitle("no ensemble MSD (recompute to build it)")
         return
-    ens = compare.ensemble_by_condition(msd, stat=stat, bin_min=style.msd_bin_min)
+    ens = compare.ensemble_by_condition(msd, stat=stat, bin_min=style.msd_bin_min,
+                                        max_lag=style.msd_max_lag)
     log = style.msd_log
     eps = 1e-9                       # log axes need strictly-positive values
     for cond in compare.order_conditions(ens, order=design.condition_order()):

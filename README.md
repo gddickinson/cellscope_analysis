@@ -54,8 +54,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   log axes, histogram bins, bars-vs-points, **trendlines**, **scatter fit lines**
   (linear / polynomial / power / exp / log; all-data / per-group / both; ±SE band),
   **background colour**, a
-  **legend**, **which groups are shown**, ensemble-MSD **τ-bin / linear axis /
-  point markers**, and a **filter annotation** that labels graphs + tables when
+  **legend**, **which groups are shown**, ensemble-MSD **τ-bin / max lags / linear
+  axis / point markers**, and a **filter annotation** that labels graphs + tables when
   filtering is active (persisted; also via main-window **Config ▸ Comparison plot
   options**). **Results ▾** saves / loads the computed comparison results
   (reload without recompute) or exports CSVs. Background compute + per-project

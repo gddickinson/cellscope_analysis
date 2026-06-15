@@ -31,6 +31,7 @@ class PlotStyle:
     hist_density: bool = True     # density vs raw cell counts
     hist_bars: bool = False       # filled bars vs outlined step curve
     msd_bin_min: int = 0          # ensemble-MSD lag-τ bin width (min); 0 = raw lags
+    msd_max_lag: int = 0          # ensemble-MSD: keep only the first N lags; 0 = all
     msd_log: bool = True          # ensemble MSD on log-log axes (else linear)
     msd_points: bool = False      # draw markers + error bars at each MSD lag
     background: str = "default"   # plot background: default / black / white / grey
@@ -66,7 +67,8 @@ class PlotStyleDialog(QtWidgets.QDialog):
               ("line_width", "Line width", 1, 10),
               ("fill_alpha", "Fill opacity (0–255)", 0, 255),
               ("hist_bins", "Histogram bins", 5, 120),
-              ("msd_bin_min", "Ensemble-MSD τ bin (min, 0=off)", 0, 240)]
+              ("msd_bin_min", "Ensemble-MSD τ bin (min, 0=off)", 0, 240),
+              ("msd_max_lag", "Ensemble-MSD max lags (0=all)", 0, 200)]
     _COMBOS = [("background", "Background", ["default", "black", "white", "grey"]),
                ("fit_kind", "Scatter fit model",
                 ["none", "linear", "polynomial (2)", "polynomial (3)",

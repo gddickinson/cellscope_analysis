@@ -135,7 +135,8 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   **which groups are shown**, histogram bins/bars, **trendlines** (connect group
   means), **scatter fit lines** (model combo linear / polynomial-2/3 / power / exp /
   log × target all-data / per-group / both, ±SE band),
-  and ensemble-MSD **τ-bin size / linear axis / point markers + error bars**, plus
+  and ensemble-MSD **τ-bin size / max lags / linear axis / point markers + error
+  bars**, plus
   a **filter annotation** that labels graphs + tables with the active filters; the
   Distributions tab adds a **Bars (mean ± SEM)** view. **Results ▾** saves / loads
   the computed results (reload without recompute) + exports CSVs.
