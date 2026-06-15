@@ -143,8 +143,10 @@ Read this before opening source files. Update it when modules change.
     the enabled-metric set (QSettings-persisted); `set_metric_enabled` recomputes
     immediately.
   - **edge_panel.py** `EdgePanel` — velocity / radius **kymograph** (angle×time,
-    blue=retraction/red=protrusion), a per-frame edge map, **and (with a Fluor
-    channel chosen — PIEZO1, SiR-actin, any signal) the faithful edge-movement ↔
+    blue=retraction/red=protrusion), a per-frame **edge-this-frame** map (the cell
+    boundary coloured by any per-sector metric — velocity / radius / intensity),
+    **and (with a Fluor channel chosen — PIEZO1, SiR-actin, any signal) the faithful
+    edge-movement ↔
     intensity views**: a rectangle-intensity kymograph, the **edge-displacement vs
     intensity scatter** coloured by movement class (with regression line + r/R²/p),
     and a per-frame **sampling-rectangles** overlay (`analysis.edge_intensity`);
