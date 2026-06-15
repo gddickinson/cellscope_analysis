@@ -3,7 +3,7 @@
 Plot types: every cell's time-course; population mean ± SEM/SD; histogram;
 flower plot (origin-centred trajectories); scatter of one metric vs another
 (per cell, click a point to select that cell); lineage tree and division
-timeline (from divisions.json). Filters: min track length, cell state, exclude
+timeline (divisions inferred from the masks). Filters: min track length, state, exclude
 edge. The per-(cell, frame) table is built once on Compute and cached. Inspired
 by CellScope's flower / comparison / lineage plots.
 """

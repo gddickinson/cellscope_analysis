@@ -5,6 +5,39 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Lineage derived from masks; no pre-cleaning artifacts in any metric
+
+Principle (from the phantom-division bug): **the loaded mask label stack is the
+single analysis input** — every metric must be computed in-project from it, so IDs
+or edits made before the masks were finalised are irrelevant. Audited the whole
+package and closed the one live violation (lineage).
+
+- **Audit result**: the live GUI analysis (shape, motion, edge, state, population,
+  comparison via `build_comparison` + `state_metrics`) is already masks-derived; it
+  uses `feature_tables` only for **constants** (`COND_COLOR`/`ARMS`) and **pure stats**
+  (`arm_tests`), never its CSV readers. The only pre-cleaning dependency in the live
+  path was **`divisions.json`**. (`feature_tables`' CSV/pickle readers are used solely
+  by the exploratory follow-up scripts for cross-checking the original pipeline — now
+  documented as legacy/validation-only.)
+- **Lineage now derived from the masks**: new `lineage.infer_divisions(labels)` infers
+  divisions from the track topology — a daughter track that first appears adjacent to
+  a parent present the previous frame (centroid within rₚ+r_d; not first seen at the
+  image border = entering the FOV). Every event references real, surviving tracks.
+- **`divisions.json` reading removed entirely**: deleted `io/divisions.py` +
+  `Entry.load_divisions` + exports; `viewer_window` computes `self.divisions =
+  lineage.infer_divisions(labels)` on load. (`lineage.valid_divisions` kept as a
+  generic safety util.)
+- **On real Pos60-DMSO** the masks-derived inference gives the *correct* lineage —
+  **8 → 11 at frame 68** (the cleaned masks really do show track 11 emerging beside
+  track 8, matching the reported expectation), with **no phantom cell 16**. The cell
+  table now shows cell 8 `daughters=11` and cell 11 `parent=8`.
+
+Tests: `tests/test_lineage.py` gains `infer_divisions` coverage (split detected;
+border-entry / distant-cell / translation not; degenerate → []). `pytest` **71 passed**;
+four GUI smokes green; all files < 500 lines.
+
+---
+
 ## 2026-06-15 — Fix phantom divisions (validate against the cleaned masks)
 
 Bug (real data, Pos60-DMSO): the cell table showed cell 11 with `daughters = 16`

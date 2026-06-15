@@ -1,11 +1,24 @@
-"""Load the CellScope IC295 result artifacts (via the data/ symlinks) and
-provide the experimental design + arm-structured statistics.
+"""Experimental-design constants + arm-structured statistics, and (legacy) loaders
+for the original CellScope IC295 result artifacts.
 
-This couples to CellScope's analysis outputs (it reads the aggregate CSVs and
-the per-cell track cache it produced — see docs/DATA.md), so it lives apart
-from the generic `label_stats`. It is the data layer for the follow-up
-analyses (multivariate / dynamics / interactions) that probe for treatment
-effects beneath the state + contact confounds.
+**Two parts, kept clearly separate:**
+  * **Constants + pure stats** — `COND_COLOR`, `ARMS`, `VEHICLE`, `arm_tests`,
+    `stars`, `_kw`. These are the *only* things the live GUI uses, and they read
+    no files (they operate on the masks-derived comparison table built by
+    `compare.build_comparison`). The live analysis is therefore fully self-contained
+    from the loaded masks.
+  * **Legacy data-readers** — `recordings()` / `cells()` / `tracks()` read the
+    original pipeline's *pre-cleaning* aggregate CSVs + track cache (`REC_CSV` etc.).
+    These are used ONLY by the exploratory follow-up scripts (`run_followup`,
+    `plot_*`) for cross-checking against the original outputs; they are **not** part
+    of the interactive analysis (the Comparison window recomputes everything from
+    masks). Treat them as historical / validation-only.
+
+  recordings()  -> DataFrame, one row per recording (recording = unit)  [legacy]
+  cells()       -> DataFrame, one row per tracked cell (pooled)         [legacy]
+  tracks()      -> list of per-cell dicts with per-frame time series    [legacy]
+  arm_tests(by_cond) -> per-arm Kruskal-Wallis + within-arm Bonferroni
+                        pairwise + the WT-vs-DMSO vehicle MWU            [live, pure]
 
   recordings()  -> DataFrame, one row per recording (recording = unit)
   cells()       -> DataFrame, one row per tracked cell (pooled)

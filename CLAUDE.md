@@ -48,6 +48,17 @@ where the data came from. Quick summary below.
 - A "recording folder" = a `*.ome.tif` + a sibling `pipeline_results/masks.npz`.
   Discovery (`maskviewer/io/dataset.py`) walks `data_roots` for these.
 
+**Single source of truth — masks only.** Every metric in this project (shape,
+motion, edge, state, **lineage/divisions**) is computed *in-project from the loaded
+label stack* (+ the recording image for intensity + the sidecar/override scale). The
+pipeline's pre-cleaning artifacts are **not** read — in particular `divisions.json`
+is ignored; divisions are inferred from the mask track topology
+(`analysis/lineage.py::infer_divisions`). So any ID or edit made before the masks
+were finalised is irrelevant and can never leak into a result. (The follow-up
+research scripts' `feature_tables` CSV readers are the lone legacy exception — they
+read the original pipeline outputs for cross-checking and are not part of the
+interactive analysis; the Comparison window recomputes all of it from masks.)
+
 ## Where the data lives — IMPORTANT (public repo)
 
 This repo is **public**, so **no real microscopy data is committed**. Real

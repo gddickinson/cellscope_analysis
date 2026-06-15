@@ -205,12 +205,10 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._cent_hist = self._track_len = self._mean_speed = None
         self._shape_model = self._pop_df = None
         labels = self.masks.labels if self.masks is not None else None
-        # divisions.json is recorded pre-cleaning → drop events whose parent/
-        # daughter track no longer exists in the (cleaned, FOV-cropped) masks, so
-        # the cell table / cell-info / overlay never show phantom divisions.
-        self.divisions = entry.load_divisions()
-        if labels is not None and self.divisions:
-            self.divisions = lineage.valid_divisions(self.divisions, labels)
+        # Lineage is derived from the loaded masks themselves (track topology), not
+        # the pipeline's pre-cleaning divisions.json — so old/removed IDs can never
+        # leak into the cell table / cell-info / overlay / timeline.
+        self.divisions = lineage.infer_divisions(labels) if labels is not None else []
         self.cell_info.clear_cell()
         self.cell_info.divisions = self.divisions
         self.edge.clear_cell()
