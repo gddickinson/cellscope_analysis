@@ -17,6 +17,8 @@ COLOR_BY = [
     ("Eccentricity", "eccentricity"), ("Aspect ratio", "aspect_ratio"),
     ("Solidity", "solidity"), ("Extent", "extent"),
     ("Nearest-neighbour dist", "nn_dist"), ("Neighbour count", "n_neighbors"),
+    ("Contact fraction", "contact_fraction"), ("Contact count", "n_contacts"),
+    ("Contact class", "contact_state"),
     ("Mean speed", "speed"), ("Track length", "track"), ("Shape mode", "shape_mode"),
 ]
 OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
@@ -76,7 +78,7 @@ class DisplayPanel(QtWidgets.QWidget):
         self.color_by = QtWidgets.QComboBox()
         self.color_by.setToolTip("Colour cells by a calculated metric "
                                  "(the colour bar shows its units)")
-        _tipkey = {"state": "state_code"}
+        _tipkey = {"state": "state_code", "contact_state": "contact_state"}
         for i, (label, key) in enumerate(COLOR_BY):
             self.color_by.addItem(label)
             tip = metric_docs.tooltip(_tipkey.get(key, key))

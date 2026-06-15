@@ -56,6 +56,26 @@ METRICS = {
                 "frame × µm/px."),
     "n_neighbors": ("Local crowding.",
                     "Number of other cells whose centroid is within 50 µm."),
+    "contact_fraction": ("How much of the cell's membrane touches another cell.",
+                         "Boundary pixels within 1.5 px of another cell ÷ the cell's "
+                         "boundary pixels (0 = free, 1 = fully engaged). Actual mask "
+                         "adjacency — distinct from the centroid-distance nn_dist."),
+    "max_contact_fraction": ("The single largest cell–cell interface.",
+                             "Max over partners of (shared boundary px ÷ boundary px); "
+                             "the point-vs-extensive discriminator."),
+    "n_contacts": ("Number of other cells physically touching this one.",
+                   "Distinct cells with ≥2 shared boundary pixels (within 1.5 px)."),
+    "contact_length": ("Length of the cell–cell interface.",
+                       "Contacting boundary pixels × µm/px (interface extent)."),
+    "contact_state": ("Contact class: free / point / extensive.",
+                      "From max_contact_fraction: free (no contact), point (a small "
+                      "contact < 25% of the boundary) or extensive (≥ 25%)."),
+    "frac_in_contact": ("Fraction of a cell's time in contact with any other cell.",
+                        "Frames classed point or extensive ÷ all present frames."),
+    "frac_point_contact": ("Fraction of time in a small (point) contact.",
+                           "point-class frames ÷ all present frames."),
+    "frac_extensive_contact": ("Fraction of time in an extensive contact.",
+                               "extensive-class frames ÷ all present frames."),
     "frac_rounded": ("Fraction of a cell's classifiable time spent rounded.",
                      "rounded frames / (rounded + spread frames); edge-truncated "
                      "and undefined frames are excluded from the denominator."),
@@ -166,7 +186,8 @@ def column_units(col: str) -> str:
         return "min"
     if c.startswith("frac_") or c == "track_quality":
         return ""                       # fraction / 0–1 score
-    if c == "n_cells" or c.startswith("n_") or "n_neighbors" in c:
+    if (c == "n_cells" or c.startswith("n_") or "n_neighbors" in c
+            or "n_contacts" in c):
         return "count"
     if "frames" in c:
         return "frames"
