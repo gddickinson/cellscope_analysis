@@ -34,8 +34,9 @@ where the data came from. Quick summary below.
 ## Data formats (what the loaders expect)
 
 - **Recording** `*.ome.tif`: shape `(T, C, H, W)` uint16 (single-channel
-  `(T, H, W)` is promoted to `C=1`). Sidecar `*.ome.json` carries
-  `um_per_px`, `time_interval_min`, `channel_names` (e.g.
+  `(T, H, W)` is promoted to `C=1`). **Any channel count works** — 1, 2 or N;
+  the channel/composite UI builds per-channel widgets dynamically. Sidecar
+  `*.ome.json` carries `um_per_px`, `time_interval_min`, `channel_names` (e.g.
   `["Cy5", "DIC 10x", "None"]`).
 - **Masks** `pipeline_results/masks.npz`: key `labels`, shape `(T, H, W)`
   int32. `0` = background; a positive integer is one cell, **consistent
@@ -177,6 +178,17 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   design-driven and the design is editable at runtime (see the Groups &
   Comparisons editor below), so arbitrary treatments / recording counts /
   groupings compare correctly.
+- **Pre-analysis: Channel Alignment & FOV** (Analysis ▸ Channel Alignment & FOV…,
+  `gui/prep_dialog.py`): DIC↔fluorescence channels are often offset by a sub-pixel
+  shift and recordings can carry black FOV borders — both bias mask-relative
+  sampling (e.g. `edge_intensity`). The dialog aligns a moving channel to a
+  reference — **automatically** (gradient phase-correlation, `analysis/registration.py`,
+  translation-only) or by nudging dy/dx — and defines the **FOV** rectangle —
+  **automatically** (`analysis/fov.py`) or by hand — with a live grey/magenta
+  overlay preview. Corrections are **non-destructive** (per-recording channel shifts
+  + FOV stored on the `Project`, applied on read: `Recording.frame`/`aligned_channel`
+  shift the channel, masks are FOV-cropped) and reach **both display and analysis**
+  (the viewer + `compare.build_comparison(corrections=…)`). Raw files are untouched.
 - **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
   + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips

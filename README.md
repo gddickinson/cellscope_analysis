@@ -37,6 +37,14 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   protrude-vs-retract means and a t-test/Mann–Whitney). A faithful reproduction of
   the lab's `cell_edge_analysis` pipeline, adapted to closed tracked cells. Available
   per cell and as a **cross-treatment comparison metric**.
+- **Pre-analysis: channel alignment & FOV** — DIC↔fluorescence channels are often
+  offset by a small shift and recordings can carry black borders, both of which bias
+  mask-relative sampling. **Analysis ▸ Channel Alignment & FOV** aligns a channel to a
+  reference (**auto** gradient phase-correlation or manual dy/dx) and defines the
+  field of view (**auto** border-trim or a manual rectangle), with a live grey/magenta
+  overlay. Corrections are **non-destructive** (stored on the project, applied to both
+  display and analysis); recordings with **1, 2 or any number of channels** are
+  supported.
 - **Shape modes** — VAMPIRE-style clustering (mode shapes, fractions, entropy,
   eigenshapes).
 - **Population** — all cells at once: time series, mean ± SEM/SD, histogram,
@@ -90,6 +98,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
 ![edge movement vs fluorescence intensity (tagged PIEZO1 / SiR-actin / any signal) — scatter coloured by movement class with regression + r/R²/p](docs/screenshots/edge_piezo.png)
+
+![channel alignment & FOV pre-analysis — align a fluorescence channel to DIC (grey/magenta overlay) and define the field of view; non-destructive](docs/screenshots/prep_align_fov.png)
 
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
 
@@ -177,10 +187,11 @@ the immediate sub-folder name is used as the **condition**. The bundled syntheti
 
 Pure, GUI-free, testable functions in `maskviewer/analysis/` — morphometry
 (`cell_metrics`), motion (`motion`), state (`state`), nearest-neighbour
-(`neighbors`), edge dynamics (`edge_dynamics`), shape modes (`shape_modes`),
-membrane quality (`membrane`), population (`population`), lineage (`lineage`),
-CSV export (`exporters`), and metric docs (`metric_docs`). See **INTERFACE.md**
-for the full map.
+(`neighbors`), edge dynamics (`edge_dynamics`), edge-movement↔fluorescence
+(`edge_intensity`), shape modes (`shape_modes`), membrane quality (`membrane`),
+channel alignment (`registration`) + field-of-view (`fov`), population
+(`population`), lineage (`lineage`), CSV export (`exporters`), and metric docs
+(`metric_docs`). See **INTERFACE.md** for the full map.
 
 ## Tests
 

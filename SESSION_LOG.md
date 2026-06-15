@@ -5,6 +5,45 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Pre-analysis: channel alignment + FOV; any channel count
+
+Two non-destructive pre-analysis tools (the actin channel was noticed slightly
+offset from DIC, and recordings can carry black FOV borders — both bias the
+mask-relative `edge_intensity` sampling), plus a robustness pass for arbitrary
+channel counts.
+
+- **`analysis/registration.py`** (new, tested): channel **translation** alignment
+  via gradient-magnitude FFT phase-correlation (+ sub-pixel parabolic peak; robust
+  across DIC↔fluorescence; no scikit-image — implemented in numpy/scipy).
+  `estimate_shift` / `estimate_stack_shift` / `apply_shift`.
+- **`analysis/fov.py`** (new, tested): `auto_fov` (inner rectangle by trimming
+  near-zero borders; 2-D / (T,H,W) / (T,C,H,W)), `apply_fov` (zero labels outside
+  the rect), `fov_mask`, `clamp_rect`.
+- **`Recording`**: non-destructive `channel_shifts` + `fov`; `frame` /
+  `aligned_channel` apply the shift on read; `apply_correction(rec, corr)`.
+  **`Project`** persists per-recording `corrections` (JSON); `correction_for`.
+- **`gui/prep_dialog.py`** (new): **Analysis ▸ Channel Alignment & FOV…** — reference/
+  align channel pickers, **Auto-align** + manual dy/dx, **Auto-detect FOV** + manual
+  rectangle, a live grey/magenta overlay preview with the FOV box. Apply stores the
+  correction on the project + reloads (non-cumulative). `window_actions.open_prep_dialog`
+  / `_apply_correction`; menu entry in `menus.py`.
+- **Wired into display + analysis** (the chosen scope): the viewer reads aligned
+  channels (`Recording.frame`) and FOV-crops masks on load; `edge_panel` samples
+  `aligned_channel`; `compare.build_comparison(corrections=…)` aligns the fluor
+  channel + FOV-crops masks per recording (threaded via `ComputeWorker`; cache keyed
+  by `corrections_tag`). Raw files are never modified.
+- **Any channel count (1 / 2 / N):** audited — `Recording` already promotes 1-channel
+  inputs and the channel/composite UI builds widgets per channel; the new tools reduce
+  over channels generically. New `scripts/smoke_channels.py` generates 1-, 2- and
+  3-channel synthetic recordings and drives the viewer + prep dialog + edge panel +
+  comparison for each.
+
+Tests: `pytest` **63 passed** (new `tests/test_registration_fov.py`); three GUI
+smokes green (`smoke_progress`, `smoke_compare_window`, `smoke_channels`); screenshot
+`docs/screenshots/prep_align_fov.png`. All files < 500 lines.
+
+---
+
 ## 2026-06-15 — Edge movement ↔ fluorescence intensity (faithful `cell_edge_analysis`)
 
 Correlate cell-edge protrusion/retraction with a fluorescence channel (tagged

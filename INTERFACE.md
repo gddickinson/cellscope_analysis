@@ -41,6 +41,10 @@ Read this before opening source files. Update it when modules change.
   progress ticks + applied results), **zoom-to-cell**, the **edge-movement↔intensity**
   panel + comparison `edge_piezo_corr` metric, and the Comparison window's threaded
   compute, plus the busy-guard. `--shot=PATH` writes the edge-fluor screenshot.
+- **scripts/smoke_channels.py** — headless smoke that generates **1-, 2- and
+  3-channel** synthetic recordings and runs each through the viewer (channel switch
+  + composite), the pre-analysis dialog (auto-align + auto-FOV + apply), the
+  edge↔intensity panel, and `build_comparison` — proving nothing assumes two channels.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -73,16 +77,20 @@ Read this before opening source files. Update it when modules change.
   IC295 genetic/drug arms + WT–DMSO vehicle; otherwise one arm with a heuristic
   control); `ensure_colors(design, groups)` assigns palette colours to new
   groups. `from_entries`, `from_data_roots` (discover + auto-design),
-  `load_project`/`save_project` (small JSON, incl. excluded/overrides). Decouples
-  the app from the hard-coded IC295 design so any dataset (any treatments /
-  counts / groupings) loads + compares correctly. GUI-free.
+  `load_project`/`save_project` (small JSON, incl. excluded/overrides + per-recording
+  **`corrections`** = channel shifts + FOV; `correction_for(label)`). Decouples the
+  app from the hard-coded IC295 design so any dataset (any treatments / counts /
+  groupings) loads + compares correctly. GUI-free.
 
 ### maskviewer/io/  — load data (GUI-free)
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
   `(T,C,H,W)`, `channel_names`, `um_per_px`, `time_interval_min`, `.frame(t,c)`).
-  Reads the `.ome.json` sidecar; coerces 2-D/3-D inputs to `(T,C,H,W)`.
-  `channel_names_of(tif)` reads just the sidecar's channel names (no tif load —
-  for a cheap channel picker).
+  Reads the `.ome.json` sidecar; coerces 2-D/3-D inputs to `(T,C,H,W)` so **1-, 2-
+  or N-channel** recordings all work. Non-destructive **corrections**:
+  `channel_shifts` (channel→(dy,dx)) + `fov` ((y0,y1,x0,x1)) — `frame` /
+  `aligned_channel(c)` apply the shift on read; `apply_correction(rec, corr)` sets
+  them from a project entry. `channel_names_of(tif)` reads just the sidecar's
+  channel names (no tif load — for a cheap channel picker).
 - **masks.py** — `load_masks(npz)` → `Masks` (`labels` `(T,H,W)`,
   `.frame(t)`, `.max_label`, `.cell_ids()`, `.n_cells_per_frame()`).
 - **dataset.py** — `discover(roots)` → sorted `[Entry]`; an `Entry`
@@ -168,8 +176,14 @@ Read this before opening source files. Update it when modules change.
   the `PlotStyleDialog`; tabs/controls tooltipped. `hidden_groups` (set via the
   style dialog's Show-groups list) hides groups from the **graphs** only (Stats /
   Data still cover all); per-plot legends are managed in `_prep_legend`.
+- **prep_dialog.py** — `PrepDialog(QDialog)`: the **pre-analysis** tool (Analysis ▸
+  Channel Alignment & FOV) — reference/align channel pickers, **Auto-align** (via
+  `registration`) + manual dy/dx, **Auto-detect FOV** (via `fov`) + manual rectangle,
+  a live overlay preview (reference grey + align-channel magenta + FOV box), and
+  Apply → writes a non-destructive correction onto the project (`on_apply`).
 - **compare_tables.py** — `ComputeWorker` (off-thread `build_comparison`: lag count
-  + optional fluorescence channel); `StatsTablesMixin`: fills the right-panel **Stats** +
+  + optional fluorescence channel + project `corrections`); `corrections_tag` (cache
+  key fingerprint); `StatsTablesMixin`: fills the right-panel **Stats** +
   **Data** tables (`_update_stats`, `_fill_data`, `_set_table`); `ResultsIOMixin`:
   **save / load** the computed results (`_save_results`/`_load_results` →
   `compare.save_results`/`load_results`, restoring design + exclusions), CSV
@@ -216,7 +230,8 @@ Read this before opening source files. Update it when modules change.
 - **menus.py** — `build_menubar(win)`: File (Open Recording / **Open Project
   Folder / Open Project File / Save Project As / Recent Projects** / Export CSV /
   screenshots) / View / Image / Analysis (**Comparison window…** `Ctrl+Shift+C`
-  + Export CSV) / **Config** (Cell-plot-metrics checkable submenu, rebuilt per
+  + **Channel Alignment & FOV…** → `open_prep_dialog` + Export CSV) /
+  **Config** (Cell-plot-metrics checkable submenu, rebuilt per
   recording; **Comparison plot options…** → `open_compare_plot_options`) / Window /
   Help (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
 - **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
@@ -233,7 +248,9 @@ Read this before opening source files. Update it when modules change.
   `run_task`), falling back to synchronous compute when none is set (tests/headless).
 - **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers
   (incl. **project** open-folder / open-file / save-as / recent-projects +
-  `set_project` to adopt a different dataset, and `open_compare_window`), the
+  `set_project` to adopt a different dataset, `open_compare_window`, and
+  **`open_prep_dialog`** / `_apply_correction` — store a recording's channel
+  alignment + FOV on the project and reload to apply it), the
   lazy+cached heavy-compute providers (`_population_table` / `_shape_modes_model`,
   `progress_cb`-aware), **`run_task`** (off-thread compute → status-bar bar/ETA),
   **`zoom_to_cell`** (frame the canvas on the selected cell — View ▸ Zoom to Cell /
@@ -295,7 +312,16 @@ Read this before opening source files. Update it when modules change.
   `correlation_summary` (Pearson **r / R² / p / slope**, protruding/retracting/stable
   counts + mean intensities, protrude−retract Δ, t-test + Mann-Whitney),
   `rectangles_for_frame` (overlay), `analyze_cell` (end-to-end). Reuses the 72
-  sectors / mid-centroid radial velocity of `edge_dynamics`.
+  sectors / mid-centroid radial velocity of `edge_dynamics`. **Samples the aligned
+  channel + FOV-cropped masks** (see `registration` / `fov`).
+- **registration.py** — channel alignment (**translation**), GUI-free, no skimage:
+  `estimate_shift(ref, mov)` (gradient-magnitude FFT phase-correlation + sub-pixel
+  parabolic peak → the (dy,dx) bringing `mov` onto `ref`; robust across DIC↔fluor
+  modalities), `estimate_stack_shift` (on mean projections), `apply_shift` (2-D
+  frame or (T,H,W) stack via `ndimage.shift`).
+- **fov.py** — field-of-view detection / cropping: `auto_fov` (inner rectangle by
+  trimming near-zero borders; 2-D / (T,H,W) / (T,C,H,W)), `apply_fov` (zero labels
+  outside the rect so out-of-FOV cells drop from analysis), `fov_mask`, `clamp_rect`.
 - **shape_modes.py** — VAMPIRE-style population shape clustering (sklearn):
   `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
   per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
@@ -318,7 +344,8 @@ Read this before opening source files. Update it when modules change.
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
   MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar; optional
   `piezo_channel` adds per-cell edge-movement↔intensity `edge_piezo_corr` /
-  `edge_piezo_slope` / `piezo_protr_minus_retr` columns via `edge_intensity`),
+  `edge_piezo_slope` / `piezo_protr_minus_retr` columns via `edge_intensity`;
+  optional `corrections` applies each recording's channel alignment + FOV crop),
   `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
   τ-bin + max-lag display controls),
@@ -386,6 +413,9 @@ Read this before opening source files. Update it when modules change.
 - **test_edge_intensity.py** — `edge_intensity`: rectangle sampling shape/coverage,
   correlation sign ±, movement classification + protrude−retract Δ, degenerate
   inputs, `rectangles_for_frame`, end-to-end `analyze_cell` (synthetic cells).
+- **test_registration_fov.py** — `registration` (integer + sub-pixel shift
+  round-trip, flat→0, stack shift, no-op) and `fov` (auto-detect border trim,
+  full-frame-when-clean, on a stack, `apply_fov` zeroing, `fov_mask`/`clamp_rect`).
 - **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
   straightness on synthetic straight tracks, end-to-end per-cell state metrics on
   a moving-square stack, and the speed cap.

@@ -24,13 +24,20 @@ import tifffile
 @dataclass
 class Recording:
     """A loaded recording. `data` is (T, C, H, W); single-channel inputs are
-    promoted to C=1 so the rest of the app has one shape to reason about."""
+    promoted to C=1 so the rest of the app has one shape to reason about.
+
+    `channel_shifts` (channel → (dy, dx) px) and `fov` ((y0,y1,x0,x1)) are
+    non-destructive **pre-analysis corrections** (see `analysis.registration` /
+    `analysis.fov`): `frame` / `aligned_channel` apply the per-channel shift on
+    read; `fov` is the inner field of view (the raw `data` is never modified)."""
     path: str
     data: np.ndarray
     channel_names: list
     um_per_px: float | None = None
     time_interval_min: float | None = None
     meta: dict = field(default_factory=dict)
+    channel_shifts: dict = field(default_factory=dict)   # channel -> (dy, dx) px
+    fov: tuple | None = None                              # (y0, y1, x0, x1)
 
     @property
     def n_frames(self) -> int:
@@ -49,10 +56,23 @@ class Recording:
         return int(self.data.shape[3])
 
     def frame(self, t: int, channel: int) -> np.ndarray:
-        """2-D (H, W) image for time `t`, channel `channel`."""
+        """2-D (H, W) image for time `t`, channel `channel` (alignment applied)."""
         t = max(0, min(t, self.n_frames - 1))
         channel = max(0, min(channel, self.n_channels - 1))
-        return np.asarray(self.data[t, channel])
+        return self._shifted(np.asarray(self.data[t, channel]), channel)
+
+    def aligned_channel(self, channel: int) -> np.ndarray:
+        """(T, H, W) stack for `channel` with its alignment shift applied — what
+        analysis should sample (e.g. `edge_intensity` against the masks)."""
+        channel = max(0, min(channel, self.n_channels - 1))
+        return self._shifted(np.asarray(self.data[:, channel]), channel)
+
+    def _shifted(self, arr, channel):
+        sh = self.channel_shifts.get(channel) or self.channel_shifts.get(int(channel))
+        if not sh or (not sh[0] and not sh[1]):
+            return arr
+        from ..analysis import registration
+        return registration.apply_shift(arr, float(sh[0]), float(sh[1]))
 
 
 def _sidecar_path(tif_path: str) -> str | None:
@@ -77,6 +97,18 @@ def channel_names_of(tif_path: str) -> list:
         except (OSError, ValueError):
             pass
     return []
+
+
+def apply_correction(rec: "Recording", corr: dict | None) -> "Recording":
+    """Set a recording's non-destructive corrections from a project entry
+    (``{"shifts": {channel: [dy, dx]}, "fov": [y0, y1, x0, x1]}``). Mutates +
+    returns ``rec``; an empty/None ``corr`` clears them."""
+    shifts = (corr or {}).get("shifts") or {}
+    rec.channel_shifts = {int(k): (float(v[0]), float(v[1]))
+                          for k, v in shifts.items()}
+    fov = (corr or {}).get("fov")
+    rec.fov = tuple(int(x) for x in fov) if fov else None
+    return rec
 
 
 def _normalise_axes(arr: np.ndarray) -> np.ndarray:

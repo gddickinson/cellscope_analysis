@@ -7,6 +7,8 @@ tab's per-recording + per-group tables (unit-tagged). GUI-thread only.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 
 from PyQt5 import QtCore, QtWidgets
@@ -18,24 +20,34 @@ _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
               "Cohen d", "OLS β", "OLS p"]
 
 
+def corrections_tag(corrections):
+    """Short stable fingerprint of the project's pre-analysis corrections, for
+    keying the compute cache (alignment / FOV changes ⇒ different results)."""
+    if not corrections:
+        return ""
+    digest = hashlib.md5(json.dumps(corrections, sort_keys=True).encode())
+    return "_c" + digest.hexdigest()[:6]
+
+
 class ComputeWorker(QtCore.QObject):
     """Runs `compare.build_comparison` off the GUI thread (lag count + optional
     edge↔fluorescence channel); emits per-recording progress, then the result."""
     progress = QtCore.pyqtSignal(int, int)
     done = QtCore.pyqtSignal(object)
 
-    def __init__(self, entries, max_lag=0, piezo_channel=None):
+    def __init__(self, entries, max_lag=0, piezo_channel=None, corrections=None):
         super().__init__()
         self.entries = entries
         self.max_lag = max_lag
         self.piezo_channel = piezo_channel
+        self.corrections = corrections or {}
         self.cancel = False
 
     def run(self):
         try:
             res = compare.build_comparison(
                 self.entries, max_lag=self.max_lag,
-                piezo_channel=self.piezo_channel,
+                piezo_channel=self.piezo_channel, corrections=self.corrections,
                 progress_cb=lambda i, n: (self.progress.emit(i, n)
                                           or not self.cancel))
         except Exception as exc:                          # surface, don't crash

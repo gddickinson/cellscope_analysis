@@ -34,7 +34,7 @@ def _resolve_channel(rec, channel):
 
 
 def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
-                     piezo_channel=None):
+                     piezo_channel=None, corrections=None):
     """(per_cell_df, msd_long_df) across all entries with masks.
 
     per_cell_df: per-cell rows + recording + condition. msd_long_df: per-recording
@@ -46,8 +46,10 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
     is called per recording; returning False cancels. Recordings w/o cells skip.
     """
     import pandas as pd
-    from . import edge_intensity
+    from . import edge_intensity, fov as fov_mod
+    from ..io import recording as _recording
     max_lag = int(max_lag) if max_lag and max_lag > 0 else MAX_LAG
+    corrections = corrections or {}
     parts, msd_rows = [], []
     n = len(entries)
     for i, e in enumerate(entries):
@@ -57,10 +59,13 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
         if masks is None:
             continue
         rec = e.load_recording()
-        cents = cell_metrics.centroid_history(masks.labels)   # reused below + by per_cell
-        pf = exporters.per_frame_table(masks.labels, rec.um_per_px,
+        # pre-analysis corrections: align fluor channels + crop to the FOV
+        _recording.apply_correction(rec, corrections.get(e.label))
+        labels = fov_mod.apply_fov(masks.labels, rec.fov) if rec.fov else masks.labels
+        cents = cell_metrics.centroid_history(labels)         # reused below + by per_cell
+        pf = exporters.per_frame_table(labels, rec.um_per_px,
                                        rec.time_interval_min, with_solidity)
-        df = exporters.per_cell_table(masks.labels, rec.um_per_px,
+        df = exporters.per_cell_table(labels, rec.um_per_px,
                                       rec.time_interval_min, with_solidity,
                                       per_frame_df=pf, centroids=cents)
         if df.empty:
@@ -69,16 +74,16 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
         # state-segmented metrics (rounded vs spread) — match the original
         # CellScope state-aware analysis; merged alongside the whole-track ones.
         sdf = state_metrics.per_cell_state_metrics(
-            masks.labels, rec.um_per_px, rec.time_interval_min, per_frame_df=pf)
+            labels, rec.um_per_px, rec.time_interval_min, per_frame_df=pf)
         if not sdf.empty:
             df = df.merge(sdf, on="cell_id", how="left")
         ch = _resolve_channel(rec, piezo_channel)
         if ch is not None:                            # edge movement ↔ intensity
-            image = rec.data[:, ch]
+            image = rec.aligned_channel(ch)
             prows = []
             for cid in df["cell_id"]:
                 *_, summ = edge_intensity.analyze_cell(
-                    masks.labels, image, int(cid), rec.um_per_px, rec.time_interval_min)
+                    labels, image, int(cid), rec.um_per_px, rec.time_interval_min)
                 prows.append({"cell_id": int(cid),
                               "edge_piezo_corr": summ["edge_move_intensity_r"],
                               "edge_piezo_slope": summ["edge_move_intensity_slope"],

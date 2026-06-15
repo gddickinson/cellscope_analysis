@@ -66,6 +66,9 @@ def build_menubar(win):
     an = mb.addMenu("&Analysis")
     an.addAction(_act(win, "&Comparison window…", win.open_compare_window,
                      "Ctrl+Shift+C", "Cross-recording / treatment comparison"))
+    an.addAction(_act(win, "Channel &Alignment && FOV…", win.open_prep_dialog,
+                     tip="Align a fluorescence channel to a reference + define the "
+                         "field of view (non-destructive pre-analysis)"))
     an.addAction(_act(win, "&Export CSV…", win.export_csv, "Ctrl+E"))
 
     cfg = mb.addMenu("&Config")
