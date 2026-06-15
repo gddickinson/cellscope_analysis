@@ -5,6 +5,51 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Fix reported regressions (division, edge views) + 8 review-confirmed bugs
+
+Three user-reported regressions on Pos60-DMSO + the bugs an adversarial multi-agent
+review surfaced, all fixed in one pass.
+
+**Reported regressions**
+1. **Division `8→11` no longer detected/reported.** The scored detector
+   (`lineage.infer_divisions`) was mis-calibrated for this project's 2-D footprints:
+   `swell` measured an area *peak* (but keratinocytes **round up** as they divide, so
+   the footprint *shrinks*), and `mass` assumed a ½-split (the parent keeps its ID), so
+   both cues read 0 and the plain-mean score fell to 0.463 (< 0.5). Re-calibrated:
+   `swell` is now a **bidirectional** departure from a **pre-split baseline** (up *or*
+   down), `mass` is **lenient** (plausible-fraction plateau, not exactly ½), the score
+   is a **weighted mean** (`_DIV_WEIGHTS` — proximity/persistence/roundedness carry it),
+   plus a **parent-continuation gate** (the parent must persist past the split — rejects
+   re-ID/hand-offs) and a `min_persist=0` divide-by-zero guard. `8→11` now scores
+   **0.692** and is reported in the viewer. (Also fixed the `_circularity` 'balled'
+   crop: sized from the cell's **true bbox** via `find_objects`, not the area-equivalent
+   radius, so elongated parents aren't truncated into looking round.)
+2. **Edge "sampling rectangles" + 3. "edge-this-frame intensity" not displayed.** Not a
+   code break — both views need a Fluor channel, and the combo defaulted to "(none)".
+   `edge_panel._populate_fluor` now **auto-selects the first fluorescence channel**
+   (heuristic `_is_fluor_name`, skips DIC/brightfield/placeholder) on first population,
+   while still respecting an explicit later "(none)". Both views render by default.
+
+**Review-confirmed bugs** (adversarial workflow — 8 confirmed): `compare_window`
+**`_current_plot` IndexError on the new Dir-autocorr tab** (HIGH — added the 4th plot
+to the list); `registration._max_shift` could be **0** for sub-4-px images
+(`max(1, …)`) + `_prep` **crashed on a 1-px strip** (`np.gradient` needs ≥2 samples);
+`prep_dialog` preview **mixed a stored-shift ref with a raw moving layer** (now both
+raw) + **`dy` spinbox bounded by width** (now height); `recording.apply_correction`
+**crashed on a malformed shift/fov** (now skips); `edge_panel` velocity edge-map used
+the **single-frame centroid** vs the kymograph's **mid-pair centroid** (now matched);
+`compare_window` fluor **cache-key collision** (new `compare_tables.channel_tag` hashes
+the raw name).
+
+Tests: +6 (`test_lineage`: footprint-rounding split detected, re-ID rejected,
+`min_persist=0`; `test_registration_fov`: `_max_shift`≥1, degenerate strip,
+`apply_correction` malformed). `pytest` **80 passed**; `smoke_edgecases` green (now
+asserts `_current_plot` on every tab + edge fluor auto-select); anomaly probe on real
+WT+KO **NO ANOMALIES**. All edited files < 500 lines (compare_window back to 499 by
+moving the hash into `channel_tag`).
+
+---
+
 ## 2026-06-15 — Edge Dynamics: plot every per-sector metric on the edge-this-frame map
 
 The "edge this frame" map (the cell boundary coloured by a per-sector metric) now

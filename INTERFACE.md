@@ -207,8 +207,9 @@ Read this before opening source files. Update it when modules change.
   `px_size`/`frame_interval` on the project + reloads (all recordings). For files with
   missing/wrong metadata.
 - **compare_tables.py** — `ComputeWorker` (off-thread `build_comparison`: lag count
-  + optional fluorescence channel + project `corrections`); `corrections_tag` (cache
-  key fingerprint); `StatsTablesMixin`: fills the right-panel **Stats** +
+  + optional fluorescence channel + project `corrections`); `corrections_tag` +
+  `channel_tag` (cache-key fingerprints — corrections/scale, and a fluor channel
+  name hashed so distinct names never collide); `StatsTablesMixin`: fills the right-panel **Stats** +
   **Data** tables (`_update_stats`, `_fill_data`, `_set_table`); `ResultsIOMixin`:
   **save / load** the computed results (`_save_results`/`_load_results` →
   `compare.save_results`/`load_results`, restoring design + exclusions), CSV
@@ -450,14 +451,19 @@ Read this before opening source files. Update it when modules change.
   inputs, `rectangles_for_frame`, end-to-end `analyze_cell` (synthetic cells).
 - **test_lineage.py** — `lineage`: `present_ids` / `valid_divisions` (drop events
   referencing absent tracks — the Pos60-DMSO `→16` / `21→` case), and
-  **`infer_divisions`** (the **scored** detector — a swelling/balled parent with a
-  persistent adjacent daughter scores high and is detected; the score threshold gates
-  candidates + `return_all` exposes them; border-entry / distant / translation /
-  degenerate are not divisions).
+  **`infer_divisions`** (the **scored** detector — proximity/persistence/roundedness
+  weighted-mean; a swelling/balled parent with a persistent adjacent daughter scores
+  high and is detected; the score threshold gates candidates + `return_all` exposes
+  them; border-entry / distant / translation / degenerate are not divisions; a
+  **footprint-rounding parent-continuing split with a small daughter is still detected**
+  (the Pos60 `8→11` case), a **re-ID/hand-off is rejected** (parent must continue), and
+  `min_persist=0` does not crash).
 - **test_registration_fov.py** — `registration` (integer + sub-pixel shift
   round-trip, **bounded peak rejects a far spurious shift**, flat→0, stack shift,
-  no-op) and `fov` (auto-detect border trim, full-frame-when-clean, on a stack,
-  `apply_fov` zeroing, `fov_mask`/`clamp_rect`).
+  no-op, **`_max_shift` never 0 for tiny images**, **degenerate 1-px strip doesn't
+  crash**, `apply_correction` **skips malformed shifts/fov**) and `fov` (auto-detect
+  border trim, full-frame-when-clean, on a stack, `apply_fov` zeroing,
+  `fov_mask`/`clamp_rect`).
 - **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
   straightness on synthetic straight tracks, end-to-end per-cell state metrics on
   a moving-square stack, and the speed cap.

@@ -90,6 +90,48 @@ def test_infer_divisions_score_threshold():
     assert len(allc) == 1 and "score" in allc[0]                    # candidate kept for inspection
 
 
+def _rounding_stack():
+    """The Pos60-DMSO style division (cell 8 → 11): a parent that *rounds up* — its
+    2-D footprint **shrinks** rather than swells — and **continues** past the split,
+    with a small persistent daughter (not a ½-mass split)."""
+    L = np.zeros((10, 80, 80), np.int32)
+    for t, r in enumerate((11, 11, 10, 9)):      # parent: large spread footprint early
+        _disc(L, t, 1, 40, 32, r)
+    for t in range(4, 10):
+        _disc(L, t, 1, 40, 30, 7)                # continues, rounded up (smaller area)
+        _disc(L, t, 2, 40, 44, 3)                # small daughter, persists (mass ≪ ½)
+    return L
+
+
+def test_infer_divisions_footprint_rounding_split():
+    """A rounding (footprint-shrinking), parent-continuing division with a small
+    daughter is detected — the regression where swell/mass alone vetoed it."""
+    ev = lineage.infer_divisions(_rounding_stack())
+    assert len(ev) == 1, [(e["parent"], e["daughter"], e["frame"]) for e in ev]
+    e = ev[0]
+    assert (e["parent"], e["daughter"], e["frame"]) == (1, 2, 4)
+    assert e["score"] >= 0.5
+    assert e["swell"] > 0.5            # footprint *shrinking* now registers as swell
+    assert e["mass"] < 0.6            # a small (non-½) daughter no longer vetoes
+
+
+def test_infer_divisions_rejects_reid_handoff():
+    """A track hand-off / re-ID — cell 1 ENDS and cell 2 appears where it was the next
+    frame — is NOT a division (the parent must continue past the split)."""
+    L = np.zeros((8, 60, 60), np.int32)
+    for t in range(4):
+        _disc(L, t, 1, 30, 30, 7)                # cell 1: frames 0-3, then gone
+    for t in range(4, 8):
+        _disc(L, t, 2, 30, 31, 7)                # cell 2: appears frame 4 where 1 was
+    assert lineage.infer_divisions(L) == []
+
+
+def test_infer_divisions_min_persist_zero_no_crash():
+    """min_persist=0 must not divide-by-zero (the persist cue guards it)."""
+    ev = lineage.infer_divisions(_division_stack(), min_persist=0)
+    assert len(ev) == 1 and ev[0]["parent"] == 1
+
+
 def test_infer_divisions_none_for_simple_motion():
     """A single cell translating across frames → no spurious divisions."""
     L = np.zeros((6, 60, 60), np.int32)

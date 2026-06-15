@@ -31,6 +31,16 @@ def corrections_tag(corrections, scale=None):
     return "_c" + digest.hexdigest()[:6]
 
 
+def channel_tag(name):
+    """Cache-key fragment for a fluor channel: a readable alphanumeric slug **plus** a
+    short hash of the raw name, so distinct channels whose alphanumerics coincide
+    (e.g. ``Cy5`` vs ``Cy-5``) never collide on the same cache file."""
+    if not name:
+        return ""
+    return "_" + "".join(c for c in name if c.isalnum()) + hashlib.md5(
+        name.encode()).hexdigest()[:4]
+
+
 class ComputeWorker(QtCore.QObject):
     """Runs `compare.build_comparison` off the GUI thread (lag count + optional
     edge↔fluorescence channel); emits per-recording progress, then the result."""

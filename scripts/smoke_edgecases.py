@@ -32,6 +32,11 @@ def op(ctx, fn):
         print(f"  !! {ctx}: {type(exc).__name__}: {exc}", flush=True)
 
 
+def _assert(cond, msg):
+    if not cond:
+        raise AssertionError(msg)
+
+
 def main():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
     QtWidgets.QDialog.exec_ = lambda self: 1               # no modal blocking offscreen
@@ -63,6 +68,9 @@ def main():
     op("exclude every recording",
        lambda: (setattr(cw.project, "excluded", {e.label for e in cw.project.entries}),
                 cw._replot(), all_tabs()))
+    op("current-plot resolves on every tab (incl. Dir. autocorr)",
+       lambda: [cw.tabs.setCurrentIndex(t) or cw._current_plot()
+                for t in range(cw.tabs.count())])
     print("  comparison edge cases OK", flush=True)
 
     # --- Viewer edge cases (synthetic sample) ---
@@ -80,6 +88,12 @@ def main():
     op("intensity edge-map without fluor at frame 0",
        lambda: (win.select_cell(1), win.edge.mode.setCurrentText("Edge this frame: intensity"),
                 win.timeline.slider.setValue(0), app.processEvents()))
+    # the edge panel auto-selects a fluorescence channel so rectangles + edge-intensity
+    # render by default (sample has a "Fluo (synthetic)" channel)
+    op("edge panel auto-selects a fluorescence channel",
+       lambda: (win.select_cell(1), app.processEvents(),
+                _assert(win.edge.fluor.currentText() != "(none)",
+                        f"fluor not auto-selected: {win.edge.fluor.currentText()!r}")))
     print("  viewer edge cases OK", flush=True)
 
     assert not _ERRORS, f"{len(_ERRORS)} edge-case failure(s): {_ERRORS}"
