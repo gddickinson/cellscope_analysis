@@ -315,10 +315,12 @@ Read this before opening source files. Update it when modules change.
   sectors / mid-centroid radial velocity of `edge_dynamics`. **Samples the aligned
   channel + FOV-cropped masks** (see `registration` / `fov`).
 - **registration.py** — channel alignment (**translation**), GUI-free, no skimage:
-  `estimate_shift(ref, mov)` (gradient-magnitude FFT phase-correlation + sub-pixel
-  parabolic peak → the (dy,dx) bringing `mov` onto `ref`; robust across DIC↔fluor
-  modalities), `estimate_stack_shift` (on mean projections), `apply_shift` (2-D
-  frame or (T,H,W) stack via `ndimage.shift`).
+  `estimate_shift(ref, mov, max_shift=None)` (gradient-magnitude FFT phase-correlation
+  + sub-pixel parabolic peak → the (dy,dx) bringing `mov` onto `ref`; the peak is
+  searched only within **±`max_shift`** px — default `min(100, min(H,W)//4)` — so
+  cross-modality DIC↔fluorescence pairs can't pick a spurious far peak),
+  `estimate_stack_shift` (on mean projections), `apply_shift` (2-D frame or (T,H,W)
+  stack via `ndimage.shift`).
 - **fov.py** — field-of-view detection / cropping: `auto_fov` (inner rectangle by
   trimming near-zero borders; 2-D / (T,H,W) / (T,C,H,W)), `apply_fov` (zero labels
   outside the rect so out-of-FOV cells drop from analysis), `fov_mask`, `clamp_rect`.
@@ -414,8 +416,9 @@ Read this before opening source files. Update it when modules change.
   correlation sign ±, movement classification + protrude−retract Δ, degenerate
   inputs, `rectangles_for_frame`, end-to-end `analyze_cell` (synthetic cells).
 - **test_registration_fov.py** — `registration` (integer + sub-pixel shift
-  round-trip, flat→0, stack shift, no-op) and `fov` (auto-detect border trim,
-  full-frame-when-clean, on a stack, `apply_fov` zeroing, `fov_mask`/`clamp_rect`).
+  round-trip, **bounded peak rejects a far spurious shift**, flat→0, stack shift,
+  no-op) and `fov` (auto-detect border trim, full-frame-when-clean, on a stack,
+  `apply_fov` zeroing, `fov_mask`/`clamp_rect`).
 - **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
   straightness on synthetic straight tracks, end-to-end per-cell state metrics on
   a moving-square stack, and the speed cap.
