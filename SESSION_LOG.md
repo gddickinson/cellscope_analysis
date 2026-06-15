@@ -5,6 +5,31 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Direction persistence: DiPer ensemble autocorrelation by condition
+
+Incorporated the **DiPer** (Gorelik & Gautreau 2014) directional-persistence
+methodology from `~/Documents/GitHub/diper_clone`. Its core metric — the **direction
+autocorrelation** C(τ) = ⟨û(t)·û(t+τ)⟩ over unit step vectors — already matched
+`motion.direction_autocorrelation` per cell; what was missing is DiPer's headline
+output, the **ensemble decay curve per condition**.
+
+- `compare.build_comparison` now also returns `autocorr_long` (per-recording ensemble
+  direction autocorrelation, mean over cells, long form recording/condition/tau/autocorr)
+  → it returns a **3-tuple** `(per_cell, msd, autocorr)`. `ensemble_by_condition` gained
+  `value_col` so it averages either MSD or autocorr across recordings (recording = unit).
+- New `compare_plots.ensemble_autocorr` + a **"Dir. autocorr"** tab in the Comparison
+  window (kept last, so Scatter stays index 2) — mean±SEM or median+CI curves per
+  condition, decaying from ~1 (persistent) toward 0 (random), y ∈ [−0.2, 1.05]. Reuses
+  the existing MSD style controls (τ-bin / max-lag / points). Threaded compute, cache,
+  and save/load now carry the autocorr frame.
+
+Tests: `test_compare_extras` — the DiPer method (straight track → 1 at every lag; a 90°
+zig-zag → 0 at lag 1) + the ensemble-autocorr aggregation. `smoke_compare_window`
+exercises the new tab + save/load and writes `docs/screenshots/comparison_autocorr.png`
+(synthetic). `pytest` **74 passed**; four GUI smokes green; all files < 500 lines.
+
+---
+
 ## 2026-06-15 — Scored division inference (the original detector's cues, in-project)
 
 `lineage.infer_divisions` is now a **scored** detector reproducing the original

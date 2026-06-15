@@ -61,7 +61,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   `Ctrl+Shift+C`) for cross-recording / treatment analysis (**recording =
   experimental unit**): tabbed **Distributions** (strip / box+Bonferroni /
   superplot) · **Ensemble MSD** (mean±SEM or median+CI) · **Scatter** (X-vs-Y +
-  Spearman), all with **units on the axes**. A **Filters** row (min frames, min
+  Spearman) · **Direction autocorrelation** (DiPer-style directional-persistence
+  decay curves per condition — Gorelik & Gautreau 2014), all with **units on the
+  axes**. A **Filters** row (min frames, min
   track-quality, min cells/recording, cell-state) refines the cells/recordings
   used; the right panel is tabbed — **Stats** (per-contrast p / Bonferroni /
   Cohen's d / covariate-adjusted OLS + per-arm KW + vehicle) · **Histogram**
@@ -113,6 +115,8 @@ retracting edges (negative r, highly significant):*
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
 
 ![the Comparison window Histogram tab — per-cell distribution by group, units on the axis](docs/screenshots/comparison_histogram.png)
+
+![the Comparison window Direction-autocorrelation tab — DiPer directional-persistence decay curves per condition (recording = unit)](docs/screenshots/comparison_autocorr.png)
 
 ![the per-graph plot-style options (Style… / shift-right-click)](docs/screenshots/comparison_style.png)
 

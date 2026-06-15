@@ -81,6 +81,29 @@ def test_ensemble_by_condition_bin_and_maxlag():
     assert len(tb) < 10 and tb.min() >= 10.0
 
 
+def test_ensemble_autocorr_by_condition():
+    """The generalized aggregator also averages the direction-autocorrelation
+    column (DiPer ensemble) across recordings."""
+    rows = [{"recording": r, "condition": "KO", "tau": (k + 1) * 10.0,
+             "autocorr": 1.0 - 0.1 * k} for r in ("a", "b") for k in range(5)]
+    ac = pd.DataFrame(rows)
+    tau, c, lo, hi = compare.ensemble_by_condition(ac, value_col="autocorr")["KO"]
+    assert len(tau) == 5 and tau[0] == 10.0
+    assert abs(c[0] - 1.0) < 1e-9 and abs(c[-1] - 0.6) < 1e-9   # mean over recordings
+
+
+def test_direction_autocorrelation_matches_diper():
+    """DiPer method: C(τ) = ⟨û(t)·û(t+τ)⟩ over unit step vectors. A straight track
+    → 1 at every lag; a 90° zig-zag → 0 at lag 1 (perpendicular steps)."""
+    from maskviewer.analysis import motion
+    straight = np.array([[float(i), 0.0] for i in range(8)])      # all steps = +x
+    ac = motion.direction_autocorrelation(straight)
+    assert np.allclose(ac[1:], 1.0)
+    zig = np.array([[0, 0], [1, 0], [1, 1], [2, 1], [2, 2], [3, 2], [3, 3]], float)
+    acz = motion.direction_autocorrelation(zig)
+    assert abs(acz[1]) < 1e-9                                     # consecutive steps ⟂
+
+
 def test_multivariate_contrasts():
     rng = np.random.default_rng(0)
     rows = []

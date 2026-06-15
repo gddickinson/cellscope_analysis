@@ -112,7 +112,7 @@ def main():
         print("  scale override persists save/load OK", flush=True)
 
         # comparison over the mixed-shape project + scale override
-        per_cell, _ = compare.build_comparison(
+        per_cell, *_ = compare.build_comparison(
             proj.entries, piezo_channel="Fluo", scale_override=(0.25, 2.0), max_lag=8)
         assert per_cell["recording"].nunique() == len(SPECS)
         assert "edge_piezo_corr" in per_cell.columns

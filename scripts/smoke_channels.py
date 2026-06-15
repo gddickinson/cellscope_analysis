@@ -107,7 +107,7 @@ def main():
                   f"(r={win.edge._summary.get('edge_move_intensity_r')})", flush=True)
 
         # comparison across mixed channel counts, sampling channel index 0
-        per_cell, _ = compare.build_comparison(
+        per_cell, *_ = compare.build_comparison(
             proj.entries, piezo_channel=0, corrections=proj.corrections)
         assert "edge_piezo_corr" in per_cell.columns
         assert per_cell["recording"].nunique() == 3

@@ -334,6 +334,41 @@ def ensemble_msd(plot, msd, design, stat, style=None):
           title=f"ensemble MSD by condition ({band}{binned})")
 
 
+def ensemble_autocorr(plot, autocorr, design, stat, style=None):
+    """DiPer **direction autocorrelation** by condition: mean ± SEM (or median +
+    bootstrap CI) of the per-recording autocorrelation curves vs the time interval
+    τ. Decays from ~1 (persistent) toward 0 (random walk) — the speed-unbiased
+    directional-persistence readout (Gorelik & Gautreau 2014)."""
+    style = style or PlotStyle()
+    if autocorr is None or autocorr.empty:
+        plot.setTitle("no direction autocorrelation (recompute to build it)")
+        return
+    ens = compare.ensemble_by_condition(autocorr, stat=stat, bin_min=style.msd_bin_min,
+                                        max_lag=style.msd_max_lag, value_col="autocorr")
+    for cond in compare.order_conditions(ens, order=design.condition_order()):
+        tau, centre, lo, hi = ens[cond]
+        keep = np.isfinite(tau) & np.isfinite(centre)
+        if keep.sum() < 1:
+            continue
+        tau, centre, lo, hi = tau[keep], centre[keep], lo[keep], hi[keep]
+        col = _rgb(design.color(cond))
+        top = plot.plot(tau, hi, pen=None)
+        bot = plot.plot(tau, lo, pen=None)
+        plot.addItem(pg.FillBetweenItem(top, bot, brush=pg.mkBrush(*col, style.fill_alpha)))
+        plot.plot(tau, centre, pen=pg.mkPen(col, width=style.line_width), name=cond)
+        if style.msd_points:
+            plot.plot(tau, centre, pen=None, symbol="o", symbolSize=style.point_size,
+                      symbolBrush=pg.mkBrush(*col, 235), symbolPen=pg.mkPen("k"))
+            for k in range(len(tau)):
+                plot.plot([tau[k], tau[k]], [lo[k], hi[k]],
+                          pen=pg.mkPen(col, width=style.line_width))
+    band = "median + 95% CI" if stat == "median" else "mean ± SEM"
+    _axes(plot, style, left="direction autocorrelation",
+          bottom="time interval τ (min)",
+          title=f"DiPer direction autocorrelation by condition ({band})")
+    plot.setYRange(-0.2, 1.05)
+
+
 def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):
     style = style or PlotStyle()
     if mx not in per_rec.columns or my not in per_rec.columns:

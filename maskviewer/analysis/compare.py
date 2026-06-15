@@ -35,11 +35,12 @@ def _resolve_channel(rec, channel):
 
 def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
                      piezo_channel=None, corrections=None, scale_override=None):
-    """(per_cell_df, msd_long_df) across all entries with masks.
+    """(per_cell_df, msd_long_df, autocorr_long_df) across all entries with masks.
 
-    per_cell_df: per-cell rows + recording + condition. msd_long_df: per-recording
-    ensemble MSD (mean over cells) in long form (recording, condition, tau, msd) up
-    to ``max_lag`` lags. ``piezo_channel`` (channel name or index) → also add
+    per_cell_df: per-cell rows + recording + condition. msd_long_df / autocorr_long_df:
+    per-recording ensemble MSD and **DiPer direction autocorrelation** (mean over
+    cells) in long form (recording, condition, tau, msd|autocorr) up to ``max_lag``
+    lags. ``piezo_channel`` (channel name or index) → also add
     per-cell **edge-movement ↔ fluorescence-intensity** columns (`edge_piezo_corr`
     = Pearson r, `edge_piezo_slope`, `piezo_protr_minus_retr`; via `edge_intensity`,
     the faithful ``cell_edge_analysis`` reproduction). ``progress_cb(done, total)``
@@ -50,7 +51,7 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
     from ..io import recording as _recording
     max_lag = int(max_lag) if max_lag and max_lag > 0 else MAX_LAG
     corrections = corrections or {}
-    parts, msd_rows = [], []
+    parts, msd_rows, ac_rows = [], [], []
     n = len(entries)
     for i, e in enumerate(entries):
         if progress_cb and progress_cb(i, n) is False:
@@ -112,15 +113,31 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
             if np.isfinite(ens[k]):
                 msd_rows.append({"recording": e.label, "condition": e.condition or "?",
                                  "tau": (k + 1) * dt, "msd": float(ens[k])})
+        # ensemble DiPer direction autocorrelation (mean over cells; scale-free)
+        amat = np.full((len(cents), max_lag + 1), np.nan)
+        for j, cen in enumerate(cents.values()):
+            ac = motion.direction_autocorrelation(cen, max_lag=max_lag)
+            amat[j, :ac.size] = ac
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            aens = (np.nanmean(amat, axis=0) if amat.shape[0]
+                    else np.full(max_lag + 1, np.nan))
+        for k in range(1, max_lag + 1):               # skip lag 0 (always 1.0)
+            if k < aens.size and np.isfinite(aens[k]):
+                ac_rows.append({"recording": e.label, "condition": e.condition or "?",
+                                "tau": k * dt, "autocorr": float(aens[k])})
     if progress_cb:
         progress_cb(n, n)
     per_cell = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
     msd = pd.DataFrame(msd_rows) if msd_rows else pd.DataFrame()
-    return per_cell, msd
+    autocorr = pd.DataFrame(ac_rows) if ac_rows else pd.DataFrame()
+    return per_cell, msd, autocorr
 
 
-def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0, max_lag=0):
-    """{condition: (tau, centre, lo, hi)} ensemble MSD across recordings.
+def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0, max_lag=0,
+                          value_col="msd"):
+    """{condition: (tau, centre, lo, hi)} ensemble curve across recordings —
+    MSD (``value_col='msd'``) or direction autocorrelation (``'autocorr'``).
 
     stat='mean' → mean ± SEM; stat='median' → median + bootstrap 95% CI (over
     recordings). Recording = unit (each recording contributes one MSD curve).
@@ -149,7 +166,7 @@ def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0, max_lag=
         taus, centre, lo, hi = [], [], [], []
         for tau, sub in buckets:
             taus.append(tau)
-            v = sub["msd"].to_numpy(float)
+            v = sub[value_col].to_numpy(float)
             v = v[np.isfinite(v)]
             if v.size == 0:
                 centre.append(np.nan); lo.append(np.nan); hi.append(np.nan)
@@ -223,18 +240,19 @@ def ols_adjusted(per_recording, outcome, covariates=("frac_spread", "mean_n_neig
     return out
 
 
-def save_results(path, per_cell, msd, meta=None):
-    """Pickle the computed comparison results (per-cell + ensemble-MSD frames +
-    a small meta dict: project name, design, exclusions) so they can be reloaded
-    and re-plotted later without the raw masks. GUI-free."""
+def save_results(path, per_cell, msd, meta=None, autocorr=None):
+    """Pickle the computed comparison results (per-cell + ensemble MSD + ensemble
+    direction-autocorrelation frames + a small meta dict: project name, design,
+    exclusions) so they can be reloaded and re-plotted later without the raw masks."""
     import pickle
     with open(path, "wb") as f:
-        pickle.dump({"per_cell": per_cell, "msd": msd, "meta": meta or {}}, f)
+        pickle.dump({"per_cell": per_cell, "msd": msd, "autocorr": autocorr,
+                     "meta": meta or {}}, f)
     return path
 
 
 def load_results(path):
-    """Inverse of `save_results` → {'per_cell', 'msd', 'meta'}."""
+    """Inverse of `save_results` → {'per_cell', 'msd', 'autocorr', 'meta'}."""
     import pickle
     with open(path, "rb") as f:
         return pickle.load(f)
