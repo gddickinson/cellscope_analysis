@@ -4,6 +4,11 @@ The pipeline records candidate cell-division events. We use the ``candidates``
 list, whose ``parent_track`` / ``daughter_track`` are the **label IDs** that match
 the mask stack (the sibling ``track_lineage`` is 0-based track indices instead).
 Returns a simple list of events; GUI-agnostic. Missing/empty file → ``[]``.
+
+This file is recorded *before* the masks are manually cleaned, so it can name
+tracks that review later removed — callers must pass the events through
+``analysis.lineage.valid_divisions(events, labels)`` to drop those phantoms before
+display (the viewer does this on load).
 """
 from __future__ import annotations
 

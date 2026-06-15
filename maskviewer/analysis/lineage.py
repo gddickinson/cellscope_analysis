@@ -9,6 +9,27 @@ from __future__ import annotations
 import numpy as np
 
 
+def present_ids(labels) -> set:
+    """Set of track label IDs that appear anywhere in the mask stack."""
+    return {int(i) for i in np.unique(np.asarray(labels)) if i > 0}
+
+
+def valid_divisions(divisions: list, labels) -> list:
+    """Keep only division events whose **parent and daughter tracks both exist**
+    in the mask stack.
+
+    `divisions.json` is recorded by the pipeline *before* the masks are manually
+    cleaned, and lists scored *candidate* events — so it can name tracks that
+    review later removed or merged (e.g. a daughter track that no longer exists).
+    Such events are not real divisions of the cleaned recording; surfacing them
+    puts phantom IDs in the cell table / cell-info and draws division markers on
+    empty space. Dropping any event that references a missing track removes them,
+    while keeping every division whose cells survive in the masks."""
+    ids = present_ids(labels)
+    return [d for d in divisions
+            if int(d.get("parent", -1)) in ids and int(d.get("daughter", -1)) in ids]
+
+
 def track_spans(labels) -> dict:
     """{cell_id: (first_frame, last_frame)} from where each label is present."""
     labels = np.asarray(labels)
