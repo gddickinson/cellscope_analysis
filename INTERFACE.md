@@ -38,8 +38,9 @@ Read this before opening source files. Update it when modules change.
 - **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
   unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
   Population / Cell-table / Shape computes through the off-thread runner (asserting
-  progress ticks + applied results), **zoom-to-cell**, and the Comparison window's
-  threaded compute, plus the busy-guard.
+  progress ticks + applied results), **zoom-to-cell**, the **edge↔fluorescence**
+  panel + comparison `edge_piezo_corr` metric, and the Comparison window's threaded
+  compute, plus the busy-guard. `--shot=PATH` writes the edge-fluor screenshot.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -80,6 +81,8 @@ Read this before opening source files. Update it when modules change.
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
   `(T,C,H,W)`, `channel_names`, `um_per_px`, `time_interval_min`, `.frame(t,c)`).
   Reads the `.ome.json` sidecar; coerces 2-D/3-D inputs to `(T,C,H,W)`.
+  `channel_names_of(tif)` reads just the sidecar's channel names (no tif load —
+  for a cheap channel picker).
 - **masks.py** — `load_masks(npz)` → `Masks` (`labels` `(T,H,W)`,
   `.frame(t)`, `.max_label`, `.cell_ids()`, `.n_cells_per_frame()`).
 - **dataset.py** — `discover(roots)` → sorted `[Entry]`; an `Entry`
@@ -121,9 +124,10 @@ Read this before opening source files. Update it when modules change.
     the enabled-metric set (QSettings-persisted); `set_metric_enabled` recomputes
     immediately.
   - **edge_panel.py** `EdgePanel` — velocity / radius **kymograph** (angle×time,
-    blue=retraction/red=protrusion) **and a per-frame edge map** (the cell's
-    boundary in the current frame coloured by per-sector velocity or radius) +
-    summary + kymograph CSV export, for the selected cell.
+    blue=retraction/red=protrusion), a per-frame edge map, **and (with a Fluor
+    channel chosen) a cortical-fluorescence kymograph + an edge-velocity↔fluorescence
+    scatter** (e.g. tagged PIEZO1; `analysis.edge_piezo`), with the Pearson r in the
+    summary; + kymograph CSV export, for the selected cell.
   - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
     mode-fraction bars, heterogeneity entropy (lazy compute button). Compute runs
     off-thread (`AsyncComputeMixin`) → status-bar progress + ETA.
@@ -141,7 +145,8 @@ Read this before opening source files. Update it when modules change.
   space (Analysis ▸ Comparison window), opened on the loaded **Project**.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
   (Compute/recompute · **lags** (compute-time MSD lag count; cache keyed by it) ·
-  **Groups…** (opens `DesignEditor`) · Metric · Y ·
+  **fluor** (correlate edge change with a fluorescence channel → `edge_piezo_corr`)
+  · **Groups…** (opens `DesignEditor`) · Metric · Y ·
   **Control** (editable for single-arm designs) · MSD stat · OLS · **Results ▾**
   (multivariate test · save / load results · export CSVs) · **Style…** · **Help**) + a
   **Filters…** button (opens the `FilterMixin` dialog: frames / track-quality /
@@ -161,7 +166,8 @@ Read this before opening source files. Update it when modules change.
   the `PlotStyleDialog`; tabs/controls tooltipped. `hidden_groups` (set via the
   style dialog's Show-groups list) hides groups from the **graphs** only (Stats /
   Data still cover all); per-plot legends are managed in `_prep_legend`.
-- **compare_tables.py** — `StatsTablesMixin`: fills the right-panel **Stats** +
+- **compare_tables.py** — `ComputeWorker` (off-thread `build_comparison`: lag count
+  + optional fluorescence channel); `StatsTablesMixin`: fills the right-panel **Stats** +
   **Data** tables (`_update_stats`, `_fill_data`, `_set_table`); `ResultsIOMixin`:
   **save / load** the computed results (`_save_results`/`_load_results` →
   `compare.save_results`/`load_results`, restoring design + exclusions), CSV
@@ -276,7 +282,13 @@ Read this before opening source files. Update it when modules change.
 - **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
-  (protrusion/retraction/net/ruffling), `edge_summary_for_cell`.
+  (protrusion/retraction/net/ruffling), `edge_events` (ADAPT-style discrete
+  events), `edge_summary_for_cell`.
+- **edge_piezo.py** — edge-change ↔ cortical **fluorescence** (e.g. tagged PIEZO1)
+  correlation: `fluor_kymograph` (per-sector cortical intensity of a channel,
+  matched to the velocity kymograph), `aligned_pairs`, `edge_fluor_correlation`
+  (Pearson + Spearman r, protrusion-vs-retraction intensity, lag-1 'fluorescence
+  leads'), `edge_fluor_for_cell`. Reuses the 72 sectors / present-frame logic.
 - **shape_modes.py** — VAMPIRE-style population shape clustering (sklearn):
   `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
   per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
@@ -297,8 +309,9 @@ Read this before opening source files. Update it when modules change.
   vs state-segmented, filters, stats).
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
-  MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar),
-  `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
+  MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar; optional
+  `piezo_channel` adds per-cell edge↔fluorescence `edge_piezo_corr` columns via
+  `edge_piezo`), `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
@@ -362,6 +375,8 @@ Read this before opening source files. Update it when modules change.
   `comparison_doc`; `compare.per_condition_summary`, `ensemble_by_condition`
   (bin/max-lag), `multivariate_contrasts`, `save_results`/`load_results`, the
   border-distance metric.
+- **test_edge_piezo.py** — `edge_piezo`: fluorescence kymograph shape/values,
+  correlation sign (synthetic), end-to-end `edge_fluor_for_cell`.
 - **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
   straightness on synthetic straight tracks, end-to-end per-cell state metrics on
   a moving-square stack, and the speed cap.

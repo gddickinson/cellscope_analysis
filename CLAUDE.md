@@ -107,7 +107,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
 - **Edge Dynamics** dock: velocity/radius kymograph (angle×time) **and a
   per-frame edge map** (the cell's boundary in the current frame coloured by
-  per-sector velocity or radius) + summary + kymograph CSV export.
+  per-sector velocity or radius) + summary + kymograph CSV export. With a **Fluor
+  channel** chosen (e.g. tagged PIEZO1) it also shows a **cortical-fluorescence
+  kymograph** and an **edge-velocity ↔ fluorescence scatter** with the Pearson r
+  (`analysis/edge_piezo.py`) — does the channel track protrusion vs retraction?
 - **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
   mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
   per-cell plot metric.
@@ -123,6 +126,8 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   per-contrast p / Bonferroni / Cohen's d / optional covariate-adjusted **OLS**
   after frac_spread + density + omnibus KW + vehicle) · **Histogram** (per-cell
   distribution by group) · **Data** (per-recording + per-group tables, unit-tagged).
+  A **fluor channel** selector adds a per-cell **edge ↔ cortical-fluorescence**
+  correlation (`edge_piezo_corr`, e.g. tagged PIEZO1) as a comparison metric.
   Offers **whole-track** metrics *and* **state-segmented** ones (`mean_speed_spread`,
   `persistence_spread`, `mean_area_um2_rounded`, … via `analysis/state_metrics.py`)
   that **reproduce the original CellScope `compare/per_recording.csv`** (edge-excluded,

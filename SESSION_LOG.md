@@ -5,6 +5,37 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Edge change ↔ PIEZO1 (cortical fluorescence) correlation
+
+New analysis: correlate cell-edge protrusion/retraction with a fluorescence
+channel (e.g. tagged PIEZO1), in the Edge Dynamics tab and as a comparison metric.
+
+- **`analysis/edge_piezo.py`** (new): `fluor_kymograph` (per-sector cortical
+  intensity of a channel, matched to the velocity kymograph's 72 sectors),
+  `aligned_pairs`, `edge_fluor_correlation` (Pearson + Spearman r between edge
+  velocity and cortical intensity over all (frame, sector); protrusion-vs-
+  retraction intensity; lag-1 'fluorescence leads'), `edge_fluor_for_cell`.
+- **Edge Dynamics tab**: a **Fluor** channel selector + two new views —
+  *Fluorescence kymograph* and *Edge ↔ fluorescence* scatter (red protrude / blue
+  retract) with the Pearson r; the correlation is added to the summary. The viewer
+  passes the recording channel stack to the panel.
+- **Comparison window**: `build_comparison(piezo_channel=…)` adds a per-cell
+  **`edge_piezo_corr`** (+ lag1 + protrude−retract) column; a **fluor** selector in
+  the toolbar (populated cheaply from the sidecar via `recording.channel_names_of`),
+  threaded via `compare_tables.ComputeWorker`, cache keyed by the channel. The new
+  metric flows into the distribution / stats / multivariate machinery.
+
+No existing edge↔PIEZO1 code was found in the sibling projects to port, so this was
+built on this project's edge_dynamics + membrane machinery. Works on any channel —
+validated on the synthetic sample's fluorescence channel (the IC295 data has no
+tagged PIEZO1).
+
+Tests: `pytest` **50 passed** (new `tests/test_edge_piezo.py`); the progress smoke
+drives the edge↔fluor panel + the comparison `edge_piezo_corr` metric and writes
+`docs/screenshots/edge_piezo.png`. Both GUI smokes green; all files < 500 lines.
+
+---
+
 ## 2026-06-14 — Self-drive test pass → multivariate test + zoom-to-cell
 
 Drove the GUI on the **real 48-recording IC295 dataset** via the self-drive remote

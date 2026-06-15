@@ -88,6 +88,22 @@ def main():
     assert win.canvas.vb.viewRange() != before, "zoom-to-cell did not change the view"
     print(f"  zoom-to-cell OK (cell {cid})")
 
+    # edge ↔ fluorescence (PIEZO1-style): correlate edge change with a channel
+    chans = win.recording.channel_names
+    win.edge.fluor.setCurrentText(chans[0])               # the sample's fluor channel
+    app.processEvents()
+    assert win.edge._piezo is not None and win.edge._piezo.size, "fluor kymograph empty"
+    for m in range(win.edge.mode.count()):                # all modes incl. fluor views
+        win.edge.mode.setCurrentIndex(m); app.processEvents()
+    print(f"  edge↔fluor OK (channel '{chans[0]}', "
+          f"r={win.edge._psum.get('edge_piezo_pearson')})")
+    shot = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--shot=")), None)
+    if shot:
+        win.edge.mode.setCurrentText("Edge ↔ fluorescence")
+        win.edge.resize(560, 460); app.processEvents()
+        win.edge.grab().save(shot)
+        print(f"  saved screenshot → {shot}")
+
     # Comparison window: real threaded build_comparison drives its bottom bar
     from maskviewer.gui.compare_window import CompareWindow
     cw = CompareWindow(proj)
@@ -97,6 +113,13 @@ def main():
     assert ok, "CompareWindow threaded compute did not finish"
     print(f"  CompareWindow: threaded compute OK "
           f"({cw._per_cell['recording'].nunique()} recording(s))")
+    # edge-PIEZO1 correlation as a comparison metric (recompute with the channel)
+    cw.fluor.setCurrentText(chans[0])
+    cw.recompute.setChecked(True)
+    cw._compute()
+    ok = wait_until(app, lambda: cw._thread is None and cw._per_cell is not None)
+    assert ok and "edge_piezo_corr" in cw._per_cell.columns, "edge_piezo_corr missing"
+    print("  comparison edge_piezo_corr metric OK")
 
     # busy-guard: a second task while one runs is refused (not started)
     win.busy.start("blocker")

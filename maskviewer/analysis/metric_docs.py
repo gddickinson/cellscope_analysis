@@ -117,6 +117,15 @@ EXTRA = {
                       "mid-centroid ÷ interval (µm/min)."),
     "ruffling": ("Edge activity.",
                  "Mean over sectors of the temporal std of edge velocity."),
+    "edge_piezo_corr": ("Edge-change ↔ cortical fluorescence coupling (e.g. tagged "
+                        "PIEZO1). +ve = enriched where the membrane protrudes; "
+                        "−ve = enriched at retracting edges.",
+                        "Pearson r between per-sector edge velocity and cortical "
+                        "intensity of the chosen channel, over all (frame, sector); "
+                        "`edge_piezo_lag1` uses intensity one frame earlier "
+                        "(fluorescence leading); `piezo_protr_minus_retr` is the "
+                        "mean cortical intensity at protruding minus retracting "
+                        "sectors."),
 }
 
 
@@ -216,6 +225,8 @@ _KEY_ALIASES = {
     "frac_isolated": "speed_isolated / speed_crowded / frac_isolated",
     "min_border_dist": "border_dist", "mean_border_dist": "border_dist",
     "nn_dist": "nn_dist", "mean_nn_dist": "nn_dist", "median_nn_dist": "nn_dist",
+    "edge_piezo_lag1": "edge_piezo_corr",
+    "piezo_protr_minus_retr": "edge_piezo_corr",
 }
 
 

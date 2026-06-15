@@ -66,6 +66,19 @@ def _sidecar_path(tif_path: str) -> str | None:
     return matches[0] if matches else None
 
 
+def channel_names_of(tif_path: str) -> list:
+    """Channel names from the sidecar JSON without loading the (large) tif — for
+    populating a channel picker cheaply. [] if unknown."""
+    sc = _sidecar_path(tif_path) if tif_path else None
+    if sc:
+        try:
+            with open(sc) as f:
+                return list(json.load(f).get("channel_names") or [])
+        except (OSError, ValueError):
+            pass
+    return []
+
+
 def _normalise_axes(arr: np.ndarray) -> np.ndarray:
     """Coerce common layouts to (T, C, H, W)."""
     if arr.ndim == 2:                      # (H, W)            -> (1, 1, H, W)

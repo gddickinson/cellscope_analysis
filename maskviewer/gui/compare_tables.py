@@ -18,6 +18,31 @@ _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
               "Cohen d", "OLS β", "OLS p"]
 
 
+class ComputeWorker(QtCore.QObject):
+    """Runs `compare.build_comparison` off the GUI thread (lag count + optional
+    edge↔fluorescence channel); emits per-recording progress, then the result."""
+    progress = QtCore.pyqtSignal(int, int)
+    done = QtCore.pyqtSignal(object)
+
+    def __init__(self, entries, max_lag=0, piezo_channel=None):
+        super().__init__()
+        self.entries = entries
+        self.max_lag = max_lag
+        self.piezo_channel = piezo_channel
+        self.cancel = False
+
+    def run(self):
+        try:
+            res = compare.build_comparison(
+                self.entries, max_lag=self.max_lag,
+                piezo_channel=self.piezo_channel,
+                progress_cb=lambda i, n: (self.progress.emit(i, n)
+                                          or not self.cancel))
+        except Exception as exc:                          # surface, don't crash
+            res = exc
+        self.done.emit(res)
+
+
 class ResultsIOMixin:
     """Save / load the computed comparison results + CSV export (compare_window)."""
 

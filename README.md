@@ -29,7 +29,11 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   autocorrelation. **Zoom to Cell** (`Z`) frames the view on the selected cell —
   handy in a large sparse field of view.
 - **Membrane dynamics** — protrusion/retraction **kymograph** + a per-frame edge
-  map coloured by edge velocity, with event detection.
+  map coloured by edge velocity, with event detection. With a **fluorescence
+  channel** (e.g. tagged **PIEZO1**), correlate **edge change ↔ cortical
+  fluorescence** — a cortical-intensity kymograph + an edge-velocity-vs-intensity
+  scatter (Pearson r): is the channel enriched where the membrane protrudes or
+  retracts? Available per cell and as a **cross-treatment comparison metric**.
 - **Shape modes** — VAMPIRE-style clustering (mode shapes, fractions, entropy,
   eigenshapes).
 - **Population** — all cells at once: time series, mean ± SEM/SD, histogram,
@@ -81,6 +85,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 | Cell inspection | Population (flower) | Shape modes |
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
+
+![edge change vs cortical fluorescence (e.g. tagged PIEZO1) — per-sector scatter + Pearson r](docs/screenshots/edge_piezo.png)
 
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
 
