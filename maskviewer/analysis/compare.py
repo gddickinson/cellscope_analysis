@@ -22,15 +22,31 @@ MAX_LAG = 30                      # lags for the ensemble-MSD-by-condition curve
 _SKIP = {"cell_id", "first_frame", "last_frame"}
 
 
-def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG):
+def _resolve_channel(rec, channel):
+    """Channel index for a name/index against a recording, or None if absent."""
+    if channel is None or rec is None:
+        return None
+    names = list(getattr(rec, "channel_names", []) or [])
+    if isinstance(channel, str):
+        return names.index(channel) if channel in names else None
+    ch = int(channel)
+    return ch if 0 <= ch < rec.n_channels else None
+
+
+def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
+                     piezo_channel=None):
     """(per_cell_df, msd_long_df) across all entries with masks.
 
     per_cell_df: per-cell rows + recording + condition. msd_long_df: per-recording
     ensemble MSD (mean over cells) in long form (recording, condition, tau, msd) up
-    to ``max_lag`` lags. ``progress_cb(done, total)`` is called per recording;
-    returning False cancels. Recordings without masks/cells are skipped.
+    to ``max_lag`` lags. ``piezo_channel`` (channel name or index) → also add
+    per-cell **edge-movement ↔ fluorescence-intensity** columns (`edge_piezo_corr`
+    = Pearson r, `edge_piezo_slope`, `piezo_protr_minus_retr`; via `edge_intensity`,
+    the faithful ``cell_edge_analysis`` reproduction). ``progress_cb(done, total)``
+    is called per recording; returning False cancels. Recordings w/o cells skip.
     """
     import pandas as pd
+    from . import edge_intensity
     max_lag = int(max_lag) if max_lag and max_lag > 0 else MAX_LAG
     parts, msd_rows = [], []
     n = len(entries)
@@ -56,6 +72,18 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
             masks.labels, rec.um_per_px, rec.time_interval_min, per_frame_df=pf)
         if not sdf.empty:
             df = df.merge(sdf, on="cell_id", how="left")
+        ch = _resolve_channel(rec, piezo_channel)
+        if ch is not None:                            # edge movement ↔ intensity
+            image = rec.data[:, ch]
+            prows = []
+            for cid in df["cell_id"]:
+                *_, summ = edge_intensity.analyze_cell(
+                    masks.labels, image, int(cid), rec.um_per_px, rec.time_interval_min)
+                prows.append({"cell_id": int(cid),
+                              "edge_piezo_corr": summ["edge_move_intensity_r"],
+                              "edge_piezo_slope": summ["edge_move_intensity_slope"],
+                              "piezo_protr_minus_retr": summ["piezo_protr_minus_retr"]})
+            df = df.merge(pd.DataFrame(prows), on="cell_id", how="left")
         df["recording"] = e.label
         df["condition"] = e.condition or "?"
         parts.append(df)
@@ -271,6 +299,41 @@ def per_condition_summary(per_recording, metric):
         sem = float(v.std(ddof=1) / np.sqrt(v.size)) if v.size > 1 else 0.0
         out.append({"group": cond, "n": int(v.size), "mean": float(v.mean()),
                     "sem": sem, "median": float(np.median(v))})
+    return out
+
+
+def multivariate_contrasts(per_recording, arms=None):
+    """Per-arm multivariate separation: PERMANOVA p + leave-one-recording-out AUC
+    over ALL numeric per-recording metrics (z-scored). Recording = unit. Surfaces
+    the multivariate phenotype that single-metric tests can miss (e.g. KO vs WT).
+    Returns [{arm, contrast, n_ctrl, n_test, n_features, permanova_p, loro_auc}];
+    p/auc are None when a contrast has < 2 recordings/group or < 2 usable metrics.
+    """
+    from . import feature_tables, multivariate as mv
+    use_arms = feature_tables.ARMS if arms is None else arms
+    if per_recording is None or per_recording.empty:
+        return []
+    cols = metric_columns(per_recording)
+    out = []
+    for arm, spec in use_arms.items():
+        ctrl = spec["control"]
+        for t in [c for c in spec["conditions"] if c != ctrl]:
+            sub = per_recording[per_recording["condition"].isin([ctrl, t])]
+            g = sub["condition"]
+            n_c, n_t = int((g == ctrl).sum()), int((g == t).sum())
+            row = {"arm": arm, "contrast": f"{t} vs {ctrl}", "n_ctrl": n_c,
+                   "n_test": n_t, "n_features": 0, "permanova_p": None,
+                   "loro_auc": None}
+            feats = [c for c in cols
+                     if np.isfinite(sub[c].to_numpy(float)).all()
+                     and float(np.nanstd(sub[c].to_numpy(float))) > 0]
+            if n_c >= 2 and n_t >= 2 and len(feats) >= 2:
+                X = sub[feats].to_numpy(float)
+                X = (X - X.mean(0)) / X.std(0)
+                row["n_features"] = len(feats)
+                row["permanova_p"] = float(mv.permanova(X, g.to_numpy())[1])
+                row["loro_auc"] = float(mv.loro_auc(X, (g == t).to_numpy(int))[0])
+            out.append(row)
     return out
 
 

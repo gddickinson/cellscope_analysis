@@ -186,6 +186,10 @@ class ImageCanvas(pg.GraphicsLayoutWidget):
     def autorange(self):
         self.vb.autoRange()
 
+    def focus(self, y0, y1, x0, x1, pad=0.6):
+        """Frame the view on a pixel bbox (row/col) with fractional padding."""
+        self.vb.setRange(xRange=(x0, x1), yRange=(y0, y1), padding=float(pad))
+
     def zoom(self, factor: float):
         self.vb.scaleBy((factor, factor))
 

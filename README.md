@@ -26,9 +26,17 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   characteristic (shape, perimeter, circularity, convexity, state, speed,
   displacement, turning, IoU, nearest-neighbour, per-channel intensity / membrane
   metrics) + MSD (log/linear, α/D + Fürth persistence-time) + direction
-  autocorrelation.
+  autocorrelation. **Zoom to Cell** (`Z`) frames the view on the selected cell —
+  handy in a large sparse field of view.
 - **Membrane dynamics** — protrusion/retraction **kymograph** + a per-frame edge
-  map coloured by edge velocity, with event detection.
+  map coloured by edge velocity, with event detection. With a **fluorescence
+  channel** (tagged **PIEZO1**, **SiR-actin**, or any signal), correlate **edge
+  movement ↔ fluorescence intensity** — at each edge point a rectangle reaches into
+  the cell and its mean intensity is plotted against the local protrusion/retraction
+  (scatter coloured by movement class, regression line, **Pearson r / R² / p**, plus
+  protrude-vs-retract means and a t-test/Mann–Whitney). A faithful reproduction of
+  the lab's `cell_edge_analysis` pipeline, adapted to closed tracked cells. Available
+  per cell and as a **cross-treatment comparison metric**.
 - **Shape modes** — VAMPIRE-style clustering (mode shapes, fractions, entropy,
   eigenshapes).
 - **Population** — all cells at once: time series, mean ± SEM/SD, histogram,
@@ -46,7 +54,10 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   used; the right panel is tabbed — **Stats** (per-contrast p / Bonferroni /
   Cohen's d / covariate-adjusted OLS + per-arm KW + vehicle) · **Histogram**
   (per-cell distribution by group) · **Data** (per-recording + per-group tables,
-  unit-tagged). It offers **whole-track** metrics and **state-segmented** ones
+  unit-tagged). A **multivariate phenotype test** (Results ▾) reports per-arm
+  **PERMANOVA p + leave-one-recording-out AUC** over all metrics — catching
+  separation single metrics miss. It offers **whole-track** metrics and
+  **state-segmented** ones
   (`mean_speed_spread`, `persistence_spread`, …) that reproduce the original
   CellScope state-aware analysis. A **Help** button + per-metric tooltips explain
   every metric, and every graph is **stylable** — a **Style…** button (or
@@ -78,6 +89,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
+![edge movement vs fluorescence intensity (tagged PIEZO1 / SiR-actin / any signal) — scatter coloured by movement class with regression + r/R²/p](docs/screenshots/edge_piezo.png)
+
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
 
 ![the Comparison window Histogram tab — per-cell distribution by group, units on the axis](docs/screenshots/comparison_histogram.png)
@@ -85,6 +98,8 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 ![the per-graph plot-style options (Style… / shift-right-click)](docs/screenshots/comparison_style.png)
 
 ![the cell / recording filters (Filters…)](docs/screenshots/comparison_filters.png)
+
+![multivariate phenotype test — PERMANOVA + leave-one-recording-out AUC per arm](docs/screenshots/comparison_multivariate.png)
 
 ![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 

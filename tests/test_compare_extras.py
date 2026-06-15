@@ -81,6 +81,28 @@ def test_ensemble_by_condition_bin_and_maxlag():
     assert len(tb) < 10 and tb.min() >= 10.0
 
 
+def test_multivariate_contrasts():
+    rng = np.random.default_rng(0)
+    rows = []
+    for cond, shift in (("WT", 0.0), ("KO", 1.0)):       # KO clearly separated
+        for r in range(4):
+            rows.append({"recording": f"{cond}{r}", "condition": cond,
+                         "mean_area_um2": float(rng.normal(100 + 40 * shift, 5)),
+                         "frac_spread": float(rng.normal(0.5 + 0.2 * shift, 0.02)),
+                         "mean_speed_spread": float(rng.normal(1.0 + shift, 0.05))})
+    per_rec = pd.DataFrame(rows)
+    arms = {"genetic": {"control": "WT", "conditions": ["WT", "KO"]}}
+    res = compare.multivariate_contrasts(per_rec, arms=arms)
+    assert len(res) == 1
+    r = res[0]
+    assert r["contrast"] == "KO vs WT" and r["n_features"] >= 2
+    assert 0.0 <= r["permanova_p"] <= 1.0
+    assert r["loro_auc"] >= 0.5                           # separable → strong AUC
+    # too few recordings → graceful None
+    tiny = per_rec[per_rec["recording"].isin(["WT0", "KO0"])]
+    assert compare.multivariate_contrasts(tiny, arms=arms)[0]["permanova_p"] is None
+
+
 def test_save_load_results_roundtrip(tmp_path):
     pc = pd.DataFrame({"recording": ["a", "b"], "condition": ["WT", "KO"],
                        "cell_id": [1, 2], "mean_area_um2": [100.0, 200.0]})

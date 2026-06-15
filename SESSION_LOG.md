@@ -5,6 +5,80 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Edge movement ↔ fluorescence intensity (faithful `cell_edge_analysis`)
+
+Correlate cell-edge protrusion/retraction with a fluorescence channel (tagged
+PIEZO1, **SiR-actin**, or any signal), in the Edge Dynamics tab and as a comparison
+metric. This is a **faithful reproduction of the lab's `cell_edge_analysis`
+9-step pipeline** (`~/Documents/GitHub/cell_edge_analysis_individual_scripts`),
+adapted to this project's closed, tracked cells.
+
+The original works on a single advancing edge `y(x)` (per-x displacement of the
+uppermost edge point, vertical sampling rectangle into the cell, correlate the
+rectangle's mean PIEZO1 intensity with that displacement). Here a cell is a closed
+contour, so the per-x displacement becomes the **per-sector radial edge velocity**
+about the mid-centroid (`edge_dynamics`, translation-removed) and the vertical
+rectangle becomes a rectangle along the **inward normal** at each sector.
+
+- **`analysis/edge_intensity.py`** (new, replaces the earlier approximate
+  `edge_piezo.py`): `rectangle_intensity` / `intensity_kymograph` (mean fluorescence
+  in a `depth`×`width` px rectangle reaching into the cell, coverage-gated),
+  `movement_intensity_pairs` (local displacement ↔ rectangle intensity, `past`/
+  `future`), `correlation_summary` (Pearson **r / R² / p / slope**; protruding/
+  retracting/stable counts + mean intensities split at a displacement threshold;
+  protrude−retract Δ; **t-test + Mann-Whitney** between protruding and retracting),
+  `rectangles_for_frame`, `analyze_cell`.
+- **Edge Dynamics tab**: a **Fluor** selector + new views — *Intensity kymograph*,
+  the *Edge movement ↔ intensity* scatter (points coloured blue=protrude /
+  grey=stable / red=retract, regression line, r/R²/p in the title) and a
+  *Sampling rectangles* overlay (centres coloured by intensity); the by-movement-type
+  means + Mann-Whitney are in the summary.
+- **Comparison window**: `build_comparison(piezo_channel=…)` adds per-cell
+  **`edge_piezo_corr`** (Pearson r), **`edge_piezo_slope`**, **`piezo_protr_minus_retr`**
+  via `edge_intensity.analyze_cell`; **fluor** toolbar selector (channels read cheaply
+  from the sidecar via `recording.channel_names_of`), threaded via
+  `compare_tables.ComputeWorker`, cache keyed by channel. Flows into the
+  distribution / stats / multivariate machinery.
+
+Validated on the synthetic sample's fluorescence channel (the IC295 data has no
+tagged PIEZO1; the method is channel-agnostic — SiR-actin Cy5 works identically).
+Tests: `pytest` **53 passed** (new `tests/test_edge_intensity.py`, sign ± /
+classification / degenerate / end-to-end on synthetic deforming cells; removed
+`test_edge_piezo.py`); the progress smoke drives the panel + the comparison metric
+and writes `docs/screenshots/edge_piezo.png`. Both GUI smokes green; all files
+< 500 lines.
+
+---
+
+## 2026-06-14 — Self-drive test pass → multivariate test + zoom-to-cell
+
+Drove the GUI on the **real 48-recording IC295 dataset** via the self-drive remote
+(`MASKVIEWER_REMOTE`, offscreen): loaded recordings, composite Cy5+DIC, colour-by
+metrics + units bar, threaded Population/Shape/Cell-table computes (progress bar),
+cell selection, screenshots — all good. Two improvements fell out:
+
+- **Analysis — multivariate phenotype test in the GUI** (`compare.multivariate_contrasts`
+  + `compare_tables.multivariate_dialog`, Results ▾ ▸ *Multivariate test*): per-arm
+  **PERMANOVA p + leave-one-recording-out AUC** over all per-recording metrics,
+  reusing `multivariate.py`. Surfaces the headline KO-vs-WT multivariate phenotype
+  (previously script-only).
+- **UX — Zoom to Cell** (`ImageCanvas.focus`, `WindowActionsMixin.zoom_to_cell`,
+  View ▸ Zoom to Cell / `Z` / remote `zoom_cell`): frames the canvas on the selected
+  cell — in the real 2048² FOV cells are tiny dots, so this was the clearest pain
+  point. Verified via the remote on real data (scale bar 200 µm → 20 µm).
+
+Tests: `pytest` **47 passed** (multivariate_contrasts + ensemble bin/max-lag +
+save/load + border-distance); compare smoke adds the multivariate dialog +
+`_multivariate.png`; progress smoke adds zoom-to-cell. Both GUI smokes green; all
+files < 500 lines. (Screenshots stay synthetic — public-repo policy; real data used
+only for validation.)
+
+Next ideas (not yet done): per-cell-pooled (cell=unit) stats toggle in the
+Comparison window; SiR-actin (Cy5) cortical-intensity-vs-edge-velocity correlation;
+a menu bar for the increasingly busy Comparison toolbar; double-click-to-zoom.
+
+---
+
 ## 2026-06-14 — Compute-time MSD lag count exposed
 
 Followed the display-time max-lag with the **compute-time** one:

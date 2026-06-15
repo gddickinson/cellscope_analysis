@@ -18,6 +18,31 @@ _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
               "Cohen d", "OLS β", "OLS p"]
 
 
+class ComputeWorker(QtCore.QObject):
+    """Runs `compare.build_comparison` off the GUI thread (lag count + optional
+    edge↔fluorescence channel); emits per-recording progress, then the result."""
+    progress = QtCore.pyqtSignal(int, int)
+    done = QtCore.pyqtSignal(object)
+
+    def __init__(self, entries, max_lag=0, piezo_channel=None):
+        super().__init__()
+        self.entries = entries
+        self.max_lag = max_lag
+        self.piezo_channel = piezo_channel
+        self.cancel = False
+
+    def run(self):
+        try:
+            res = compare.build_comparison(
+                self.entries, max_lag=self.max_lag,
+                piezo_channel=self.piezo_channel,
+                progress_cb=lambda i, n: (self.progress.emit(i, n)
+                                          or not self.cancel))
+        except Exception as exc:                          # surface, don't crash
+            res = exc
+        self.done.emit(res)
+
+
 class ResultsIOMixin:
     """Save / load the computed comparison results + CSV export (compare_window)."""
 
@@ -64,6 +89,14 @@ class ResultsIOMixin:
         self._refresh_control_combo()
         self._on_done((per_cell, msd), cached=True)      # refresh combos + replot
 
+    def _show_multivariate(self):
+        if self._per_cell is None:
+            return
+        pc = self._filtered()
+        if pc is None or pc.empty:
+            return
+        show_multivariate(self, compare.aggregate(pc), self.project.design)
+
     def _export(self):
         if self._per_cell is None:
             return
@@ -83,6 +116,44 @@ class ResultsIOMixin:
             self._msd.to_csv(os.path.join(d, "comparison_ensemble_msd.csv"),
                              index=False)
         QtWidgets.QMessageBox.information(self, "Exported", f"CSVs written to {d}")
+
+
+def show_multivariate(parent, per_rec, design):
+    """Modal table of per-arm PERMANOVA p + leave-one-recording-out AUC."""
+    multivariate_dialog(parent, per_rec, design).exec_()
+
+
+def multivariate_dialog(parent, per_rec, design):
+    """Build (don't show) the multivariate-results dialog."""
+    rows = compare.multivariate_contrasts(per_rec, arms=design.arms)
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Multivariate phenotype (recording = unit)")
+    dlg.resize(580, 360)
+    lay = QtWidgets.QVBoxLayout(dlg)
+    lay.addWidget(QtWidgets.QLabel(
+        "PERMANOVA + leave-one-recording-out classifier AUC over <i>all</i> metrics "
+        "— detects multivariate separation that single-metric tests can miss "
+        "(permutation tests; recording = experimental unit)."))
+    cols = ["arm", "contrast", "n ctrl", "n test", "# metrics", "PERMANOVA p", "LORO AUC"]
+    keys = ["arm", "contrast", "n_ctrl", "n_test", "n_features", "permanova_p", "loro_auc"]
+    tbl = QtWidgets.QTableWidget(len(rows), len(cols))
+    tbl.setHorizontalHeaderLabels(cols)
+    tbl.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+    for ri, r in enumerate(rows):
+        for ci, k in enumerate(keys):
+            v = r.get(k)
+            item = QtWidgets.QTableWidgetItem()
+            if isinstance(v, str) or v is None:
+                item.setText("" if v is None else v)
+            else:
+                item.setData(QtCore.Qt.DisplayRole, round(float(v), 4))
+            tbl.setItem(ri, ci, item)
+    tbl.resizeColumnsToContents()
+    lay.addWidget(tbl, 1)
+    btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+    btns.rejected.connect(dlg.reject)
+    lay.addWidget(btns)
+    return dlg
 
 
 def show_metrics_help(parent):

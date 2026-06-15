@@ -29,16 +29,18 @@ Read this before opening source files. Update it when modules change.
   exercises the **filters** (frames / quality / cells-per-rec / state / crowding /
   edge via the Filters… dialog), the right **Stats / Histogram / Data** tabs +
   units, the **bars view + plot-style dialog (style / fits / msd-points / groups /
-  background / legend / filter annotation) + shift-right-click + save/load results**,
-  the **Groups & Comparisons editor** (exclude / regroup / add-comparison / control
-  / vehicle / reset), and verifies `ViewerWindow.open_compare_window` /
-  `set_project`. `--shot=PATH` (also writes `_msd` / `_histogram` / `_style` /
-  `_filters` variants) / `--editshot=PATH` (re)write the screenshots.
+  background / legend / filter annotation) + shift-right-click + save/load results
+  + multivariate dialog**, the **Groups & Comparisons editor** (exclude / regroup /
+  add-comparison / control / vehicle / reset), and verifies
+  `ViewerWindow.open_compare_window` / `set_project`. `--shot=PATH` (also writes
+  `_msd` / `_histogram` / `_style` / `_filters` / `_multivariate` variants) /
+  `--editshot=PATH` (re)write the screenshots.
 - **scripts/smoke_progress.py** — headless smoke for the status-bar progress bars:
   unit-checks `StatusProgress` + `TaskRunner`, then drives the main viewer's
   Population / Cell-table / Shape computes through the off-thread runner (asserting
-  progress ticks + applied results) and the Comparison window's threaded compute,
-  plus the busy-guard.
+  progress ticks + applied results), **zoom-to-cell**, the **edge-movement↔intensity**
+  panel + comparison `edge_piezo_corr` metric, and the Comparison window's threaded
+  compute, plus the busy-guard. `--shot=PATH` writes the edge-fluor screenshot.
 - **scripts/run_followup.py** — runs the multivariate / dynamics /
   interactions investigation and prints arm-structured results.
 - **scripts/plot_followup.py** — writes the basic multivariate figures
@@ -79,6 +81,8 @@ Read this before opening source files. Update it when modules change.
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
   `(T,C,H,W)`, `channel_names`, `um_per_px`, `time_interval_min`, `.frame(t,c)`).
   Reads the `.ome.json` sidecar; coerces 2-D/3-D inputs to `(T,C,H,W)`.
+  `channel_names_of(tif)` reads just the sidecar's channel names (no tif load —
+  for a cheap channel picker).
 - **masks.py** — `load_masks(npz)` → `Masks` (`labels` `(T,H,W)`,
   `.frame(t)`, `.max_label`, `.cell_ids()`, `.n_cells_per_frame()`).
 - **dataset.py** — `discover(roots)` → sorted `[Entry]`; an `Entry`
@@ -94,7 +98,7 @@ Read this before opening source files. Update it when modules change.
   `set_base(img, levels, lut)`, `set_base_layers([...])` (additive composite of
   several channels), `set_overlay(...)`, `set_colorbar(legend)` (units colour bar
   for colour-by, via a `ColorBarItem`), emits `cellHovered(int)` +
-  `cellClicked(int)`, `zoom`/`autorange`.
+  `cellClicked(int)`, `zoom` / `autorange` / `focus(bbox)` (frame a pixel bbox).
 - **colorby.py** — `overlay_lut(win, lab)` → `(label-LUT, legend)` for the
   current colour-by metric (legend = lo/hi/cmap/units for the colour bar).
 - **overlays.py** — `Overlays`: scale bar, frame/time text, cell-ID labels,
@@ -120,9 +124,12 @@ Read this before opening source files. Update it when modules change.
     the enabled-metric set (QSettings-persisted); `set_metric_enabled` recomputes
     immediately.
   - **edge_panel.py** `EdgePanel` — velocity / radius **kymograph** (angle×time,
-    blue=retraction/red=protrusion) **and a per-frame edge map** (the cell's
-    boundary in the current frame coloured by per-sector velocity or radius) +
-    summary + kymograph CSV export, for the selected cell.
+    blue=retraction/red=protrusion), a per-frame edge map, **and (with a Fluor
+    channel chosen — PIEZO1, SiR-actin, any signal) the faithful edge-movement ↔
+    intensity views**: a rectangle-intensity kymograph, the **edge-displacement vs
+    intensity scatter** coloured by movement class (with regression line + r/R²/p),
+    and a per-frame **sampling-rectangles** overlay (`analysis.edge_intensity`);
+    the by-movement-type means + Mann-Whitney are in the summary. + CSV export.
   - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
     mode-fraction bars, heterogeneity entropy (lazy compute button). Compute runs
     off-thread (`AsyncComputeMixin`) → status-bar progress + ETA.
@@ -140,9 +147,10 @@ Read this before opening source files. Update it when modules change.
   space (Analysis ▸ Comparison window), opened on the loaded **Project**.
   Background compute (`_Worker` thread) + per-project disk cache; toolbar
   (Compute/recompute · **lags** (compute-time MSD lag count; cache keyed by it) ·
-  **Groups…** (opens `DesignEditor`) · Metric · Y ·
+  **fluor** (correlate edge movement with a fluorescence channel → `edge_piezo_corr`)
+  · **Groups…** (opens `DesignEditor`) · Metric · Y ·
   **Control** (editable for single-arm designs) · MSD stat · OLS · **Results ▾**
-  (save / load computed results · export CSVs) · **Style…** · **Help**) + a
+  (multivariate test · save / load results · export CSVs) · **Style…** · **Help**) + a
   **Filters…** button (opens the `FilterMixin` dialog: frames / track-quality /
   cells-per-recording / state / nearest-neighbour crowding / distance-from-edge).
   Left tabbed plots — **Distributions** (strip / box+Bonferroni / bars /
@@ -160,11 +168,14 @@ Read this before opening source files. Update it when modules change.
   the `PlotStyleDialog`; tabs/controls tooltipped. `hidden_groups` (set via the
   style dialog's Show-groups list) hides groups from the **graphs** only (Stats /
   Data still cover all); per-plot legends are managed in `_prep_legend`.
-- **compare_tables.py** — `StatsTablesMixin`: fills the right-panel **Stats** +
+- **compare_tables.py** — `ComputeWorker` (off-thread `build_comparison`: lag count
+  + optional fluorescence channel); `StatsTablesMixin`: fills the right-panel **Stats** +
   **Data** tables (`_update_stats`, `_fill_data`, `_set_table`); `ResultsIOMixin`:
   **save / load** the computed results (`_save_results`/`_load_results` →
-  `compare.save_results`/`load_results`, restoring design + exclusions) + CSV
-  **`_export`**; `show_metrics_help(parent)`. Split out to keep `compare_window` small.
+  `compare.save_results`/`load_results`, restoring design + exclusions), CSV
+  **`_export`**, and `_show_multivariate`; `multivariate_dialog`/`show_multivariate`
+  (PERMANOVA + LORO-AUC table) + `show_metrics_help(parent)`. Split out to keep
+  `compare_window` small.
 - **compare_filters.py** — `FilterMixin`: builds the cell/recording filter widgets,
   lays them out in a non-modal **Filters…** dialog, and applies them in `_filtered`
   (min frames · track-quality · min cells/recording · state · NN distance min/max ·
@@ -225,8 +236,9 @@ Read this before opening source files. Update it when modules change.
   `set_project` to adopt a different dataset, and `open_compare_window`), the
   lazy+cached heavy-compute providers (`_population_table` / `_shape_modes_model`,
   `progress_cb`-aware), **`run_task`** (off-thread compute → status-bar bar/ETA),
-  + the remote-control handlers (`remote_state/set/cmd/screenshot`); keeps
-  `viewer_window` small.
+  **`zoom_to_cell`** (frame the canvas on the selected cell — View ▸ Zoom to Cell /
+  `Z` / remote `zoom_cell`), + the remote-control handlers
+  (`remote_state/set/cmd/screenshot`); keeps `viewer_window` small.
 - **remote.py** — `RemoteControl`: optional localhost HTTP self-drive
   (`MASKVIEWER_REMOTE=<port>`); marshals commands to the GUI thread; for headless
   agent driving + screenshots.
@@ -272,7 +284,18 @@ Read this before opening source files. Update it when modules change.
 - **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
-  (protrusion/retraction/net/ruffling), `edge_summary_for_cell`.
+  (protrusion/retraction/net/ruffling), `edge_events` (ADAPT-style discrete
+  events), `edge_summary_for_cell`.
+- **edge_intensity.py** — edge-movement ↔ **fluorescence-intensity** correlation
+  (tagged PIEZO1, SiR-actin, any signal); a faithful reproduction of the lab's
+  `cell_edge_analysis` pipeline adapted to closed tracked cells. `rectangle_intensity`
+  /`intensity_kymograph` (mean fluorescence in a `depth`×`width` px rectangle reaching
+  **into the cell** along the inward normal per sector), `movement_intensity_pairs`
+  (local radial displacement ↔ rectangle intensity, `past`/`future`),
+  `correlation_summary` (Pearson **r / R² / p / slope**, protruding/retracting/stable
+  counts + mean intensities, protrude−retract Δ, t-test + Mann-Whitney),
+  `rectangles_for_frame` (overlay), `analyze_cell` (end-to-end). Reuses the 72
+  sectors / mid-centroid radial velocity of `edge_dynamics`.
 - **shape_modes.py** — VAMPIRE-style population shape clustering (sklearn):
   `fit_shape_modes` (aligned radial contour signatures → PCA + K-means → mode
   per cell-frame + mode mean-shapes + Shannon-entropy heterogeneity),
@@ -293,15 +316,19 @@ Read this before opening source files. Update it when modules change.
   vs state-segmented, filters, stats).
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
   (→ per-cell table over many recordings + condition, AND per-recording ensemble
-  MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar),
+  MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar; optional
+  `piezo_channel` adds per-cell edge-movement↔intensity `edge_piezo_corr` /
+  `edge_piezo_slope` / `piezo_protr_minus_retr` columns via `edge_intensity`),
   `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
   `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
   `per_condition_summary` (per-group n / mean / SEM / median over recordings —
-  the Data tab), `save_results` / `load_results` (pickle the computed per-cell +
-  MSD frames + meta for reload-without-recompute). Per-arm KW / Bonferroni reuse
-  `feature_tables.arm_tests`.
+  the Data tab), `multivariate_contrasts` (per-arm **PERMANOVA p + leave-one-
+  recording-out AUC** over all metrics, reusing `multivariate.py` — the
+  multivariate phenotype in the GUI), `save_results` / `load_results` (pickle the
+  computed per-cell + MSD frames + meta for reload-without-recompute). Per-arm KW /
+  Bonferroni reuse `feature_tables.arm_tests`.
   `build_comparison` also merges in the **state-segmented** per-cell metrics
   (`state_metrics`) so the GUI can reproduce the original analysis.
 - **state_metrics.py** — `per_cell_state_metrics`: per-cell metrics computed
@@ -353,7 +380,12 @@ Read this before opening source files. Update it when modules change.
   generic single-arm), `regroup` exclude/override, effective conditions +
   `all_groups`, `ensure_colors`, save/load roundtrip of excluded/overrides.
 - **test_compare_extras.py** — `metric_docs` units / labels / per-state suffix /
-  `comparison_doc` + `compare.per_condition_summary` (units + per-group summary).
+  `comparison_doc`; `compare.per_condition_summary`, `ensemble_by_condition`
+  (bin/max-lag), `multivariate_contrasts`, `save_results`/`load_results`, the
+  border-distance metric.
+- **test_edge_intensity.py** — `edge_intensity`: rectangle sampling shape/coverage,
+  correlation sign ±, movement classification + protrude−retract Δ, degenerate
+  inputs, `rectangles_for_frame`, end-to-end `analyze_cell` (synthetic cells).
 - **test_state_metrics.py** — `state_metrics`: segmentation helper, persistence /
   straightness on synthetic straight tracks, end-to-end per-cell state metrics on
   a moving-square stack, and the speed cap.

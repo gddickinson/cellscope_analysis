@@ -20,7 +20,9 @@ from PyQt5 import QtCore, QtWidgets
 from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
-from .compare_tables import StatsTablesMixin, ResultsIOMixin, show_metrics_help
+from .compare_tables import (StatsTablesMixin, ResultsIOMixin, ComputeWorker,
+                             show_metrics_help)
+from ..io import recording as _recording
 from .compare_filters import FilterMixin
 from .plot_style import PlotStyle, PlotStyleMixin
 from ..analysis import compare, metric_docs
@@ -28,27 +30,6 @@ from ..config import PROJECT_ROOT
 
 _DIST_KINDS = ["Strip (mean ± SEM)", "Box (+ Bonferroni)", "Superplot",
                "Bars (mean ± SEM)"]
-
-
-class _Worker(QtCore.QObject):
-    progress = QtCore.pyqtSignal(int, int)
-    done = QtCore.pyqtSignal(object)
-
-    def __init__(self, entries, max_lag=0):
-        super().__init__()
-        self.entries = entries
-        self.max_lag = max_lag
-        self.cancel = False
-
-    def run(self):
-        try:
-            res = compare.build_comparison(
-                self.entries, max_lag=self.max_lag,
-                progress_cb=lambda i, n: (self.progress.emit(i, n)
-                                          or not self.cancel))
-        except Exception as exc:                          # surface, don't crash
-            res = exc
-        self.done.emit(res)
 
 
 class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixin,
@@ -86,6 +67,11 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.lags.setPrefix("lags ")
         self.lags.setToolTip("Number of MSD lags computed (max τ = lags × frame "
                              "interval) — click Compute to apply (recompute)")
+        self.fluor = QtWidgets.QComboBox()
+        self.fluor.addItem("(no fluor)")
+        self.fluor.setToolTip("Correlate edge protrusion/retraction with a fluor "
+                              "channel per cell (PIEZO1, SiR-actin, any signal) → "
+                              "edge_piezo_corr metric — click Compute to apply")
         self.metric = QtWidgets.QComboBox()
         self.metric.setToolTip("Primary metric — drives the left plots, the "
                                "histogram, stats and data tables. _spread / "
@@ -117,6 +103,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
                                     "or export them as CSVs")
         self.results_btn.setPopupMode(QtWidgets.QToolButton.InstantPopup)
         rmenu = QtWidgets.QMenu(self.results_btn)
+        rmenu.addAction("Multivariate test…", self._show_multivariate)
+        rmenu.addSeparator()
         rmenu.addAction("Save results…", self._save_results)
         rmenu.addAction("Load results…", self._load_results)
         rmenu.addSeparator()
@@ -138,8 +126,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
 
         bar = QtWidgets.QToolBar()
         bar.setMovable(False)
-        for w in (self.compute_btn, self.recompute, self.lags, self.groups_btn,
-                  self.filters_btn):
+        for w in (self.compute_btn, self.recompute, self.lags, self.fluor,
+                  self.groups_btn, self.filters_btn):
             bar.addWidget(w)
         bar.addSeparator()
         for lbl, w in (("Metric", self.metric), ("Y", self.metric_y),
@@ -292,12 +280,28 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
             t.setRowCount(0)
         self.omnibus.setText("")
         self._refresh_control_combo()
+        self._refresh_fluor_combo()
         if self._design_editor is not None:
             self._design_editor.set_project(project, None)
         self.setWindowTitle(f"Comparison — {project.name}")
         self.status.showMessage(
             f"{project.name}: {project.n_recordings} recordings · "
             f"{len(project.conditions)} groups — click Compute")
+
+    def _refresh_fluor_combo(self):
+        names = next((n for e in self.project.entries        # from the first sidecar
+                      if (n := _recording.channel_names_of(e.recording_path))), [])
+        cur = self.fluor.currentText()
+        self.fluor.blockSignals(True)
+        self.fluor.clear()
+        self.fluor.addItem("(no fluor)")
+        self.fluor.addItems(names)
+        self.fluor.setCurrentText(cur if cur in (["(no fluor)"] + names) else "(no fluor)")
+        self.fluor.blockSignals(False)
+
+    def _fluor_choice(self):
+        name = self.fluor.currentText()
+        return None if name == "(no fluor)" else name
 
     def _refresh_control_combo(self):
         arms = self.project.design.arms
@@ -344,8 +348,10 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
 
     # -- compute ---------------------------------------------------------
     def _cache_path(self):
+        fl = self._fluor_choice()
+        ch = "_" + "".join(c if c.isalnum() else "" for c in fl) if fl else ""
         return os.path.join(PROJECT_ROOT, "analysis_out",
-                            f"_compare_{self._safe}_lag{self.lags.value()}.pkl")
+                            f"_compare_{self._safe}_lag{self.lags.value()}{ch}.pkl")
 
     def _compute(self):
         if self._thread is not None and self._thread.isRunning():
@@ -365,7 +371,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.compute_btn.setText("Cancel")
         self.busy.start(f"Measuring {len(self.project.entries)} recordings")
         self._thread = QtCore.QThread(self)
-        self._worker = _Worker(self.project.entries, self.lags.value())
+        self._worker = ComputeWorker(self.project.entries, self.lags.value(),
+                                     self._fluor_choice())
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.busy.update)

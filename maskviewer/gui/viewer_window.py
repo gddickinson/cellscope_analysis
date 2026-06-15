@@ -408,7 +408,8 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                                     recording=self.recording)
             self.cell_info.set_frame_marker(self.timeline.value())
             self.edge.set_cell(cid, self.masks.labels, self.recording.um_per_px,
-                               self.recording.time_interval_min)
+                               self.recording.time_interval_min,
+                               recording=self.recording)
             self.edge.set_frame(self.timeline.value())
             self.cell_table.select_in_table(cid)
             self.docks["Cell Info"].raise_()

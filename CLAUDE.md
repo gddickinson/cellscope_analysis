@@ -107,7 +107,15 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
 - **Edge Dynamics** dock: velocity/radius kymograph (angle×time) **and a
   per-frame edge map** (the cell's boundary in the current frame coloured by
-  per-sector velocity or radius) + summary + kymograph CSV export.
+  per-sector velocity or radius) + summary + CSV export. With a **Fluor channel**
+  chosen (tagged PIEZO1, **SiR-actin**, or any fluorescent signal) it adds the
+  **faithful `cell_edge_analysis` reproduction** (`analysis/edge_intensity.py`): a
+  rectangle-intensity kymograph, the **edge-movement ↔ intensity scatter** coloured
+  by movement class (protruding/stable/retracting) with regression line + r/R²/p,
+  and a **sampling-rectangles** overlay — at each edge point a rectangle reaches into
+  the cell and its mean fluorescence is correlated with the local protrusion/
+  retraction (+ protrude-vs-retract means, t-test/Mann-Whitney). Does the channel
+  track where the edge advances vs retracts?
 - **Shape Modes** dock: VAMPIRE-style shape-mode clustering — mode mean-shapes,
   mode fractions, heterogeneity entropy (lazy compute); `shape_mode` is also a
   per-cell plot metric.
@@ -123,6 +131,9 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   per-contrast p / Bonferroni / Cohen's d / optional covariate-adjusted **OLS**
   after frac_spread + density + omnibus KW + vehicle) · **Histogram** (per-cell
   distribution by group) · **Data** (per-recording + per-group tables, unit-tagged).
+  A **fluor channel** selector adds a per-cell **edge-movement ↔ fluorescence**
+  correlation (`edge_piezo_corr` = Pearson r; tagged PIEZO1, SiR-actin, or any
+  signal; via `analysis/edge_intensity.py`) as a comparison metric.
   Offers **whole-track** metrics *and* **state-segmented** ones (`mean_speed_spread`,
   `persistence_spread`, `mean_area_um2_rounded`, … via `analysis/state_metrics.py`)
   that **reproduce the original CellScope `compare/per_recording.csv`** (edge-excluded,
@@ -139,8 +150,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   error bars** (plus a **compute-time MSD lag count** in the toolbar — recompute,
   cache keyed by it), plus
   a **filter annotation** that labels graphs + tables with the active filters; the
-  Distributions tab adds a **Bars (mean ± SEM)** view. **Results ▾** saves / loads
-  the computed results (reload without recompute) + exports CSVs.
+  Distributions tab adds a **Bars (mean ± SEM)** view. **Results ▾** runs a
+  **multivariate phenotype test** (PERMANOVA + leave-one-recording-out AUC over all
+  metrics — the headline KO-vs-WT result, now in the GUI), saves / loads the
+  computed results (reload without recompute), and exports CSVs.
   Driven by the loaded project's **Design**; click a point to load that recording
   in the main viewer; CSV export. Heavy compute is threaded + per-project cached.
   Toolbar **Groups…** opens the **Groups & Comparisons editor**
@@ -169,7 +182,8 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
   throughout the GUI.
 - **Menus**: File (open recording / **open+save projects** / **Recent Projects** /
-  **Export CSV** Ctrl+E / screenshot), View (zoom), Image (auto/reset/colormap/
+  **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
+  — frame the canvas on the selected cell, handy in a large sparse FOV), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
 Status bar shows frame/time/scale/cell-count + hovered/selected cell, plus a
