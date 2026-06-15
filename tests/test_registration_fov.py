@@ -46,6 +46,25 @@ def test_estimate_shift_flat_is_zero():
     assert reg.estimate_shift(flat, flat) == (0.0, 0.0)
 
 
+def test_max_shift_never_zero_for_tiny_images():
+    """The default cap must never be 0 — a tiny image would otherwise forbid every
+    non-zero displacement and silently report a zero shift."""
+    assert reg._max_shift((3, 3), None) >= 1
+    assert reg._max_shift((1, 1), None) >= 1
+    # a tiny image with a real 1-px shift can still resolve it (cap isn't 0)
+    ref = _texture(8, 8, seed=5)
+    mov = ndimage.shift(ref, (1, 0), order=1)
+    dy, dx = reg.estimate_shift(ref, mov)
+    assert abs(dy + 1) < 1.0, (dy, dx)
+
+
+def test_estimate_shift_degenerate_strip_no_crash():
+    """A single-row/column image has no shift information and must not crash
+    (np.gradient needs ≥2 samples per axis)."""
+    assert reg.estimate_shift(np.zeros((1, 20)), np.zeros((1, 20))) == (0.0, 0.0)
+    assert reg.estimate_shift(np.zeros((20, 1)), np.zeros((20, 1))) == (0.0, 0.0)
+
+
 def test_apply_shift_stack_and_noop():
     stack = np.stack([_texture(48, 48, s) for s in range(3)])
     assert reg.apply_shift(stack, 0, 0) is stack          # no-op returns input
@@ -97,3 +116,15 @@ def test_fov_mask_and_clamp():
     m = fov.fov_mask((20, 20), (2, 10, 3, 12))
     assert m[2:10, 3:12].all() and m.sum() == 8 * 9
     assert fov.clamp_rect((-5, 999, -1, 999), (30, 40)) == (0, 30, 0, 40)
+
+
+def test_apply_correction_skips_malformed_shifts():
+    """A malformed/short channel-shift entry is skipped, not crashed on, while the
+    valid entries (and a bad fov) are handled gracefully."""
+    from maskviewer.io.recording import Recording, apply_correction
+    rec = Recording("x.tif", np.zeros((2, 2, 8, 8), np.uint16), ["Cy5", "DIC"])
+    corr = {"shifts": {"0": [1.0, 2.0], "1": [3.0], "2": None, "3": "bad"},
+            "fov": ["oops"]}
+    apply_correction(rec, corr)
+    assert rec.channel_shifts == {0: (1.0, 2.0)}          # only the well-formed entry
+    assert rec.fov is None                                # malformed fov ignored

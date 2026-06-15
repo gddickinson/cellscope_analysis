@@ -36,6 +36,15 @@ _RECTANGLES = 7
 _EDGE_FRAME = (4, 5, 6, 7)       # mode indices drawn on the current frame
 _FRAME_METRIC = {4: "velocity", 5: "radius", 6: "intensity"}
 _NONE = "(none)"
+# brightfield / transmitted / placeholder channel names (NOT fluorescence)
+_NON_FLUOR = ("dic", "bright", "bf", "phase", "trans", "label", "none", "empty")
+
+
+def _is_fluor_name(name) -> bool:
+    """Heuristic: a real fluorescence channel (e.g. ``Cy5``) — not a brightfield /
+    transmitted-light / empty placeholder channel."""
+    low = (name or "").strip().lower()
+    return bool(low) and not any(k in low for k in _NON_FLUOR)
 
 
 def _lut(name):
@@ -169,13 +178,19 @@ class EdgePanel(QtWidgets.QWidget):
         names = list(getattr(recording, "channel_names", []) or [])
         if names == self._chan_names:
             return
+        first_time = self._chan_names is None          # never populated with real channels
         self._chan_names = names
         cur = self.fluor.currentText()
         self.fluor.blockSignals(True)
         self.fluor.clear()
         self.fluor.addItem(_NONE)
         self.fluor.addItems(names)
-        self.fluor.setCurrentText(cur if cur in ([_NONE] + names) else _NONE)
+        # keep a still-valid *user* choice; otherwise (incl. the initial "(none)"
+        # default) auto-select the first fluorescence channel so the rectangles +
+        # edge-intensity views work without the user having to pick a channel
+        pick = (cur if not first_time and cur in ([_NONE] + names)
+                else next((n for n in names if _is_fluor_name(n)), _NONE))
+        self.fluor.setCurrentText(pick)
         self.fluor.blockSignals(False)
 
     def _fluor_channel(self):
@@ -336,7 +351,16 @@ class EdgePanel(QtWidgets.QWidget):
                 self.scatter.clear()
                 self.plot.setTitle("no edge velocity for the first tracked frame")
                 return
-            val = self._vel[hit[0]][sect]
+            # the velocity kymograph bins about the mid-centroid of the (prev, t) pair,
+            # so map this frame's boundary to sectors about that same centroid
+            present = [f for f in range(self._labels.shape[0])
+                       if (self._labels[f] == self.cell_id).any()]
+            a = present[present.index(t) - 1] if present.index(t) > 0 else t
+            pa, pb = np.nonzero(self._labels[a] == self.cell_id), (ry, rx)
+            mcy = (pa[0].mean() + pb[0].mean()) / 2.0
+            mcx = (pa[1].mean() + pb[1].mean()) / 2.0
+            vsect = ((np.arctan2(by - mcy, bx - mcx) + np.pi) / (2 * np.pi) * n).astype(int) % n
+            val = self._vel[hit[0]][vsect]
             vmax = float(np.nanmax(np.abs(self._vel))) or 1.0
             lut, lo, hi = self._lut_div, -vmax, vmax
             self.plot.setTitle("edge velocity (blue retract · red protrude)")

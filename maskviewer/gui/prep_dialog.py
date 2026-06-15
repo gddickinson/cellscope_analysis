@@ -53,7 +53,7 @@ class PrepDialog(QtWidgets.QDialog):
         self.ref.setCurrentIndex(_guess(names, _REF_HINTS, 0))
         self.mov.setCurrentIndex(_guess(names, _MOV_HINTS,
                                         1 if len(names) > 1 else 0))
-        self.dy = self._dspin(-w, w); self.dx = self._dspin(-w, w)
+        self.dy = self._dspin(-h, h); self.dx = self._dspin(-w, w)   # dy spans height
         self.auto_align = QtWidgets.QPushButton("Auto-align")
         self.frame = QtWidgets.QSpinBox()
         self.frame.setRange(0, max(0, recording.n_frames - 1))
@@ -173,7 +173,9 @@ class PrepDialog(QtWidgets.QDialog):
 
     def _update_preview(self):
         t = self.frame.value()
-        ref = _norm(self.rec.frame(t, self.ref.currentIndex()))
+        # build BOTH layers from raw data so neither is pre-shifted by a stored
+        # correction — the overlay then shows exactly the live dy/dx being edited
+        ref = _norm(np.asarray(self.rec.data[t, self.ref.currentIndex()], float))
         mov = registration.apply_shift(
             np.asarray(self.rec.data[t, self.mov.currentIndex()], float),
             self.dy.value(), self.dx.value())

@@ -104,10 +104,18 @@ def apply_correction(rec: "Recording", corr: dict | None) -> "Recording":
     (``{"shifts": {channel: [dy, dx]}, "fov": [y0, y1, x0, x1]}``). Mutates +
     returns ``rec``; an empty/None ``corr`` clears them."""
     shifts = (corr or {}).get("shifts") or {}
-    rec.channel_shifts = {int(k): (float(v[0]), float(v[1]))
-                          for k, v in shifts.items()}
+    parsed = {}
+    for k, v in shifts.items():
+        try:                                 # skip malformed entries, don't crash
+            parsed[int(k)] = (float(v[0]), float(v[1]))
+        except (TypeError, ValueError, IndexError, KeyError):
+            continue
+    rec.channel_shifts = parsed
     fov = (corr or {}).get("fov")
-    rec.fov = tuple(int(x) for x in fov) if fov else None
+    try:
+        rec.fov = tuple(int(x) for x in fov) if fov else None
+    except (TypeError, ValueError):
+        rec.fov = None
     return rec
 
 

@@ -24,6 +24,9 @@ from scipy import ndimage
 def _prep(img):
     """Gradient-magnitude, mean-removed, Hann-windowed — robust across modalities."""
     img = np.asarray(img, float)
+    # np.gradient needs ≥2 samples per axis; degenerate 1-px strips have no shift info
+    if min(img.shape[:2]) < 2:
+        return np.zeros(img.shape, float)
     gy, gx = np.gradient(img)
     g = np.hypot(gy, gx)
     g = g - g.mean()
@@ -43,7 +46,9 @@ def _parabolic(c, i):
 def _max_shift(shape, max_shift):
     if max_shift is not None:
         return int(max_shift)
-    return min(100, min(shape) // 4)                 # sane channel-offset cap
+    # sane channel-offset cap, but never 0 (a tiny image would otherwise forbid
+    # every non-zero displacement and silently report a zero shift)
+    return max(1, min(100, min(shape) // 4))
 
 
 def estimate_shift(ref, mov, max_shift=None):
