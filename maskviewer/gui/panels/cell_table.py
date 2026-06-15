@@ -90,11 +90,16 @@ class CellTablePanel(AsyncComputeMixin, QtWidgets.QWidget):
         Only added when the recording has division events."""
         if self._df is None or self._df.empty or not self._divisions:
             return
+        present = {int(c) for c in self._df["cell_id"]}     # only real, in-table cells
         parents, daughters = [], []
         for cid in self._df["cell_id"]:
             p, d = lineage.relatives(self._divisions, int(cid))
+            p = [x for x in p if x in present]
+            d = [x for x in d if x in present]
             parents.append(p[0] if p else "")
             daughters.append(", ".join(map(str, d)) if d else "")
+        if not any(parents) and not any(daughters):          # nothing real → no columns
+            return
         self._df.insert(1, "parent", parents)
         self._df.insert(2, "daughters", daughters)
 

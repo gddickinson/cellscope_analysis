@@ -154,7 +154,8 @@ Read this before opening source files. Update it when modules change.
     (min track length, state, exclude edge); off-thread compute (`AsyncComputeMixin`)
     → status-bar progress + ETA, cached.
   - **cell_table.py** `CellTablePanel` — sortable per-cell metric table (+
-    `parent` / `daughters` columns from divisions.json); row → select cell;
+    `parent` / `daughters` columns from *validated* divisions — restricted to
+    in-table cells, added only when a real relationship exists); row → select cell;
     CSV export. Off-thread compute (`AsyncComputeMixin`) → status-bar progress + ETA.
   (cross-recording comparison is no longer a dock — it is its own window, see
   **compare_window.py** below.)
@@ -431,6 +432,9 @@ Read this before opening source files. Update it when modules change.
 - **test_edge_intensity.py** — `edge_intensity`: rectangle sampling shape/coverage,
   correlation sign ±, movement classification + protrude−retract Δ, degenerate
   inputs, `rectangles_for_frame`, end-to-end `analyze_cell` (synthetic cells).
+- **test_lineage.py** — `lineage.present_ids` / **`valid_divisions`** — division
+  events referencing a track absent from the cleaned masks (the Pos60-DMSO phantom
+  `→16` / `21→` case) are dropped; valid ones survive and drive `relatives`.
 - **test_registration_fov.py** — `registration` (integer + sub-pixel shift
   round-trip, **bounded peak rejects a far spurious shift**, flat→0, stack shift,
   no-op) and `fov` (auto-detect border trim, full-frame-when-clean, on a stack,

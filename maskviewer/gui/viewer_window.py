@@ -30,7 +30,7 @@ from .window_actions import WindowActionsMixin
 from .status_progress import StatusProgress
 from .task_runner import TaskRunner
 from . import colorby
-from ..analysis import label_stats, cell_metrics, metric_docs
+from ..analysis import label_stats, cell_metrics, metric_docs, lineage
 
 _RIGHT = QtCore.Qt.RightDockWidgetArea
 _BOTTOM = QtCore.Qt.BottomDockWidgetArea
@@ -204,8 +204,13 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.selected = 0
         self._cent_hist = self._track_len = self._mean_speed = None
         self._shape_model = self._pop_df = None
-        self.divisions = entry.load_divisions()
         labels = self.masks.labels if self.masks is not None else None
+        # divisions.json is recorded pre-cleaning → drop events whose parent/
+        # daughter track no longer exists in the (cleaned, FOV-cropped) masks, so
+        # the cell table / cell-info / overlay never show phantom divisions.
+        self.divisions = entry.load_divisions()
+        if labels is not None and self.divisions:
+            self.divisions = lineage.valid_divisions(self.divisions, labels)
         self.cell_info.clear_cell()
         self.cell_info.divisions = self.divisions
         self.edge.clear_cell()

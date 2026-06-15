@@ -5,6 +5,34 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Fix phantom divisions (validate against the cleaned masks)
+
+Bug (real data, Pos60-DMSO): the cell table showed cell 11 with `daughters = 16`
+though no cell 16 exists and cell 11 never divides, and the Divisions overlay drew
+diamonds in empty space at frames 55 & 63.
+
+Root cause: `divisions.json` is written by the pipeline **before** the masks are
+manually cleaned, and lists scored *candidate* events. After cleaning, the surviving
+tracks here are `[1,2,3,4,5,7,8,10,11]`, but the two candidates reference daughter
+track **16** (and parent **21**) — both removed in review. The app surfaced these
+stale candidates as real divisions (the Population lineage tree already guarded
+against missing tracks, but the cell table, cell-info, divisions overlay and
+division-count timeline did not).
+
+Fix (one place, all consumers): **`lineage.valid_divisions(divisions, labels)`** keeps
+only events whose **parent and daughter tracks both exist** in the (cleaned,
+FOV-cropped) mask stack; `viewer_window._load_entry` filters `self.divisions` through
+it right after load, so the cell table / cell-info / overlay / timeline all get clean
+data. `cell_table` additionally restricts parent/daughters to in-table cells and adds
+the columns only when a real relationship exists. On Pos60-DMSO both phantom events
+drop → no `daughters` column, no overlay diamonds.
+
+Tests: new `tests/test_lineage.py` (`present_ids`, `valid_divisions` drops
+absent-track events incl. the exact Pos60 case, keeps valid ones, `relatives` on the
+cleaned set). `pytest` **68 passed**; four GUI smokes green; all files < 500 lines.
+
+---
+
 ## 2026-06-15 — Single-cell crops (varying shape/length) + manual scale overrides
 
 For a new experiment style that crops one cell per field — recordings vary in H×W
