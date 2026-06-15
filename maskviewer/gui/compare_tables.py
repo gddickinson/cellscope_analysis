@@ -74,7 +74,7 @@ class ResultsIOMixin:
         meta = {"name": self.project.name, "design": self.project.design.to_dict(),
                 "excluded": sorted(self.project.excluded),
                 "overrides": self.project.overrides}
-        compare.save_results(fn, self._per_cell, self._msd, meta)
+        compare.save_results(fn, self._per_cell, self._msd, meta, self._autocorr)
         self.status.showMessage(f"Saved comparison results → {fn}", 5000)
 
     def _load_results(self):
@@ -91,7 +91,7 @@ class ResultsIOMixin:
         self.status.showMessage(f"Loaded comparison results from {fn}", 5000)
 
     def _apply_loaded_results(self, blob):
-        """Adopt a saved (per_cell, msd) + design into the window (no recompute)."""
+        """Adopt saved (per_cell, msd, autocorr) + design into the window (no recompute)."""
         per_cell, msd = blob.get("per_cell"), blob.get("msd")
         if per_cell is None or getattr(per_cell, "empty", True):
             QtWidgets.QMessageBox.warning(self, "Empty", "No results in that file.")
@@ -104,7 +104,7 @@ class ResultsIOMixin:
         self.project.excluded = set(meta.get("excluded", []))
         self.project.overrides = dict(meta.get("overrides", {}))
         self._refresh_control_combo()
-        self._on_done((per_cell, msd), cached=True)      # refresh combos + replot
+        self._on_done((per_cell, msd, blob.get("autocorr")), cached=True)  # combos + replot
 
     def _show_multivariate(self):
         if self._per_cell is None:

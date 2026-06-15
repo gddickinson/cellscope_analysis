@@ -174,7 +174,8 @@ Read this before opening source files. Update it when modules change.
   **Filters…** button (opens the `FilterMixin` dialog: frames / track-quality /
   cells-per-recording / state / nearest-neighbour crowding / distance-from-edge).
   Left tabbed plots — **Distributions** (strip / box+Bonferroni / bars /
-  superplot) · **Ensemble MSD** · **Scatter** (all axis-labelled with units). The
+  superplot) · **Ensemble MSD** · **Scatter** · **Dir. autocorr** (DiPer direction
+  autocorrelation by condition) — all axis-labelled with units. The
   right panel is tabbed: **Stats** (sortable per-contrast p / Bonferroni / Cohen d
   / OLS β,p + omnibus KW + vehicle — via `StatsTablesMixin`) · **Histogram**
   (per-cell distribution by group) · **Data** (per-recording + per-group tables,
@@ -217,7 +218,9 @@ Read this before opening source files. Update it when modules change.
   means), `ensemble_msd` (mean±SEM / median+CI bands; band-bound curves added to
   the plot so they inherit its log mode + clamped > 0 — fixes misaligned log-log
   bands/lines; honours τ-binning, linear/log axis, and optional point markers +
-  per-point error bars), `scatter` (X-vs-Y + Spearman, clickable, optional
+  per-point error bars), `ensemble_autocorr` (**DiPer direction autocorrelation**
+  by condition — the same band/point style, y in [−0.2, 1.05]), `scatter` (X-vs-Y +
+  Spearman, clickable, optional
   per-group / all-data **fit lines** with ±SE band — `_fit_xy`/`_draw_fit`),
   `histogram` (per-cell distribution by group). `_fit_xy` handles polynomial
   (linear / poly-2 / poly-3, multiparameter) + linearised power/exp/log fits;
@@ -369,7 +372,9 @@ Read this before opening source files. Update it when modules change.
   optional `corrections` applies each recording's channel alignment + FOV crop;
   optional `scale_override` = (µm/px, min/frame) overrides every recording's metadata),
   `aggregate`, `by_condition`, `order_conditions`, `metric_columns`,
-  `ensemble_by_condition` (mean±SEM / median+bootstrap-CI MSD curves; optional
+  `ensemble_by_condition` (mean±SEM / median+bootstrap-CI curves over recordings —
+  MSD or, with `value_col='autocorr'`, the **DiPer direction autocorrelation**;
+  `build_comparison` returns both `msd_long` + `autocorr_long`; optional
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
   `per_condition_summary` (per-group n / mean / SEM / median over recordings —

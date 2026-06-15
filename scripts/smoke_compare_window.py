@@ -28,8 +28,8 @@ rng = np.random.default_rng(0)
 
 
 def fake_data(conditions, n_rec=4, n_cells=15):
-    """(per_cell, msd) mimicking compare.build_comparison output."""
-    pc_rows, msd_rows = [], []
+    """(per_cell, msd, autocorr) mimicking compare.build_comparison output."""
+    pc_rows, msd_rows, ac_rows = [], [], []
     for cond in conditions:
         bump = 1.0 + 0.15 * conditions.index(cond)             # per-cond shift
         for r in range(n_rec):
@@ -52,7 +52,11 @@ def fake_data(conditions, n_rec=4, n_cells=15):
                                  "tau": (k + 1) * 2.0,
                                  "msd": float((k + 1) * 3.0 * bump
                                               + rng.normal(0, 1))})
-    return pd.DataFrame(pc_rows), pd.DataFrame(msd_rows)
+                ac_rows.append({"recording": rec, "condition": cond,
+                                "tau": (k + 1) * 2.0,        # decays from ~1 → 0
+                                "autocorr": float(np.exp(-(k + 1) / (2.0 + bump))
+                                                  + rng.normal(0, 0.03))})
+    return (pd.DataFrame(pc_rows), pd.DataFrame(msd_rows), pd.DataFrame(ac_rows))
 
 
 def make_project(name, conditions):
@@ -76,6 +80,11 @@ def drive(win, label):
     win.tabs.setCurrentIndex(2)
     if win.metric_y.count() > 1:
         win.metric_y.setCurrentIndex(1)
+    # DiPer direction autocorrelation (mean then median)
+    win.tabs.setCurrentIndex(3)
+    for s in range(win.stat.count()):
+        win.stat.setCurrentIndex(s)
+    assert win._filtered_autocorr() is not None and not win._filtered_autocorr().empty
     win.tabs.setCurrentIndex(0)
     win.ols.setChecked(True)
 
@@ -254,9 +263,10 @@ def main():
     QtWidgets.QFileDialog.getOpenFileName = staticmethod(lambda *a, **k: (rpath, ""))
     try:
         win._save_results()
-        win._per_cell = win._msd = None              # wipe, then reload from disk
+        win._per_cell = win._msd = win._autocorr = None   # wipe, then reload from disk
         win._load_results()
         assert win._per_cell is not None and not win._per_cell.empty, "reload failed"
+        assert win._autocorr is not None and not win._autocorr.empty, "autocorr lost"
     finally:
         QtWidgets.QFileDialog.getSaveFileName = _save
         QtWidgets.QFileDialog.getOpenFileName = _open
@@ -278,6 +288,10 @@ def main():
         app.processEvents()
         win.grab().save(shot.replace(".png", "_msd.png"))
         print(f"  saved screenshot → {shot.replace('.png', '_msd.png')}")
+        win.tabs.setCurrentIndex(3)                   # DiPer direction autocorrelation
+        app.processEvents()
+        win.grab().save(shot.replace(".png", "_autocorr.png"))
+        print(f"  saved screenshot → {shot.replace('.png', '_autocorr.png')}")
         win.tabs.setCurrentIndex(0)
         win.right_tabs.setCurrentIndex(1)             # Histogram tab (units on axis)
         app.processEvents()
