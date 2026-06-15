@@ -5,6 +5,30 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Scored division inference (the original detector's cues, in-project)
+
+`lineage.infer_divisions` is now a **scored** detector reproducing the original
+pipeline's cue set — but computed from the **cleaned masks** in-project (still no
+`divisions.json`). Each parent→daughter candidate (a daughter first appearing
+adjacent to a parent present the previous frame, away from the border) gets five
+[0,1] cues — **prox** (closeness), **swell** (parent area peak ÷ life baseline),
+**balled** (parent circularity in the pre-split window, via `cell_metrics._perimeter`),
+**persist** (daughter survival vs `min_persist`), **mass** (daughter:parent area near
+½) — averaged into a `score`, kept above `score_threshold` (default 0.5). Each event
+carries the score + sub-cues; `return_all` exposes rejected candidates for tuning.
+
+On real Pos60-DMSO the one geometric candidate **8→11 @68 scores 0.46** (prox 0.58,
+swell **0.00**, balled 0.74, persist 1.00, mass **0.00**) → **below 0.5, not flagged**:
+cell 8 did not swell and the masses don't split ½, so the full cue set treats it as a
+weak candidate rather than a confident division (the original scored that region low
+too). The threshold is tunable per call.
+
+Tests: `tests/test_lineage.py` — a realistic swelling division is detected with a high
+score + sub-cues; the threshold gates it and `return_all` exposes it. `pytest`
+**72 passed**; four GUI smokes green; all files < 500 lines.
+
+---
+
 ## 2026-06-15 — Divisions overlay: parent→daughter links
 
 The Divisions overlay now draws each division as a **parent→daughter link** — a line

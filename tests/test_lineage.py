@@ -51,27 +51,43 @@ def _disc(L, t, cid, cy, cx, r):
     L[t][(yy - cy) ** 2 + (xx - cx) ** 2 <= r * r] = cid
 
 
-def test_infer_divisions_detects_a_split():
-    """A new daughter appearing adjacent to a parent present the previous frame
-    is a division; a cell entering at the border, and a distant new cell, are not."""
-    L = np.zeros((5, 60, 60), np.int32)
-    for t in range(5):
-        _disc(L, t, 1, 30, 20, 8)            # parent: present all frames
-    for t in range(2, 5):
-        _disc(L, t, 2, 30, 34, 7)            # daughter: appears frame 2, beside parent 1
-    for t in range(2, 5):
-        _disc(L, t, 3, 4, 4, 6)              # enters at the border frame 2 → not a division
-    for t in range(3, 5):
-        _disc(L, t, 4, 50, 50, 6)            # distant new cell → not a division
-    ev = lineage.infer_divisions(L)
-    assert len(ev) == 1, ev
+def _division_stack():
+    """A realistic division: a parent that swells + stays round, then a persistent
+    daughter appears beside it; plus a border-entry and a distant new cell."""
+    L = np.zeros((10, 80, 80), np.int32)
+    for t, r in enumerate((6, 7, 8, 10)):        # parent swells (rounds up) frames 0-3
+        _disc(L, t, 1, 40, 30, r)
+    for t in range(4, 10):                       # parent continues (shrunk) after split
+        _disc(L, t, 1, 40, 28, 7)
+        _disc(L, t, 2, 40, 42, 7)                # daughter: appears frame 4, persists
+    for t in range(2, 10):
+        _disc(L, t, 3, 4, 4, 6)                  # enters at the border → not a division
+    for t in range(5, 10):
+        _disc(L, t, 4, 70, 70, 6)                # distant new cell → not a division
+    return L
+
+
+def test_infer_divisions_scored_split():
+    """A swelling, balled parent with a persistent adjacent daughter scores high
+    and is detected; the border-entry and distant cell are not."""
+    ev = lineage.infer_divisions(_division_stack())
+    assert len(ev) == 1, [(e["parent"], e["daughter"], e["frame"]) for e in ev]
     e = ev[0]
-    assert e["parent"] == 1 and e["daughter"] == 2 and e["frame"] == 2
+    assert e["parent"] == 1 and e["daughter"] == 2 and e["frame"] == 4
+    assert 0.0 <= e["score"] <= 1.0 and e["score"] > 0.7, e["score"]
+    assert all(k in e for k in ("prox", "swell", "balled", "persist", "mass"))
+    assert e["swell"] > 0.5 and e["balled"] > 0.5 and e["persist"] > 0.9
     assert lineage.relatives(ev, 1) == ([], [2])
-    assert lineage.relatives(ev, 2) == ([1], [])
-    # every inferred event references real tracks present in the stack
-    ids = lineage.present_ids(L)
-    assert all(e["parent"] in ids and e["daughter"] in ids for e in ev)
+    ids = lineage.present_ids(_division_stack())
+    assert all(x["parent"] in ids and x["daughter"] in ids for x in ev)
+
+
+def test_infer_divisions_score_threshold():
+    """The score threshold gates candidates; return_all exposes their scores."""
+    L = _division_stack()
+    assert lineage.infer_divisions(L, score_threshold=0.99) == []   # nothing passes
+    allc = lineage.infer_divisions(L, score_threshold=0.99, return_all=True)
+    assert len(allc) == 1 and "score" in allc[0]                    # candidate kept for inspection
 
 
 def test_infer_divisions_none_for_simple_motion():

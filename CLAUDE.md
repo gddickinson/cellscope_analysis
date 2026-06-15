@@ -52,8 +52,10 @@ where the data came from. Quick summary below.
 motion, edge, state, **lineage/divisions**) is computed *in-project from the loaded
 label stack* (+ the recording image for intensity + the sidecar/override scale). The
 pipeline's pre-cleaning artifacts are **not** read — in particular `divisions.json`
-is ignored; divisions are inferred from the mask track topology
-(`analysis/lineage.py::infer_divisions`). So any ID or edit made before the masks
+is ignored; divisions are inferred + **scored** from the masks
+(`analysis/lineage.py::infer_divisions`, the original detector's cue set —
+proximity + area-swelling + balled-state + persistence + ½-mass — recomputed
+in-project, kept above a tunable `score_threshold`). So any ID or edit made before the masks
 were finalised is irrelevant and can never leak into a result. (The follow-up
 research scripts' `feature_tables` CSV readers are the lone legacy exception — they
 read the original pipeline outputs for cross-checking and are not part of the
