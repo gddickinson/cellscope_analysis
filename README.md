@@ -97,9 +97,14 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
-![edge movement vs fluorescence intensity (tagged PIEZO1 / SiR-actin / any signal) — scatter coloured by movement class with regression + r/R²/p](docs/screenshots/edge_piezo.png)
+*Edge movement ↔ SiR-actin (Cy5) on a real WT-control cell — actin is enriched at
+retracting edges (negative r, highly significant):*
 
-![channel alignment & FOV pre-analysis — align a fluorescence channel to DIC (grey/magenta overlay) and define the field of view; non-destructive](docs/screenshots/prep_align_fov.png)
+| Edge movement ↔ intensity | Sampling rectangles (coloured by intensity) |
+|---|---|
+| ![edge movement vs Cy5 actin — scatter coloured by movement class with regression + r/R²/p](docs/screenshots/edge_piezo.png) | ![per-sector sampling rectangles on the cell boundary, centres coloured by actin intensity](docs/screenshots/edge_sampling_rectangles.png) |
+
+![channel alignment & FOV pre-analysis (real WT control) — align the actin (Cy5) channel to DIC and define the field of view inside the black border; non-destructive](docs/screenshots/prep_align_fov.png)
 
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
 
@@ -113,7 +118,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 
 ![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 
-*(Screenshots use synthetic data only — no real microscopy data is committed.)*
+*(Most screenshots use synthetic data. The edge-movement ↔ actin and channel-
+alignment panels above use a **WT-control** recording from the study — baseline only,
+no treatment-comparison data.)*
 
 ## Environment
 

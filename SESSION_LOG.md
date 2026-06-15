@@ -28,9 +28,11 @@ the new edge analysis + alignment and check nothing is broken.
   actin/DIC misalignment is real and that correcting it improves the analysis.
   New test `test_estimate_shift_bounded_rejects_far_peak`.
 
-Real-data screenshots were captured for validation but **not committed** (public
-repo — committed screenshots stay synthetic). `pytest` **64 passed**; all three
-GUI smokes green; all files < 500 lines.
+README screenshots for the edge-analysis + alignment panels now use a **real
+WT-control** recording's actin (Cy5) channel (`edge_piezo.png`,
+`edge_sampling_rectangles.png`, `prep_align_fov.png`) — baseline only, **no
+treatment-comparison data** (the comparison screenshots stay synthetic).
+`pytest` **64 passed**; all three GUI smokes green; all files < 500 lines.
 
 ---
 
