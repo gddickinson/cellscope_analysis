@@ -5,6 +5,39 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Expose ALL remaining code-level constants in the Analysis-parameters tab
+
+Followed up by surfacing the constants previously left in code. The tab now groups
+**17** parameters by section (scrollable):
+- **Neighbours & contact**: + **min contact size (px)** (`contacts.MIN_CONTACT_PX`).
+- **State classification**: + **min cell area (px)** (`state.MIN_AREA_PX` — also gates
+  shape-mode contour extraction, so its change re-fits the shape model too).
+- **Motion**: **run/tumble turn angle °** + **jump-step factor** (new module constants
+  `motion.RUN_TUMBLE_TURN_DEG` / `JUMP_FACTOR`; `run_and_tumble` / `jump_steps` now
+  sentinel-`None` and read them).
+- **Edge dynamics**: **front/rear half-cone °** (`edge_dynamics.POLARITY_FRONT_DEG`, new),
+  **kymograph time σ** (`TEMPORAL_SIGMA`) + **angular window** (`ANGULAR_SG_WINDOW`) — the
+  last two were already read in-body, so they just needed wiring.
+- **Edge↔fluorescence sampling**: **rectangle depth/width px** + **min in-cell coverage**
+  (`edge_intensity.DEPTH_PX` / `WIDTH_PX` / `MIN_COVERAGE`; `rectangle_intensity` +
+  wrappers sentinel-`None`).
+- **Contact inhibition (CIL)**: **speed window (frames)** (`cil.DEFAULT_WINDOW`;
+  `contact_locomotion` sentinel-`None`).
+
+Same pattern throughout: `apply_analysis_params` mutates the module globals; leaves read
+them at call time; `analysis_params_tag` folds all of them into the comparison cache key.
+The params tab is now wrapped in a `QScrollArea`; `_set_param` re-fits the cached shape
+model for `shape_n_modes` **and** `state_min_area_px`. Tests +1 (`test_extra_params_apply`
+drives every new global + checks leaf flow for motion turn angle and state min-area).
+`pytest` **122 passed**; headless ConfigWindow smoke (set via spinbox + reset) green; all
+files < 500 (config_window 183, compare_tables 485).
+
+Nothing tunable now stays hard-coded except genuinely structural constants (`N_SECTORS`
+kymograph resolution, `N_PCS`) — changing those mid-session would invalidate the kymograph
+geometry / PCA basis, so they remain code-level.
+
+---
+
 ## 2026-06-16 — Expose the remaining analysis parameters (state thresholds + shape count)
 
 Follow-up on the deferred options. The **state-classification thresholds** turned out

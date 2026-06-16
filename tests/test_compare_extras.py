@@ -292,3 +292,51 @@ def test_state_and_shape_params_apply(tmp_path):
         state.ROUNDED_AREA_UM2 = 960.0
         state.ROUNDED_ECC = 0.85
         shape_modes.N_MODES = 5
+
+
+def test_extra_params_apply(tmp_path):
+    """The remaining code-level constants (motion / edge / CIL / min-area / min-contact)
+    are settable via apply_analysis_params and read at call time by their leaves."""
+    from PyQt5 import QtCore
+    from maskviewer.gui.compare_tables import apply_analysis_params, analysis_params_tag
+    from maskviewer.analysis import (state, motion, edge_dynamics, edge_intensity,
+                                     contacts, cil)
+    s = QtCore.QSettings(str(tmp_path / "c.ini"), QtCore.QSettings.IniFormat)
+    # a right-angle track: one 90° turn joint out of three
+    cen = np.array([[0, 0], [1, 0], [2, 0], [2, 1], [2, 2]], float)
+    assert motion.run_and_tumble(cen)["frac_tumble"] > 0       # 90° > default 60° → tumble
+    s.setValue("analysis/run_tumble_turn_deg", 175.0)
+    s.setValue("analysis/jump_factor", 9.0)
+    s.setValue("analysis/state_min_area_px", 300.0)
+    s.setValue("analysis/contact_min_px", 7)
+    s.setValue("analysis/edge_front_deg", 45.0)
+    s.setValue("analysis/edge_temporal_sigma", 2.0)
+    s.setValue("analysis/edge_angular_window", 9)
+    s.setValue("analysis/edge_rect_depth_px", 20)
+    s.setValue("analysis/edge_rect_width_px", 11)
+    s.setValue("analysis/edge_min_coverage", 0.5)
+    s.setValue("analysis/cil_window", 6)
+    try:
+        apply_analysis_params(s)
+        assert motion.RUN_TUMBLE_TURN_DEG == 175.0 and motion.JUMP_FACTOR == 9.0
+        assert state.MIN_AREA_PX == 300 and contacts.MIN_CONTACT_PX == 7
+        assert edge_dynamics.POLARITY_FRONT_DEG == 45.0
+        assert edge_dynamics.TEMPORAL_SIGMA == 2.0 and edge_dynamics.ANGULAR_SG_WINDOW == 9
+        assert edge_intensity.DEPTH_PX == 20 and edge_intensity.WIDTH_PX == 11
+        assert edge_intensity.MIN_COVERAGE == 0.5 and cil.DEFAULT_WINDOW == 6
+        # leaves read the live globals
+        assert motion.run_and_tumble(cen)["frac_tumble"] == 0    # 90° < 175° → no tumble
+        assert state.classify_state(250, area_um2=500, eccentricity=0.5) == "unknown"
+        assert analysis_params_tag(s) != ""
+    finally:
+        motion.RUN_TUMBLE_TURN_DEG = 60.0
+        motion.JUMP_FACTOR = 5.0
+        state.MIN_AREA_PX = 200
+        contacts.MIN_CONTACT_PX = 2
+        edge_dynamics.POLARITY_FRONT_DEG = 60.0
+        edge_dynamics.TEMPORAL_SIGMA = 1.0
+        edge_dynamics.ANGULAR_SG_WINDOW = 5
+        edge_intensity.DEPTH_PX = 12
+        edge_intensity.WIDTH_PX = 7
+        edge_intensity.MIN_COVERAGE = 0.3
+        cil.DEFAULT_WINDOW = 3

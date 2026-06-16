@@ -24,8 +24,10 @@ STATE_COLOR = {"unknown": (130, 130, 130), "spread": (44, 160, 44),
 
 
 def classify_state(area_px, area_um2=None, eccentricity=None, circularity=None,
-                   solidity=None, edge=False, min_area_px=MIN_AREA_PX) -> str:
-    """Return one of 'rounded' / 'spread' / 'edge' / 'unknown' for one cell-frame."""
+                   solidity=None, edge=False, min_area_px=None) -> str:
+    """Return one of 'rounded' / 'spread' / 'edge' / 'unknown' for one cell-frame.
+    ``min_area_px=None`` reads the (configurable) module-level ``MIN_AREA_PX``."""
+    min_area_px = MIN_AREA_PX if min_area_px is None else min_area_px
     if edge:
         return "edge"
     if area_px is None or area_px < min_area_px or eccentricity is None:

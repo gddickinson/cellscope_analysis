@@ -17,6 +17,10 @@ from __future__ import annotations
 
 import numpy as np
 
+# Configurable thresholds (read at call time so a GUI override propagates).
+RUN_TUMBLE_TURN_DEG = 60.0       # turning angle above which a step is a "tumble"
+JUMP_FACTOR = 5.0                # step length / median above which a step is a "jump"
+
 
 def _finite_points(cen: np.ndarray) -> np.ndarray:
     cen = np.asarray(cen, float)
@@ -150,7 +154,7 @@ def fit_furth(tau: np.ndarray, msd_vals: np.ndarray) -> dict:
 
 
 def run_and_tumble(cen: np.ndarray, dt_min: float | None = None,
-                   turn_threshold_deg: float = 60.0) -> dict:
+                   turn_threshold_deg: float | None = None) -> dict:
     """Decompose a track into directed **runs** and reorientation **tumbles**.
 
     A step whose turning angle (vs the previous step) exceeds ``turn_threshold_deg``
@@ -159,6 +163,8 @@ def run_and_tumble(cen: np.ndarray, dt_min: float | None = None,
     (tumbles per min), ``frac_tumble`` (fraction of step-joints that are tumbles) and
     ``mean_tumble_angle_deg``. A more sensitive persistence readout than a single
     autocorrelation number. NaNs for < 3 finite points."""
+    if turn_threshold_deg is None:
+        turn_threshold_deg = RUN_TUMBLE_TURN_DEG
     keys = ("n_runs", "mean_run_steps", "mean_run_duration", "tumble_rate",
             "frac_tumble", "mean_tumble_angle_deg")
     turns = turning_angles(cen)                       # one per step-joint
@@ -187,13 +193,17 @@ def run_and_tumble(cen: np.ndarray, dt_min: float | None = None,
     }
 
 
-def jump_steps(cen: np.ndarray, factor: float = 5.0, min_px: float = 0.0) -> tuple:
+def jump_steps(cen: np.ndarray, factor: float | None = None,
+               min_px: float = 0.0) -> tuple:
     """Track-continuity QC: step indices whose displacement is an outlier — a
     suspected tracking error / ID swap.
 
     A step is a *jump* when its length exceeds ``factor``× the median step length
     (and ≥ ``min_px``). Returns ``(n_jumps, max_step, frac_jumps)``. Operates on the
-    raw centroid units (px unless ``cen`` is pre-scaled)."""
+    raw centroid units (px unless ``cen`` is pre-scaled). ``factor=None`` reads the
+    (configurable) module-level ``JUMP_FACTOR``."""
+    if factor is None:
+        factor = JUMP_FACTOR
     seg = instantaneous_speed(cen)                    # per-step length (no dt → length)
     if seg.size == 0:
         return 0, np.nan, np.nan

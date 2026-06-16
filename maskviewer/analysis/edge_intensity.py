@@ -79,7 +79,7 @@ def _sector_geometry(center, radii):
 
 
 def rectangle_intensity(image_frame, mask_frame, center, radii,
-                        depth=DEPTH_PX, width=WIDTH_PX, min_coverage=MIN_COVERAGE,
+                        depth=None, width=None, min_coverage=None,
                         return_corners=False):
     """Mean fluorescence per sector in an inward ``depth``×``width`` px rectangle.
 
@@ -87,7 +87,12 @@ def rectangle_intensity(image_frame, mask_frame, center, radii,
     px inward from the boundary point (``width`` px along the edge). Pixels inside
     the cell mask are averaged; a sector is NaN if too little of its rectangle
     lies in the cell (< ``min_coverage``). Returns ``(N_SECTORS,)`` intensities
-    (and, if asked, ``(N_SECTORS, 4, 2)`` rectangle corners in (row, col))."""
+    (and, if asked, ``(N_SECTORS, 4, 2)`` rectangle corners in (row, col)).
+    ``depth`` / ``width`` / ``min_coverage`` of ``None`` read the (configurable)
+    module-level ``DEPTH_PX`` / ``WIDTH_PX`` / ``MIN_COVERAGE``."""
+    depth = DEPTH_PX if depth is None else depth
+    width = WIDTH_PX if width is None else width
+    min_coverage = MIN_COVERAGE if min_coverage is None else min_coverage
     img = np.asarray(image_frame, float)
     h, w = mask_frame.shape
     point, inward, tangent = _sector_geometry(center, radii)
@@ -116,7 +121,7 @@ def rectangle_intensity(image_frame, mask_frame, center, radii,
     return (out, corners) if return_corners else out
 
 
-def intensity_kymograph(labels, image, cell_id, depth=DEPTH_PX, width=WIDTH_PX):
+def intensity_kymograph(labels, image, cell_id, depth=None, width=None):
     """(present_frames, (n, N_SECTORS)) mean rectangle fluorescence per sector."""
     labels = np.asarray(labels)
     frames = edge_dynamics._present_frames(labels, cell_id)
@@ -221,7 +226,7 @@ def lagged_intensity_correlation(velmat, intmat, max_lag=3):
     return np.array(lags), rs, 0, np.nan
 
 
-def rectangles_for_frame(labels, image, cell_id, t, depth=DEPTH_PX, width=WIDTH_PX):
+def rectangles_for_frame(labels, image, cell_id, t, depth=None, width=None):
     """(corners (m, 4, 2) row/col, intensities (m,)) for accepted rectangles in
     frame ``t`` — for the per-frame sampling-rectangle overlay."""
     m = np.asarray(labels)[t] == cell_id
@@ -236,7 +241,7 @@ def rectangles_for_frame(labels, image, cell_id, t, depth=DEPTH_PX, width=WIDTH_
 
 
 def analyze_cell(labels, image, cell_id, um_per_px=None, dt_min=None,
-                 depth=DEPTH_PX, width=WIDTH_PX, temporal="past",
+                 depth=None, width=None, temporal="past",
                  move_threshold=None):
     """End-to-end for one cell. Returns
     ``(vfr, velmat, ifr, intmat, disp, inten, summary)``: the edge-velocity
