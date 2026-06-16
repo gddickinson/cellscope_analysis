@@ -180,6 +180,15 @@ Read this before opening source files. Update it when modules change.
     intensity scatter** coloured by movement class (with regression line + r/R²/p),
     and a per-frame **sampling-rectangles** overlay (`analysis.edge_intensity`);
     the by-movement-type means + Mann-Whitney are in the summary. + CSV export.
+    The heavy per-cell compute is **lazy** — deferred (`set_cell` → `_pending`) until
+    the dock is the front tab (visibility tracked via show/hide events), so clicking
+    cells while viewing another tab (e.g. Cell Info) stays instant; `showEvent` runs
+    the pending cell. Rendering lives in **edge_render.py** `EdgeRenderMixin` (split
+    out to keep each file < 500 lines).
+  - **edge_render.py** `EdgeRenderMixin` — the Edge panel's view layer (mixed into
+    `EdgePanel`): `_replot` + all `_draw_*` (kymographs, per-frame edge map,
+    movement↔intensity scatter, sampling rectangles) + CSV `_export`, drawing from
+    the panel's already-computed state.
   - **shape_panel.py** `ShapeModesPanel` — VAMPIRE shape modes: mode mean-shapes,
     mode-fraction bars, heterogeneity entropy (lazy compute button). Compute runs
     off-thread (`AsyncComputeMixin`) → status-bar progress + ETA.
