@@ -155,6 +155,52 @@ def test_contact_event_columns_in_per_cell_table():
     assert r1["n_contact_events"] == 1 and r1["mean_contact_duration_min"] == 2.0
 
 
+def test_contact_pairs_which_when_degree():
+    """One record per cell pair that touches — which cells, when, and the degree."""
+    L = np.zeros((6, 40, 40), np.int32)
+    for t in range(6):
+        L[t, 5:25, 5:15] = 1                 # cell 1 present all frames
+    L[2:5, 5:25, 15:25] = 2                  # cell 2 touches cell 1 on frames 2,3,4
+    pairs = contacts.contact_pairs(L, dt_min=3.0)
+    assert len(pairs) == 1
+    p = pairs[0]
+    assert (p["cell_a"], p["cell_b"]) == (1, 2)                  # which cells
+    assert (p["first_frame"], p["last_frame"]) == (2, 4)        # when
+    assert p["n_frames_in_contact"] == 3 and p["n_episodes"] == 1
+    assert p["mean_episode_min"] == 3 * 3.0                     # 3 frames × 3 min
+    assert p["max_contact_fraction"] > 0.25                     # degree (extensive)
+
+
+def test_contact_pairs_separate_partners_and_none():
+    L = np.zeros((4, 60, 60), np.int32)
+    L[:, 5:25, 5:15] = 1
+    L[:2, 5:25, 15:25] = 2                   # cell 2 touches 1 on frames 0,1
+    L[2:, 25:32, 5:15] = 3                   # cell 3 touches 1 (below) on frames 2,3
+    pairs = {(p["cell_a"], p["cell_b"]): p for p in contacts.contact_pairs(L)}
+    assert set(pairs) == {(1, 2), (1, 3)}
+    assert pairs[(1, 2)]["last_frame"] == 1 and pairs[(1, 3)]["first_frame"] == 2
+    # an all-isolated stack yields no pairs
+    iso = np.zeros((3, 40, 40), np.int32)
+    iso[:, 2:8, 2:8] = 1
+    iso[:, 30:38, 30:38] = 2
+    assert contacts.contact_pairs(iso) == []
+
+
+def test_contact_pairs_table_export():
+    L = np.zeros((3, 40, 40), np.int32)
+    L[:, 5:25, 5:15] = 1
+    L[:, 5:25, 15:25] = 2
+    df = exporters.contact_pairs_table(L, um_per_px=0.5, dt_min=1.0)
+    assert list(df.columns[:5]) == ["cell_a", "cell_b", "first_frame",
+                                    "last_frame", "n_frames_in_contact"]
+    assert len(df) == 1 and df.iloc[0]["cell_a"] == 1 and df.iloc[0]["cell_b"] == 2
+    # export_all writes the contact_pairs.csv when requested
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        paths = exporters.export_all(L, 0.5, 1.0, out_dir=d, which=("contact_pairs",))
+        assert "contact_pairs" in paths and paths["contact_pairs"].endswith("contact_pairs.csv")
+
+
 def test_cell_frame_table_contact_series():
     """The per-cell-info plot exposes the contact series for a clicked cell."""
     L = np.zeros((3, 40, 40), np.int32)

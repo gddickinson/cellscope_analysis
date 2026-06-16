@@ -5,6 +5,29 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Pairwise contact tracking (which cells touch, when, degree)
+
+Answering "do you keep track of which cells touch, when, and the degree?" — the
+per-frame/per-cell tables tracked *when* + *degree* but collapsed *which* partner.
+New `contacts.contact_pairs(labels, scale, dt)` returns **one record per cell pair**
+that ever touches: `cell_a` / `cell_b`, `first_frame` / `last_frame`,
+`n_frames_in_contact`, `n_episodes`, `mean_episode_(min|frames)`, and the contact
+**degree** (`mean_contact_fraction` / `max_contact_fraction`; per-frame pair degree =
+the larger of the two cells' engaged-boundary fractions). Reuses the per-frame
+`partners` dicts (no extra compute when `contacts_over_time` is passed).
+
+Surfaced as a **Cell-pair contacts CSV** — `exporters.contact_pairs_table` +
+`export_all(which=…contact_pairs…)` + a checkbox in the Export-CSV dialog (off the
+GUI thread, so it stays responsive). Real Pos60-DMSO: the 8↔11 pair first touches at
+**frame 68 — the division frame** (degree ≤0.20); 7↔8 spans frames 10–93.
+
+(Deliberately not a synchronous Cell-Info line — the full per-recording pass would
+freeze on selection; the threaded CSV + the live contact overlay cover it.)
+Tests +3 (`contact_pairs` which/when/degree, separate partners + none, table +
+`export_all`). `pytest` **97 passed**; all files < 500.
+
+---
+
 ## 2026-06-15 — Unified Config window + comparison-analysis controls
 
 Consolidated the scattered Config dialogs into one tabbed **Config ▸ Settings…**

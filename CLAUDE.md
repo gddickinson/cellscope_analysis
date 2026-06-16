@@ -240,7 +240,8 @@ its bottom bar.
 
 **CSV export** (File ▸ Export CSV…, Ctrl+E) writes tidy, unit-tagged tables for
 Origin/Prism: per-frame region properties ("masks as CSV"), per-cell summary
-(track + shape + motion), and centroid trajectories — via
+(track + shape + motion + **contact**), centroid trajectories, and a **cell-pair
+contacts** table (which cells touch, when, and the degree) — via
 `analysis/exporters.py` (pure, reusable from scripts/notebooks too).
 
 ## Testing without a display

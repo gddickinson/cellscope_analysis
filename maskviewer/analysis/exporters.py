@@ -56,6 +56,14 @@ def track_table(labels, um_per_px=None, dt_min=None):
     return pd.DataFrame(rows)
 
 
+def contact_pairs_table(labels, um_per_px=None, dt_min=None):
+    """DataFrame: one row per cell **pair** that touches — which cells, when
+    (first/last frame, frames-in-contact, episodes) and the contact degree."""
+    import pandas as pd
+    scale = float(um_per_px) if um_per_px else 1.0
+    return pd.DataFrame(contacts.contact_pairs(np.asarray(labels), scale, dt_min))
+
+
 def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
                    per_frame_df=None, with_edge=False, centroids=None,
                    progress_cb=None):
@@ -214,6 +222,10 @@ def export_all(labels, um_per_px=None, dt_min=None, out_dir=".", prefix="",
     if "tracks" in which:
         tr = track_table(labels, um_per_px, dt_min)
         paths["tracks"] = write_csv(tr, os.path.join(out_dir, f"{prefix}tracks.csv"))
+    if "contact_pairs" in which:
+        cp = contact_pairs_table(labels, um_per_px, dt_min)
+        paths["contact_pairs"] = write_csv(
+            cp, os.path.join(out_dir, f"{prefix}contact_pairs.csv"))
     if progress_cb:
         progress_cb(1, 1)
     return paths
