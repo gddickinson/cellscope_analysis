@@ -93,9 +93,15 @@ class ConfigWindow(QtWidgets.QDialog):
         v.addWidget(_wrap("Parameters that define the neighbour / contact analyses. "
                           "Apply to <b>both</b> the comparison (recompute) and the "
                           "interactive overlays / colour-by."))
-        form = QtWidgets.QFormLayout()
         self._param_spins = {}
-        for key, label, default, lo, hi, dec, tip in ANALYSIS_PARAMS:
+        section = None
+        form = None
+        for key, label, default, lo, hi, dec, sect, tip in ANALYSIS_PARAMS:
+            if sect != section:                            # new section → header + form
+                section = sect
+                v.addWidget(QtWidgets.QLabel(f"<b>{sect}</b>"))
+                form = QtWidgets.QFormLayout()
+                v.addLayout(form)
             sp = QtWidgets.QDoubleSpinBox()
             sp.setRange(lo, hi)
             sp.setDecimals(dec)
@@ -104,7 +110,6 @@ class ConfigWindow(QtWidgets.QDialog):
             sp.valueChanged.connect(lambda val, k=key: self._set_param(k, val))
             self._param_spins[key] = sp
             form.addRow(label, sp)
-        v.addLayout(form)
         reset = QtWidgets.QPushButton("Reset to defaults")
         reset.clicked.connect(self._reset_params)
         v.addWidget(reset)
@@ -114,6 +119,8 @@ class ConfigWindow(QtWidgets.QDialog):
     def _set_param(self, key, val):
         self._settings.setValue(f"analysis/{key}", float(val))
         apply_analysis_params(self._settings)
+        if key == "shape_n_modes":                        # shape model must re-fit
+            self.win._shape_model = None
         for attr in ("_contact_cache", "_iface_cache"):   # force overlays to recompute
             getattr(self.win, attr, {}).clear()
         if getattr(self.win, "masks", None) is not None:

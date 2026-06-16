@@ -5,6 +5,26 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Expose the remaining analysis parameters (state thresholds + shape count)
+
+Follow-up on the deferred options. The **state-classification thresholds** turned out
+to be a clean win — `classify_state` reads `ROUNDED_AREA_UM2` / `ROUNDED_ECC` in its
+body (not as bound defaults), so mutating the module globals propagates everywhere with
+no analysis-code change. Added to the **Analysis parameters** tab (now grouped by
+section): **Rounded max area (µm²)**, **Rounded max eccentricity**, and the **number of
+shape modes** (`shape_modes.fit_shape_modes` made to read the live `N_MODES`). All set
+via `apply_analysis_params`, folded into the comparison cache key (`analysis_params_tag`)
+so a change recomputes, and flow to state / frac_rounded / state-segmented metrics +
+the interactive state colouring + the VAMPIRE model (the params tab clears the cached
+shape model + redraws). Verified: setting rounded-area=300 flips a 500-µm² cell from
+rounded→spread live. Tests +1. `pytest` **121 passed**; smoke green; all files < 500.
+
+(Left as documented module constants — low value to tune via UI: the state min-area
+floor, edge-rectangle depth/width, kymograph smoothing, contact min-pixels, and the
+per-function defaults already settable as args, e.g. run-tumble turn angle.)
+
+---
+
 ## 2026-06-16 — Options panel: grouped metrics + Analysis-parameters tab
 
 Second half of the options audit. **Cell-plot-metrics tab** is now **grouped by

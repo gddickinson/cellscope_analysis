@@ -51,18 +51,30 @@ def compare_options(settings=None) -> dict:
 
 
 # Tunable analysis parameters (Config ▸ Analysis parameters). Each:
-# (key, label, default, min, max, decimals, tooltip). Applied to the analysis module
-# globals so they take effect everywhere — comparison + interactive overlay / colour-by.
+# (key, label, default, min, max, decimals, section, tooltip). Applied to the analysis
+# module globals so they take effect everywhere — comparison + interactive views — by
+# being read at call time (the functions reference the globals, not bound defaults).
 ANALYSIS_PARAMS = [
-    ("nn_radius", "Neighbour radius (µm)", 50.0, 1.0, 2000.0, 0,
+    ("nn_radius", "Neighbour radius (µm)", 50.0, 1.0, 2000.0, 0, "Neighbours & contact",
      "Cells within this centroid distance count as neighbours (n_neighbors / crowding "
      "/ density-stratified speed)."),
     ("contact_gap", "Contact gap tolerance (px)", 1.5, 0.5, 10.0, 1,
+     "Neighbours & contact",
      "Max boundary-pixel separation treated as a cell–cell contact (touching masks "
      "sit ~1 px apart)."),
     ("extensive_frac", "Extensive-contact threshold", 0.25, 0.05, 1.0, 2,
+     "Neighbours & contact",
      "A neighbour interface ≥ this fraction of the cell's boundary is 'extensive' "
      "(else 'point')."),
+    ("rounded_area_um2", "Rounded: max area (µm²)", 960.0, 50.0, 10000.0, 0,
+     "State classification (rounded vs spread)",
+     "A cell is 'rounded' only if its footprint is ≤ this AND not elongated; drives "
+     "state / frac_rounded / all state-segmented metrics."),
+    ("rounded_ecc", "Rounded: max eccentricity", 0.85, 0.1, 1.0, 2,
+     "State classification (rounded vs spread)",
+     "A cell is 'rounded' only if its eccentricity is ≤ this (and small)."),
+    ("shape_n_modes", "Number of shape modes", 5, 2, 12, 0, "Shape modes (VAMPIRE)",
+     "How many clusters the VAMPIRE shape-mode model uses (re-fits + re-caches)."),
 ]
 
 
@@ -75,11 +87,14 @@ def analysis_params(settings=None) -> dict:
 def apply_analysis_params(settings=None):
     """Push the configured analysis parameters onto the analysis module globals so
     every computation (comparison + interactive) reads them at call time."""
-    from ..analysis import neighbors, contacts
+    from ..analysis import neighbors, contacts, state, shape_modes
     p = analysis_params(settings)
     neighbors.DEFAULT_RADIUS_UM = p["nn_radius"]
     contacts.DEFAULT_GAP_PX = p["contact_gap"]
     contacts.EXTENSIVE_FRAC = p["extensive_frac"]
+    state.ROUNDED_AREA_UM2 = p["rounded_area_um2"]
+    state.ROUNDED_ECC = p["rounded_ecc"]
+    shape_modes.N_MODES = int(p["shape_n_modes"])
 
 
 def analysis_params_tag(settings=None) -> str:
