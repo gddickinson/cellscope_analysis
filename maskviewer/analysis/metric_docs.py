@@ -330,6 +330,30 @@ then Mann–Whitney U of each treatment vs the arm's control with Bonferroni
 correction; Cohen's d effect size; and an optional covariate-adjusted OLS
 (treatment effect after frac_spread + density). A vehicle/batch pair test and a
 condition ensemble MSD (mean±SEM or median+bootstrap-CI) are also reported.</p>
+<p><b>Ranked report.</b> The Stats tab's <i>Ranked report…</i> button lists
+<i>every</i> group-vs-group pair for the current metric, ordered by the likelihood
+of a significant difference (smallest p first) — Mann–Whitney U + Cohen's d with a
+Bonferroni correction over the pairs. Unlike the per-contrast table above (which is
+design-driven: control vs test within arms), this scans <i>all</i> group pairs so
+you see which groups differ most on a feature. Exportable to CSV.</p>
+<p><b>What gets computed.</b> Config ▸ Settings ▸ <i>Comparison analysis</i> toggles
+the heavier optional families — cell–cell contacts, state-segmented metrics,
+solidity — to speed the per-recording pass; changing a toggle recomputes.</p>
+"""
+
+_CONTACTS_HTML = """
+<h3>Cell–cell contact (shared membrane)</h3>
+<p>Distinct from nearest-neighbour <i>proximity</i> (centroid distance): a cell is
+<b>in contact</b> where its mask boundary is adjacent (within ~1.5&nbsp;px) to
+another cell's. Per frame each cell gets a <b>contact_fraction</b> (share of its
+boundary engaged), an interface <b>contact_length</b>, <b>n_contacts</b> (cells
+touched), and a class — <b>free</b> / <b>point</b> (a small contact &lt;25% of the
+boundary) / <b>extensive</b> (≥25%). Over a track: time-in-class fractions
+(frac_in_contact / _point / _extensive) and <b>episode dynamics</b>
+(n_contact_events, mean_contact_duration, formation rate). The <b>Cell contacts</b>
+overlay draws the touching boundary pixels (blue point / red extensive), colour-by
+offers <i>contact fraction / count / class</i>, and <b>Export CSV</b> writes a
+<b>cell-pair</b> table — which cells touch, when (frames), and the degree.</p>
 """
 
 
@@ -345,5 +369,6 @@ def as_html() -> str:
             + section("Per-channel metrics (one per image channel)",
                       [(p + "&lt;channel&gt;", v) for p, v in PREFIX.items()])
             + section("Track / motion / edge summaries", EXTRA.items())
+            + _CONTACTS_HTML
             + _COMPARISON_HTML
             + "</body></html>")
