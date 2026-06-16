@@ -11,13 +11,12 @@ from __future__ import annotations
 from PyQt5 import QtWidgets
 
 
-class ScaleDialog(QtWidgets.QDialog):
-    def __init__(self, px_size, frame_interval, file_px, file_dt, on_apply,
-                 parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Pixel size & time scale")
-        self.on_apply = on_apply
+class ScalePanel(QtWidgets.QWidget):
+    """The pixel-size / time-scale override controls (reused by the standalone
+    dialog and the unified Config window's 'Pixel size & time scale' tab)."""
 
+    def __init__(self, px_size, frame_interval, file_px, file_dt, parent=None):
+        super().__init__(parent)
         self.px_chk = QtWidgets.QCheckBox("Override pixel size")
         self.px = QtWidgets.QDoubleSpinBox()
         self.px.setDecimals(5); self.px.setRange(1e-5, 1e6); self.px.setSuffix(" µm/px")
@@ -39,21 +38,35 @@ class ScaleDialog(QtWidgets.QDialog):
             "Applies to ALL recordings in this project — use when a file's metadata "
             "is missing or wrong. Unchecked = use each file's own metadata.")
         note.setWordWrap(True)
-        bb = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        bb.accepted.connect(self._apply)
-        bb.rejected.connect(self.reject)
-
         form = QtWidgets.QFormLayout()
         form.addRow(self.px_chk, self.px)
         form.addRow(self.dt_chk, self.dt)
         lay = QtWidgets.QVBoxLayout(self)
         lay.addWidget(note)
         lay.addLayout(form)
+
+    def values(self):
+        """``(px_size, frame_interval)`` — None for an unchecked override."""
+        px = float(self.px.value()) if self.px_chk.isChecked() else None
+        dt = float(self.dt.value()) if self.dt_chk.isChecked() else None
+        return px, dt
+
+
+class ScaleDialog(QtWidgets.QDialog):
+    def __init__(self, px_size, frame_interval, file_px, file_dt, on_apply,
+                 parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Pixel size & time scale")
+        self.on_apply = on_apply
+        self.panel = ScalePanel(px_size, frame_interval, file_px, file_dt)
+        bb = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self._apply)
+        bb.rejected.connect(self.reject)
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.addWidget(self.panel)
         lay.addWidget(bb)
 
     def _apply(self):
-        px = float(self.px.value()) if self.px_chk.isChecked() else None
-        dt = float(self.dt.value()) if self.dt_chk.isChecked() else None
-        self.on_apply(px, dt)
+        self.on_apply(*self.panel.values())
         self.accept()

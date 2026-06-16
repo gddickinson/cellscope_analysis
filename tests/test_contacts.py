@@ -103,6 +103,11 @@ def test_contacts_disabled_omits_columns():
     L[:, 5:15, 5:15] = 1
     recs = cell_metrics.per_frame_records(L, with_contacts=False)
     assert all("contact_fraction" not in r for r in recs)
+    # the toggle propagates through the exporter table too (comparison gating path)
+    pf_off = exporters.per_frame_table(L, with_contacts=False)
+    assert "contact_fraction" not in pf_off.columns
+    pf_on = exporters.per_frame_table(L, with_contacts=True)
+    assert "contact_fraction" in pf_on.columns
 
 
 def test_contact_episodes_counts_runs_and_gaps():

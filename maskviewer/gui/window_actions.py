@@ -210,6 +210,11 @@ class WindowActionsMixin:
             self.select_cell(self.selected)
         self.status.showMessage(f"Applied alignment / FOV to {label}", 5000)
 
+    def open_config_window(self):
+        """Unified Config window — cell-plot metrics · comparison analysis · scale."""
+        from .config_window import ConfigWindow
+        ConfigWindow(self).exec_()
+
     def open_scale_dialog(self):
         """Project-wide manual pixel-size / time-scale overrides (metadata fix)."""
         from .scale_dialog import ScaleDialog

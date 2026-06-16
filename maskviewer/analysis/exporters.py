@@ -22,11 +22,12 @@ from . import label_stats, cell_metrics, motion, edge_dynamics, contacts
 
 
 def per_frame_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
-                    progress_cb=None):
+                    progress_cb=None, with_contacts=True):
     """DataFrame: one row per (cell, frame) with region/shape metrics."""
     import pandas as pd
     recs = cell_metrics.per_frame_records(np.asarray(labels), um_per_px, dt_min,
-                                          with_solidity, progress_cb=progress_cb)
+                                          with_solidity, progress_cb=progress_cb,
+                                          with_contacts=with_contacts)
     return pd.DataFrame(recs)
 
 

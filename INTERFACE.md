@@ -201,11 +201,15 @@ Read this before opening source files. Update it when modules change.
   `registration`) + manual dy/dx, **Auto-detect FOV** (via `fov`) + manual rectangle,
   a live overlay preview (reference grey + align-channel magenta + FOV box), and
   Apply → writes a non-destructive correction onto the project (`on_apply`).
-- **scale_dialog.py** — `ScaleDialog(QDialog)`: **Config ▸ Pixel size & time scale** —
-  per-field override checkboxes + spinboxes for µm/px + min/frame, prefilled from the
-  project override or the current file. Apply → `window_actions._apply_scale` stores
-  `px_size`/`frame_interval` on the project + reloads (all recordings). For files with
-  missing/wrong metadata.
+- **config_window.py** — `ConfigWindow(QDialog)`: the unified **Config ▸ Settings…**
+  (Ctrl+,) tabbed window — **Cell plot metrics** (checkboxes bound to `cell_info`),
+  **Comparison analysis** (toggles `compare_tables.COMPARE_OPTIONS` → QSettings → what
+  `build_comparison` computes) and **Pixel size & time scale** (embeds `ScalePanel`).
+- **scale_dialog.py** — `ScalePanel(QWidget)` (the override controls, reused by the
+  Config window's scale tab) + `ScaleDialog(QDialog)` wrapping it: **pixel size & time
+  scale** — checkboxes + spinboxes for µm/px + min/frame, prefilled from the project
+  override or the current file. Apply → `window_actions._apply_scale` stores
+  `px_size`/`frame_interval` on the project + reloads. For missing/wrong metadata.
 - **compare_tables.py** — `ComputeWorker` (off-thread `build_comparison`: lag count
   + optional fluorescence channel + project `corrections`); `corrections_tag` +
   `channel_tag` (cache-key fingerprints — corrections/scale, and a fluor channel
