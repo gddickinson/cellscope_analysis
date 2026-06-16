@@ -148,6 +148,11 @@ EXTRA = {
         "Steps whose length exceeds 5× the cell's median step — abnormal displacement "
         "that suggests a tracking error / ID swap. n_track_jumps, frac_track_jumps and "
         "the max single step."),
+    "shape_modes": ("VAMPIRE shape-mode usage over a cell's track.",
+        "dominant_shape_mode (most-used mode), n_shape_modes (distinct modes visited), "
+        "shape_mode_entropy (bits — how varied the cell's shape is) and "
+        "shape_mode_switch_rate (fraction of consecutive frames that change mode — "
+        "shape instability)."),
     "cil": ("Contact-inhibition of locomotion — does touching change how a cell moves?",
         "speed_free / speed_contact (mean step speed free vs in-contact), "
         "speed_ratio_contact (contact ÷ free; <1 = the cell slows on contact, the CIL "
@@ -298,6 +303,8 @@ _KEY_ALIASES = {
     "frac_track_jumps": "track_jumps",
     "speed_free": "cil", "speed_contact": "cil", "speed_ratio_contact": "cil",
     "delta_speed_onset": "cil", "velocity_alignment": "cil", "n_contact_onsets": "cil",
+    "dominant_shape_mode": "shape_modes", "n_shape_modes": "shape_modes",
+    "shape_mode_entropy": "shape_modes", "shape_mode_switch_rate": "shape_modes",
 }
 
 

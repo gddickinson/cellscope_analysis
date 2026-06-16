@@ -35,6 +35,11 @@ COMPARE_OPTIONS = [
     ("cil", "Contact-inhibition of locomotion (CIL)", False,
      "Per-cell speed free-vs-in-contact, speed change at contact onset, and "
      "velocity alignment with contacting neighbours."),
+    ("fluor_metrics", "Fluorescence intensity + membrane (per channel)", False,
+     "Per-cell mean intensity + membrane score / boundary gradient / contrast for "
+     "every channel (e.g. SiR-actin / tagged-PIEZO1 level + cortical enrichment)."),
+    ("shape_modes", "Shape-mode usage (VAMPIRE)", False,
+     "Per-cell dominant shape mode, # modes visited, mode entropy + switch rate."),
 ]
 
 
@@ -95,6 +100,8 @@ class ComputeWorker(QtCore.QObject):
                 with_state_segmented=o.get("state_segmented", True),
                 with_edge=o.get("edge_dynamics", False),
                 with_cil=o.get("cil", False),
+                with_fluor_metrics=o.get("fluor_metrics", False),
+                with_shape_modes=o.get("shape_modes", False),
                 progress_cb=lambda i, n: (self.progress.emit(i, n)
                                           or not self.cancel))
         except Exception as exc:                          # surface, don't crash
