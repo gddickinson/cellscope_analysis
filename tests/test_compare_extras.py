@@ -185,3 +185,50 @@ def test_ranked_group_comparisons_edge_cases():
     assert compare.ranked_group_comparisons(df, "missing_metric") == []   # no such col
     one = df[df["condition"] == "WT"]
     assert compare.ranked_group_comparisons(one, "m") == []               # single group
+
+
+def test_benjamini_hochberg_monotone_and_le_bonferroni():
+    from maskviewer.analysis import stats_extra as se
+    p = np.array([0.001, 0.01, 0.02, 0.2, 0.5])
+    q = se.benjamini_hochberg(p)
+    assert np.all(np.diff(q) >= -1e-9)                 # monotone non-decreasing
+    assert np.all(q <= np.minimum(p * p.size, 1) + 1e-9)  # FDR ≤ Bonferroni
+    assert np.all((q >= 0) & (q <= 1))
+    # NaNs pass through, finite count drives m
+    q2 = se.benjamini_hochberg([0.01, np.nan, 0.02])
+    assert np.isnan(q2[1]) and np.isfinite(q2[0])
+
+
+def test_bootstrap_ci_brackets_effect():
+    from maskviewer.analysis import stats_extra as se, compare
+    rng = np.random.default_rng(1)
+    a = rng.normal(0, 1, 30); b = rng.normal(2, 1, 30)   # clear separation
+    lo, hi = se.bootstrap_ci(a, b, compare.cohens_d)
+    d = compare.cohens_d(a, b)
+    assert lo < d < hi and lo > 0                        # CI excludes 0 (real effect)
+    assert se.bootstrap_ci([1.0], [2.0, 3.0], compare.cohens_d) == (float("nan"),) * 2 \
+        or np.isnan(se.bootstrap_ci([1.0], [2.0, 3.0], compare.cohens_d)[0])
+
+
+def test_ranked_report_has_fdr_and_ci():
+    from maskviewer.analysis import compare
+    res = compare.ranked_group_comparisons(_per_rec_three_groups(), "m")
+    assert all("q_fdr" in r and "cohen_d_lo" in r and "cluster_p" in r for r in res)
+    fin = [r for r in res if np.isfinite(r["p"])]
+    for r in fin:                                        # q ≤ Bonferroni per row
+        assert r["q_fdr"] <= r["p_bonferroni"] + 1e-9
+
+
+def test_cluster_robust_detects_group_effect():
+    from maskviewer.analysis import stats_extra as se
+    rng = np.random.default_rng(2)
+    rows = []
+    for rec in range(4):
+        wbase, kbase = rng.normal(0, 0.3), rng.normal(0, 0.3)   # per-recording intercepts
+        for _ in range(12):
+            rows.append({"condition": "WT", "recording": f"w{rec}", "m": wbase + rng.normal(0, 1)})
+            rows.append({"condition": "KO", "recording": f"k{rec}", "m": kbase + 3 + rng.normal(0, 1)})
+    df = pd.DataFrame(rows)
+    p = se.cluster_robust_p(df, "m")
+    assert np.isfinite(p) and p < 0.05                   # large group effect detected
+    assert np.isnan(se.cluster_robust_p(df[df["condition"] == "WT"], "m"))   # 1 group → NaN

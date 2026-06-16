@@ -5,6 +5,21 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR3: stats power — FDR + bootstrap CI + cluster-robust cell-level test
+
+New `analysis/stats_extra.py` (dependency-free, np+scipy — the project stays
+statsmodels-free): `benjamini_hochberg` (FDR q-values, less conservative than
+Bonferroni across many contrasts), `bootstrap_ci` (percentile CI of any statistic),
+and `cluster_robust_p` (cell-level group effect with **recording-clustered** robust
+SE, Liang-Zeger CR1 — a random-intercept-mixed-model stand-in that uses cell-level
+data while keeping the recording the inference unit). The **Ranked report** now adds
+**q (FDR)**, **Cohen's d ±95% bootstrap CI** and a **cell-level p** column (★★★ now
+keys off q<0.05); `ranked_group_comparisons` gained `per_cell` + `with_ci`. On
+synthetic data the cell-level cluster-robust p (0.0006) is sharper than the
+recording-unit MWU, as expected. Tests +4. `pytest` **109 passed**; all files < 500.
+
+---
+
 ## 2026-06-15 — PR2: run-and-tumble decomposition + ID-swap track QC
 
 `motion.run_and_tumble`: split a track into directed **runs** and reorientation

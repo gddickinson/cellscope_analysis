@@ -302,15 +302,20 @@ def cohens_d(control, test):
     return float((b.mean() - a.mean()) / sp) if sp > 0 else np.nan
 
 
-def ranked_group_comparisons(per_recording, metric, groups=None) -> list:
+def ranked_group_comparisons(per_recording, metric, groups=None, per_cell=None,
+                             with_ci=True) -> list:
     """**Every** group pair compared on one metric, ranked by the likelihood of a
     significant difference (smallest p first). Recording = unit; Mann-Whitney U
-    (two-sided) + Cohen's d, with a Bonferroni correction over the tested pairs.
+    (two-sided) + Cohen's d, with a **Bonferroni** *and* a **Benjamini-Hochberg FDR**
+    correction over the tested pairs, a percentile **bootstrap CI** on Cohen's d, and
+    (when ``per_cell`` is given) a cell-nested-in-recording **mixed-model** p.
 
     Unlike the design-driven per-contrast Stats table (control-vs-test within arms),
     this enumerates *all* unordered group pairs. Returns a list of dicts (group_a,
-    group_b, n_a, n_b, mean_a, mean_b, p, p_bonferroni, cohen_d), p-ascending."""
+    group_b, n_a, n_b, mean_a, mean_b, p, p_bonferroni, q_fdr, cohen_d, cohen_d_lo,
+    cohen_d_hi, cluster_p), p-ascending."""
     from scipy import stats as _ss
+    from . import stats_extra as _se
     cols = getattr(per_recording, "columns", [])
     if per_recording is None or metric not in cols or "condition" not in cols:
         return []
@@ -337,9 +342,20 @@ def ranked_group_comparisons(per_recording, metric, groups=None) -> list:
                          "mean_b": float(vb.mean()) if vb.size else np.nan,
                          "p": p, "cohen_d": cohens_d(va, vb)})
     m = sum(1 for r in rows if np.isfinite(r["p"]))
-    for r in rows:
+    qs = _se.benjamini_hochberg([r["p"] for r in rows])
+    for r, q in zip(rows, qs):
         r["p_bonferroni"] = (min(r["p"] * m, 1.0)
                              if np.isfinite(r["p"]) and m else np.nan)
+        r["q_fdr"] = float(q) if np.isfinite(q) else np.nan
+        if with_ci:
+            r["cohen_d_lo"], r["cohen_d_hi"] = _se.bootstrap_ci(
+                vals.get(r["group_a"]), vals.get(r["group_b"]), cohens_d)
+        else:
+            r["cohen_d_lo"] = r["cohen_d_hi"] = np.nan
+        r["cluster_p"] = (_se.cluster_robust_p(
+            per_cell[per_cell["condition"].isin([r["group_a"], r["group_b"]])],
+            metric) if per_cell is not None and metric in getattr(
+            per_cell, "columns", []) else np.nan)
     rows.sort(key=lambda r: (not np.isfinite(r["p"]),
                              r["p"] if np.isfinite(r["p"]) else 1.0))
     return rows
