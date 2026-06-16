@@ -62,7 +62,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._display = {}              # channel -> luts.DisplayState
         self._cent_hist = None          # lazy {cid: (T,2)} for trails / NN
         self._track_len = None          # lazy {cid: int} for colour-by track
-        self._mean_speed = None         # lazy {cid: float} for colour-by speed
+        self._mean_speed = self._cell_source = None    # lazy colour-by: speed / source
         self._shape_model = None        # lazy VAMPIRE shape-mode model
         self._contact_cache = {}        # {frame: frame_contacts} for colour-by/overlay
         self._iface_cache = {}          # {frame: frame_interfaces} for the overlay
@@ -206,7 +206,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._display = {}
         self.selected = 0
         self._cent_hist = self._track_len = self._mean_speed = None
-        self._shape_model = self._pop_df = None
+        self._cell_source = self._shape_model = self._pop_df = None
         self._contact_cache, self._iface_cache = {}, {}     # per-recording contact memo
         labels = self.masks.labels if self.masks is not None else None
         # Lineage is derived from the loaded masks themselves (track topology), not

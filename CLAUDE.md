@@ -118,7 +118,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   + Cy5 magenta) + per-channel visibility, mask show/outline/opacity, **colour-by
   any calculated metric** (Cell ID / state / area / perimeter / circularity /
   eccentricity / aspect ratio / solidity / extent / nearest-neighbour /
-  neighbour count / mean speed / track length / shape mode), overlay toggles
+  neighbour count / mean speed / track length / shape mode / **mask source**
+  — red=DIC, yellow=Cy5, lime=both, the detection channel each cell came from via
+  the pipeline's `fusion_source_stack`, read display-only from the sibling
+  pre-cleaning artifact; absent for single-channel/unfused recordings), overlay toggles
   (scale bar, frame/time, cell IDs, track trails, **division links** =
   parent→daughter connectors).
 - **Cell Info** dock: click a cell → summary + plot any *enabled* per-frame

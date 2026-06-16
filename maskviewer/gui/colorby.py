@@ -101,6 +101,18 @@ def overlay_lut(win, lab):
         key = "contact_fraction" if mode == "contact_fraction" else "n_contacts"
         vals = {cid: float(r[key]) for cid, r in fc.items()}
         return _continuous(vals, mx, CMAP[mode], _label(mode, um, dt))
+    if mode == "source":                               # detection provenance (categorical)
+        from ..io.masks import SOURCE_CODE_COLOR
+        if win._cell_source is None and win.masks is not None:
+            win._cell_source = win.masks.cell_sources()  # lazy, cached on the window
+        src = win._cell_source
+        if not src:
+            return None, None                          # no fusion-source data → default
+        lut = np.zeros((mx + 1, 4), dtype=np.ubyte)
+        for cid, code in src.items():
+            if 0 < cid < lut.shape[0] and code in SOURCE_CODE_COLOR:
+                lut[cid] = (*SOURCE_CODE_COLOR[code], 255)
+        return lut, None
     if mode == "track":
         win._ensure_track_len()
         return _continuous(win._track_len, mx, "magma", _label(mode, um, dt))

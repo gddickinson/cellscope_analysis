@@ -5,6 +5,27 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Colour masks by detection source (DIC / Cy5 / both)
+
+Added a **Mask source** colour-by. The detection pipeline records a per-pixel
+`fusion_source_stack` (uint8: 0 bg / 1 DIC-only / 2 Cy5-only / 3 both — the DIC↔Cy5
+detection fusion). The final `masks.npz` drops it, so `io/masks.load_masks` now also
+locates it in the loaded npz **or a sibling pre-cleaning artifact**
+(`masks_precleanup.npz` / `masks_original.npz`) and exposes `Masks.source_stack()`
+(lazy) + `Masks.cell_sources()` (`{cell_id: code}` by majority pixel vote over the track,
+matching the pipeline's per-track `fusion_source`). `colorby` gained a categorical
+**source** mode (red=DIC, yellow=Cy5, lime=both), added to the Display colour-by combo
+with an explanatory tooltip. It's **display/QC only** — read from a pre-cleaning artifact
+purely for provenance, never fed into analysis — and degrades gracefully (default
+colouring) for single-channel / unfused recordings with no source data.
+
+Verified on real IC295 data (a recording resolved to {both:6, DIC:3, Cy5:1}) and the
+synthetic sample (no source → graceful fallback). `viewer_window` kept at 499 lines
+(field folded in, lazy cache done inline in `colorby`). Tests +4
+(`tests/test_mask_source.py`); `pytest` **145 passed**; all files < 500.
+
+---
+
 ## 2026-06-16 — Edge curvature, rectangle positioning, track-length metric
 
 Three user-requested viewer/analysis additions:

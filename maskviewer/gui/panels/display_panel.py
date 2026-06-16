@@ -20,6 +20,7 @@ COLOR_BY = [
     ("Contact fraction", "contact_fraction"), ("Contact count", "n_contacts"),
     ("Contact class", "contact_state"),
     ("Mean speed", "speed"), ("Track length", "track"), ("Shape mode", "shape_mode"),
+    ("Mask source (DIC/Cy5/both)", "source"),
 ]
 OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
             ("ids", "Cell IDs", False), ("trails", "Track trails", False),
