@@ -102,3 +102,28 @@ def test_rectangles_for_frame():
     corners, inten = ei.rectangles_for_frame(labels, image, 1, 3)
     assert corners.ndim == 3 and corners.shape[1:] == (4, 2)
     assert corners.shape[0] == inten.size
+
+
+def test_lagged_intensity_correlation_recovers_lead_lag():
+    """When intensity is a shifted copy of edge velocity, the peak correlation lands
+    at the corresponding lag (the cross-correlation finds the lead/lag)."""
+    rng = np.random.default_rng(0)
+    n, ns = 12, ei.N_SECTORS
+    vel = rng.standard_normal((n, ns))
+    # intensity at frame k mirrors the velocity of pair k-1 (so intensity FOLLOWS by +0)
+    intm = np.full((n, ns), np.nan)
+    for k in range(n - 1):
+        intm[k + 1] = vel[k]                      # intensity[k+1] == velocity of pair k
+    lags, rs, peak_lag, peak_r = ei.lagged_intensity_correlation(vel, intm, max_lag=3)
+    assert list(lags) == [-3, -2, -1, 0, 1, 2, 3]
+    assert peak_lag == 0 and peak_r > 0.99        # aligned at lag 0, near-perfect r
+    # degenerate input → no crash, NaN peak
+    z = np.zeros((0, ns))
+    assert np.isnan(ei.lagged_intensity_correlation(z, z)[3])
+
+
+def test_analyze_cell_exposes_peak_lag():
+    labels = _growing_cell()
+    image = np.ones((labels.shape[0], 80, 80), float)
+    *_, summary = ei.analyze_cell(labels, image, 1, um_per_px=1.0, dt_min=1.0)
+    assert "edge_intensity_peak_lag" in summary and "edge_intensity_peak_r" in summary

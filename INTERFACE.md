@@ -357,7 +357,10 @@ Read this before opening source files. Update it when modules change.
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
   (protrusion/retraction/net/ruffling), `edge_events` (ADAPT-style discrete
-  events), `edge_summary_for_cell`.
+  events), **`edge_polarity`** (rotate sectors to the migration direction →
+  front/rear/side velocity + `polarity_index` + `rear_retraction_fraction`, the
+  PIEZO1 rear-retraction signature), `edge_summary_for_cell` (summary + events +
+  polarity — surfaced in the comparison via the Edge-dynamics analysis toggle).
 - **edge_intensity.py** — edge-movement ↔ **fluorescence-intensity** correlation
   (tagged PIEZO1, SiR-actin, any signal); a faithful reproduction of the lab's
   `cell_edge_analysis` pipeline adapted to closed tracked cells. `rectangle_intensity`
@@ -366,6 +369,9 @@ Read this before opening source files. Update it when modules change.
   (local radial displacement ↔ rectangle intensity, `past`/`future`),
   `correlation_summary` (Pearson **r / R² / p / slope**, protruding/retracting/stable
   counts + mean intensities, protrude−retract Δ, t-test + Mann-Whitney),
+  **`lagged_intensity_correlation`** (r vs frame lag → does the signal **lead or
+  follow** the edge motion; peak lag/r in `analyze_cell`'s summary →
+  `edge_piezo_peak_lag`/`_r` in the comparison),
   `rectangles_for_frame` (overlay), `analyze_cell` (end-to-end). Reuses the 72
   sectors / mid-centroid radial velocity of `edge_dynamics`. **Samples the aligned
   channel + FOV-cropped masks** (see `registration` / `fov`).
