@@ -106,3 +106,32 @@ def test_scale_override_applies_and_persists(tmp_path):
     q = projmod.load_project(fp)
     assert q.px_size == 0.25 and q.frame_interval == 2.0
     assert q.correction_for("WT__0")["fov"] == [1, 9, 2, 8]
+
+
+def test_exclude_cell_and_regroup_drops_it():
+    p = _project(["WT", "KO"])
+    rows = [{"recording": e.label, "condition": e.condition, "cell_id": c, "x": 1}
+            for e in p.entries for c in (1, 2, 3)]
+    df = pd.DataFrame(rows)
+    assert not p.is_cell_excluded("WT__0", 2)
+    p.exclude_cell("WT__0", 2)
+    assert p.is_cell_excluded("WT__0", 2)
+    g = p.regroup(df)
+    assert not ((g["recording"] == "WT__0") & (g["cell_id"] == 2)).any()   # dropped
+    assert ((g["recording"] == "WT__0") & (g["cell_id"] == 1)).any()       # sibling kept
+    assert ((g["recording"] == "KO__0") & (g["cell_id"] == 2)).any()       # other rec kept
+    p.exclude_cell("WT__0", 2, on=False)                                   # toggle off
+    assert not p.is_cell_excluded("WT__0", 2) and "WT__0" not in p.excluded_cells
+    assert ((p.regroup(df)["recording"] == "WT__0") & (p.regroup(df)["cell_id"] == 2)).any()
+
+
+def test_excluded_cells_save_load_roundtrip(tmp_path):
+    p = _project(["WT", "KO"])
+    p.exclude_cell("WT__0", 5)
+    p.exclude_cell("WT__0", 7)
+    p.exclude_cell("KO__1", 3)
+    fp = str(tmp_path / "p.cmp")
+    projmod.save_project(p, fp)
+    q = projmod.load_project(fp)
+    assert q.is_cell_excluded("WT__0", 5) and q.is_cell_excluded("WT__0", 7)
+    assert q.is_cell_excluded("KO__1", 3) and not q.is_cell_excluded("WT__0", 99)

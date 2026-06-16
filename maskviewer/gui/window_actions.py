@@ -243,6 +243,22 @@ class WindowActionsMixin:
             f"Scale: {px_size or 'file'} µm/px · {frame_interval or 'file'} min/frame",
             5000)
 
+    def toggle_cell_excluded(self):
+        """QC-flag the selected cell in/out of the cross-recording comparison.
+
+        Persisted on the project (`excluded_cells`); applied as a display-time remap
+        (`Project.regroup`) so the comparison drops it with no recompute — and saved
+        with the project file. Use it to remove obvious tracking errors / debris."""
+        if not self.selected or not self.entries:
+            self.status.showMessage("Select a cell first.", 3000)
+            return
+        label = self.entries[self._current_index()].label
+        on = not self.project.is_cell_excluded(label, self.selected)
+        self.project.exclude_cell(label, self.selected, on)
+        self.status.showMessage(
+            f"Cell {self.selected} {'excluded from' if on else 'restored to'} the "
+            f"comparison  ({label})", 5000)
+
     def export_csv(self):
         if self.masks is None or self.recording is None:
             QtWidgets.QMessageBox.information(
