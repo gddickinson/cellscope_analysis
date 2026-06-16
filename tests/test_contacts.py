@@ -195,10 +195,26 @@ def test_contact_pairs_table_export():
                                     "last_frame", "n_frames_in_contact"]
     assert len(df) == 1 and df.iloc[0]["cell_a"] == 1 and df.iloc[0]["cell_b"] == 2
     # export_all writes the contact_pairs.csv when requested
-    import tempfile
+    import tempfile, pandas as pd
     with tempfile.TemporaryDirectory() as d:
         paths = exporters.export_all(L, 0.5, 1.0, out_dir=d, which=("contact_pairs",))
         assert "contact_pairs" in paths and paths["contact_pairs"].endswith("contact_pairs.csv")
+
+
+def test_contact_pairs_table_empty_keeps_header():
+    """A recording with no touching cells (e.g. a single-cell crop) still produces a
+    header-carrying table whose CSV is readable (no headerless 1-byte file)."""
+    import tempfile, pandas as pd
+    L = np.zeros((3, 30, 30), np.int32)
+    L[:, 5:15, 5:15] = 1                     # one cell → zero pairs
+    df = exporters.contact_pairs_table(L, um_per_px=0.5, dt_min=1.0)
+    assert len(df) == 0
+    assert "cell_a" in df.columns and "mean_episode_min" in df.columns
+    assert "mean_episode_frames" in exporters.contact_pairs_table(L).columns   # no-dt variant
+    with tempfile.TemporaryDirectory() as d:
+        p = exporters.export_all(L, 0.5, 1.0, out_dir=d, which=("contact_pairs",))["contact_pairs"]
+        back = pd.read_csv(p)                # must round-trip, not EmptyDataError
+        assert len(back) == 0 and len(back.columns) == 9
 
 
 def test_cell_frame_table_contact_series():

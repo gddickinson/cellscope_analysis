@@ -5,6 +5,21 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — GUI bug-hunt: fix headerless empty contact-pairs CSV
+
+A headless test-drive (every colour-by mode incl. contacts, the contacts overlay,
+cell-info contact plots, edge panel, Settings, the comparison + ranked report for
+every metric, single-group + over-filtered, on a real multi-cell and a single-cell
+recording) found **0 crashes / 0 anomalies** in the interactive surfaces. One real
+bug surfaced in the export edge case: a recording with **no touching cells** (e.g. a
+single-cell crop) made `contact_pairs_table` return a columnless empty DataFrame, so
+`contact_pairs.csv` was a 1-byte headerless file that pandas/Origin can't read
+(`EmptyDataError`). Fixed — `contact_pairs_table` now always carries the full column
+header (dt-aware `mean_episode_min`/`_frames`), so an empty export round-trips. Test
++1 (`test_contact_pairs_table_empty_keeps_header`); `pytest` **100 passed**.
+
+---
+
 ## 2026-06-15 — Docs / screenshots / help / tooltips refresh (contacts + config + ranked report)
 
 Brought the user-facing surfaces up to date with the session's new features.
