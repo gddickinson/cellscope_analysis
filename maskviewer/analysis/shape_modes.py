@@ -45,10 +45,12 @@ def contour_signature(mask):
     return rad / eqr if eqr > 0 else rad
 
 
-def fit_shape_modes(labels, n_modes=N_MODES, n_pcs=N_PCS, progress_cb=None):
+def fit_shape_modes(labels, n_modes=None, n_pcs=N_PCS, progress_cb=None):
     """Cluster all cell-frame contours into shape modes. None if too few cells.
     ``progress_cb(done, total)`` drives a GUI progress bar (per frame, during the
-    contour-extraction pass — the dominant cost before PCA/K-means)."""
+    contour-extraction pass — the dominant cost before PCA/K-means).
+    ``n_modes=None`` reads the (configurable) module-level ``N_MODES`` at call time."""
+    n_modes = N_MODES if n_modes is None else n_modes
     labels = np.asarray(labels)
     sigs, keys = [], []
     T = labels.shape[0]

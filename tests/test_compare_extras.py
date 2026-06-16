@@ -271,3 +271,24 @@ def test_analysis_params_apply_and_tag(tmp_path):
         contacts.DEFAULT_GAP_PX = 1.5
         contacts.EXTENSIVE_FRAC = 0.25
         neighbors.DEFAULT_RADIUS_UM = 50.0
+
+
+def test_state_and_shape_params_apply(tmp_path):
+    from PyQt5 import QtCore
+    from maskviewer.gui.compare_tables import apply_analysis_params, analysis_params_tag
+    from maskviewer.analysis import state, shape_modes
+    s = QtCore.QSettings(str(tmp_path / "b.ini"), QtCore.QSettings.IniFormat)
+    # a 500-µm² ecc-0.5 cell is 'rounded' by default
+    assert state.classify_state(9999, area_um2=500, eccentricity=0.5) == "rounded"
+    s.setValue("analysis/rounded_area_um2", 300.0)
+    s.setValue("analysis/shape_n_modes", 7)
+    try:
+        apply_analysis_params(s)
+        assert state.ROUNDED_AREA_UM2 == 300.0 and shape_modes.N_MODES == 7
+        # classify_state reads the live global → the same cell is now 'spread'
+        assert state.classify_state(9999, area_um2=500, eccentricity=0.5) == "spread"
+        assert analysis_params_tag(s) != ""             # recompute key reflects it
+    finally:
+        state.ROUNDED_AREA_UM2 = 960.0
+        state.ROUNDED_ECC = 0.85
+        shape_modes.N_MODES = 5
