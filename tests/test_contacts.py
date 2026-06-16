@@ -115,9 +115,10 @@ def test_contact_episodes_counts_runs_and_gaps():
     n, durs = contacts.contact_episodes(
         [0, 1, 2, 3, 4, 5, 6], [1, 1, 0, 1, 1, 1, 0])
     assert n == 2 and durs == [2, 3]
-    # a frame gap (5→8) breaks an otherwise-continuous in-contact run
+    # a tracking gap (5→8) must NOT split one sustained contact into two events —
+    # only a present-but-free frame breaks a run (4 in-contact present frames → 1 ep)
     n2, durs2 = contacts.contact_episodes([4, 5, 8, 9], [1, 1, 1, 1])
-    assert n2 == 2 and durs2 == [2, 2]
+    assert n2 == 1 and durs2 == [4]
     assert contacts.contact_episodes([0, 1, 2], [0, 0, 0]) == (0, [])
 
 

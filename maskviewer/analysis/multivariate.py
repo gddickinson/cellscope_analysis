@@ -95,12 +95,16 @@ def permanova(X, labels, b=4999, seed=0):
         return s
 
     a = len(np.unique(labels))
+    if a < 2 or N - a < 1:                 # need ≥2 groups and ≥1 within-group df
+        return float("nan"), float("nan")
     ssw = within(labels)
+    if ssw <= 0:                           # zero within-group dispersion → F undefined
+        return float("nan"), float("nan")
     F = ((sst - ssw) / (a - 1)) / (ssw / (N - a))
     ge = 1
     for _ in range(b):
         sw = within(rng.permutation(labels))
-        Fp = ((sst - sw) / (a - 1)) / (sw / (N - a))
+        Fp = ((sst - sw) / (a - 1)) / (sw / (N - a)) if sw > 0 else np.inf
         ge += Fp >= F
     return float(F), ge / (b + 1)
 
@@ -185,7 +189,9 @@ def loadings(df, ctrl, test, features=FEATURES, top=6):
         a, b = a[np.isfinite(a)], b[np.isfinite(b)]
         if len(a) < 2 or len(b) < 2:
             continue
-        sp = np.sqrt((a.var(ddof=1) + b.var(ddof=1)) / 2) or 1.0
+        na, nb = len(a), len(b)             # n-weighted pooled SD (matches compare.cohens_d)
+        sp = np.sqrt(((na - 1) * a.var(ddof=1) + (nb - 1) * b.var(ddof=1))
+                     / (na + nb - 2)) or 1.0
         out.append((f, (b.mean() - a.mean()) / sp))
     out.sort(key=lambda kv: -abs(kv[1]))
     return out[:top]

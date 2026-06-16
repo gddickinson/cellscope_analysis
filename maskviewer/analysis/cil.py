@@ -63,6 +63,7 @@ def contact_locomotion(labels, scale=1.0, dt_min=None,
     out = {}
     for cid in cents:
         ic, sp, u = in_contact[cid], speeds[cid], units[cid]
+        present = np.isfinite(cents[cid]).all(axis=1)    # cell tracked at frame t?
         step_state = ic[:-1]                             # state at the step's start frame
         fin = np.isfinite(sp)
         sf, sc = sp[(~step_state) & fin], sp[step_state & fin]
@@ -70,7 +71,10 @@ def contact_locomotion(labels, scale=1.0, dt_min=None,
         speed_contact = float(sc.mean()) if sc.size else np.nan
         ratio = (speed_contact / speed_free
                  if np.isfinite(speed_free) and speed_free > 0 else np.nan)
-        onsets = [t for t in range(1, T) if ic[t] and not ic[t - 1]]
+        # an onset = newly in contact while the cell was present-but-free the frame
+        # before (not merely re-appearing after a tracking gap, which isn't a formation)
+        onsets = [t for t in range(1, T)
+                  if ic[t] and not ic[t - 1] and present[t - 1]]
         deltas = []
         for f in onsets:
             before = sp[max(0, f - window):f]

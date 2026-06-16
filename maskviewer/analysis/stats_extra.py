@@ -44,9 +44,10 @@ def bootstrap_ci(control, test, statistic, n_boot=2000, ci=0.95, seed=0):
         sa = a[rng.integers(0, a.size, a.size)]
         sb = b[rng.integers(0, b.size, b.size)]
         vals[i] = statistic(sa, sb)
-    vals = vals[np.isfinite(vals)]
-    if vals.size == 0:
-        return (np.nan, np.nan)
+    finite = vals[np.isfinite(vals)]
+    if finite.size < 0.5 * vals.size:        # too many degenerate resamples (e.g.
+        return (np.nan, np.nan)              # zero-variance groups) → CI unreliable
+    vals = finite
     lo = (1.0 - ci) / 2.0 * 100.0
     return (float(np.percentile(vals, lo)), float(np.percentile(vals, 100.0 - lo)))
 

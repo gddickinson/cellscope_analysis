@@ -30,14 +30,22 @@ def _finite_points(cen: np.ndarray) -> np.ndarray:
 def instantaneous_speed(cen: np.ndarray, dt_min: float | None = None) -> np.ndarray:
     """Per-step speed between consecutive finite frames (units/min if dt given).
 
-    Returns one value per consecutive finite step (gaps are bridged as a single
-    step). Length 0 if fewer than two finite points.
+    One value per consecutive-finite step. When ``dt_min`` is given each step is
+    divided by the **actual elapsed time** (``Δframe · dt_min``), so a step that
+    bridges a tracking gap is not over-stated. Without ``dt_min`` the raw step length
+    is returned (gaps bridged) — that bridged length is what ``jump_steps`` keys on to
+    flag a suspected ID swap. Length 0 if fewer than two finite points.
     """
-    pts = _finite_points(cen)
+    cen = np.asarray(cen, float)
+    ok = np.isfinite(cen).all(axis=1)
+    pts = cen[ok]
     if pts.shape[0] < 2:
         return np.array([])
     seg = np.sqrt((np.diff(pts, axis=0) ** 2).sum(axis=1))
-    return seg / float(dt_min) if dt_min else seg
+    if not dt_min:
+        return seg
+    gap = np.diff(np.where(ok)[0]).astype(float)      # frames elapsed per step (≥ 1)
+    return seg / (gap * float(dt_min))
 
 
 def displacement_metrics(cen: np.ndarray, dt_min: float | None = None) -> dict:

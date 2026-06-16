@@ -11,6 +11,11 @@ cannot silently regress:
    internally constant but clearly different must still yield a finite p-value.
 4. ``cell_metrics`` → ``state.classify_state`` — the circularity/solidity fallback
    must be reachable for a scale-less recording (state not all "unknown").
+5. Speed across tracking gaps (``motion`` / per-frame series) ÷ elapsed time.
+6. ``contacts._boundary_mask`` counts image-border pixels (no edge-cell undercount).
+7. ``edge_dynamics.edge_summary`` returns NaN (not 0) when a cell never protrudes/
+   retracts; PERMANOVA guards degenerate group counts; ``loadings`` pooled SD matches
+   ``cohens_d``; ``bootstrap_ci`` returns NaN when resamples are degenerate.
 """
 import os
 import sys
@@ -19,7 +24,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from maskviewer.analysis import motion, shape_modes, compare, cell_metrics  # noqa: E402
+from maskviewer.analysis import (motion, shape_modes, compare, cell_metrics,   # noqa: E402
+                                 contacts, edge_dynamics, edge_intensity,
+                                 multivariate, stats_extra)
 
 
 # -- 1. turning_angles / run_and_tumble pause handling ----------------------
@@ -102,3 +109,67 @@ def test_state_classified_without_scale_via_circularity_fallback():
                                            with_solidity=True, with_perimeter=True)
     assert props[1]["state"] != "unknown"                       # fallback now reachable
     assert props[1]["state"] == "rounded"                       # a disk is rounded
+
+
+# -- 5. speed divided by elapsed time across tracking gaps ------------------
+def test_speed_across_gap_uses_elapsed_time():
+    cen = np.array([[0, 0], [2, 0], [np.nan, np.nan], [8, 0]], float)  # gap at frame 2
+    sp = motion.instantaneous_speed(cen, dt_min=1.0)
+    assert np.allclose(sp, [2.0, 3.0])                          # 6 px over 2 frames = 3, not 6
+    dm = motion.displacement_metrics(cen, dt_min=1.0)
+    assert np.isclose(dm["mean_speed"], 8.0 / 3.0)             # total 8 px ÷ 3 elapsed frames
+    # gapless track: unchanged (one frame per step)
+    straight = np.array([[0, 0], [1, 0], [2, 0], [3, 0]], float)
+    assert np.allclose(motion.instantaneous_speed(straight, dt_min=1.0), [1, 1, 1])
+
+
+# -- 6. boundary includes image-border pixels (edge-cell undercount) --------
+def test_boundary_mask_counts_image_border():
+    def block(corner):
+        f = np.zeros((40, 40), np.int32)
+        if corner:
+            f[0:10, 0:10] = 1                                   # flush against 2 image edges
+        else:
+            f[15:25, 15:25] = 1                                 # interior
+        return f
+    bp_interior = contacts.frame_contacts(block(False))[1]["boundary_px"]
+    bp_corner = contacts.frame_contacts(block(True))[1]["boundary_px"]
+    assert bp_corner == bp_interior == 36                       # full 10×10 ring both ways
+
+
+# -- 7. edge_summary NaN / PERMANOVA guard / loadings SD / bootstrap_ci -----
+def test_edge_summary_nan_when_no_events():
+    s = edge_dynamics.edge_summary(np.array([[1.0, 2.0], [0.5, 1.5]]))   # all protrusion
+    assert np.isnan(s["mean_retraction_velocity"])              # no retraction → NaN not 0
+    assert np.isfinite(s["mean_protrusion_velocity"])
+
+
+def test_permanova_degenerate_groups_return_nan():
+    X = np.arange(18.0).reshape(6, 3)
+    F, p = multivariate.permanova(X, np.array(["A"] * 6), b=99)  # one group
+    assert np.isnan(F) and np.isnan(p)
+
+
+def test_loadings_pooled_sd_matches_cohens_d():
+    import pandas as pd
+    df = pd.DataFrame({"condition": ["WT"] * 5 + ["KO"] * 7,
+                       "m": [1, 2, 3, 4, 5] + [4, 5, 6, 7, 8, 9, 10]})
+    d = dict(multivariate.loadings(df, "WT", "KO", features=["m"]))["m"]
+    a = df.loc[df.condition == "WT", "m"].to_numpy(float)
+    b = df.loc[df.condition == "KO", "m"].to_numpy(float)
+    assert np.isclose(d, compare.cohens_d(a, b))                # n-weighted, consistent
+
+
+def test_bootstrap_ci_degenerate_returns_nan():
+    lo, hi = stats_extra.bootstrap_ci([5, 5, 5], [5, 5, 5], compare.cohens_d, n_boot=200)
+    assert np.isnan(lo) and np.isnan(hi)
+
+
+def test_lagged_correlation_frame_path_matches_rows_when_contiguous():
+    rng = np.random.RandomState(0)
+    velmat = rng.randn(4, 8)
+    intmat = rng.randn(5, 8)
+    _, rs_rows, pl_rows, _ = edge_intensity.lagged_intensity_correlation(velmat, intmat)
+    _, rs_fr, pl_fr, _ = edge_intensity.lagged_intensity_correlation(
+        velmat, intmat, frames=[0, 1, 2, 3, 4])                 # contiguous → identical
+    assert pl_rows == pl_fr and np.allclose(rs_rows, rs_fr, equal_nan=True)

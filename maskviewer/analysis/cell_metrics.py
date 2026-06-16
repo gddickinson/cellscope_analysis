@@ -4,10 +4,9 @@ Moment-based morphometry computed directly with NumPy/SciPy so the package
 keeps its light, CPU-only dependency set. The eccentricity and axis-length
 definitions match scikit-image's ``regionprops`` (central second moments with
 the +1/12 pixel-area correction), so values are comparable to the wider
-literature. Perimeter / circularity / convexity are **opt-in** (``with_perimeter``)
-since a raster perimeter is noise-sensitive at this pixel size; the estimator is
-scikit-image's ``regionprops`` perimeter (Benkrid–Crookes, neighborhood=4), not the
-Crofton variant. ``solidity`` is a SciPy convex hull, also opt-in.
+literature. Perimeter / circularity / convexity are **opt-in** (``with_perimeter``);
+the estimator is scikit-image's ``regionprops`` perimeter (Benkrid–Crookes,
+neighborhood=4), not the Crofton variant. ``solidity`` is a SciPy hull, also opt-in.
 
 These are the building blocks for the CSV exporters (``exporters.py``) and the
 GUI cell-info panel. Pure functions over ``(T, H, W)`` / ``(H, W)`` int arrays.
@@ -23,9 +22,8 @@ from . import neighbors as _nbr
 from . import membrane as _membrane
 from . import contacts as _contacts
 
-# Perimeter weights = skimage ``measure.perimeter(neighborhood=4)`` (Benkrid–Crookes,
-# as ``regionprops.perimeter`` uses) — NOT skimage's separate ``perimeter_crofton``.
-# Runs ~2-4% high on curves, so the derived circularity is conservative.
+# Perimeter = skimage ``measure.perimeter(neighborhood=4)`` (Benkrid–Crookes, as
+# ``regionprops.perimeter`` uses) — NOT ``perimeter_crofton``; ~2-4% high on curves.
 _PERIM_W = np.zeros(50)
 _PERIM_W[[5, 7, 15, 17, 25, 27]] = 1.0
 _PERIM_W[[21, 33]] = np.sqrt(2)
@@ -46,10 +44,9 @@ def _convexity(rows: np.ndarray, cols: np.ndarray, perimeter_px: float) -> float
 
     Perimeter-based (unlike solidity, which is area-based) so it is far more
     sensitive to fine membrane ruffling / blebbing — an actin-protrusion readout.
-
-    NOTE: numerator = exact Euclidean hull-polygon perimeter, denominator = raster
-    ``_perimeter`` (a few % high on curves), so a smoothly convex curved cell reads
-    ~0.95 not 1.0 (a mild curvature-dependent offset) — a *relative* ruffling index.
+    NOTE: numerator = exact hull-polygon perimeter, denominator = raster ``_perimeter``
+    (a few % high on curves), so a smoothly convex curved cell reads ~0.95 not 1.0
+    (curvature-dependent offset) — read it as a *relative* ruffling index.
     """
     if perimeter_px <= 0:
         return float("nan")
@@ -66,12 +63,15 @@ def _convexity(rows: np.ndarray, cols: np.ndarray, perimeter_px: float) -> float
 def _region_shape(rows: np.ndarray, cols: np.ndarray) -> dict:
     """Second-moment shape descriptors for one region's pixel coordinates.
 
-    ``rows`` (y) and ``cols`` (x) are float pixel coordinates. Returns the
-    centroid, major/minor axis lengths, eccentricity and orientation using the
-    same normalised central moments as scikit-image.
+    ``rows`` (y) and ``cols`` (x) are float pixel coordinates. Returns the centroid,
+    major/minor axis lengths, eccentricity and orientation using the same normalised
+    central moments as scikit-image. Degenerate regions (< 3 px) return 0 axes /
+    eccentricity (skimage's convention; such cells are sub-``MIN_AREA_PX`` anyway).
     """
-    cr = float(rows.mean())
-    cc = float(cols.mean())
+    cr, cc = float(rows.mean()), float(cols.mean())
+    if rows.size < 3:
+        return {"centroid_row": cr, "centroid_col": cc, "major_axis": 0.0,
+                "minor_axis": 0.0, "eccentricity": 0.0, "orientation": 0.0}
     dr = rows - cr
     dc = cols - cc
     mrr = float((dr * dr).mean()) + 1.0 / 12.0
@@ -464,7 +464,8 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
     speed = np.full(fr.size, np.nan)
     if fr.size >= 2:
         seg = np.sqrt((np.diff(pres, axis=0) ** 2).sum(axis=1))
-        speed[1:] = seg / float(dt_min) if dt_min else seg
+        gap = np.diff(fr).astype(float)               # frames elapsed per step (≥ 1)
+        speed[1:] = seg / (gap * float(dt_min)) if dt_min else seg / gap
     series["speed"] = (speed, f"speed ({u}/{'min' if dt_min else 'frame'})")
     series["displacement_from_start"] = (
         np.sqrt(((pres - pres[0]) ** 2).sum(axis=1)), f"displacement ({u})")

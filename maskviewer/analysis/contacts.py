@@ -65,12 +65,16 @@ def classify_contact(max_partner_frac, contact_px, extensive_frac=EXTENSIVE_FRAC
 
 def _boundary_mask(lab) -> np.ndarray:
     """Cell pixels adjacent (4-connectivity, no wrap) to a different label or
-    background — the cells' boundary pixels."""
+    background — the cells' boundary pixels. A cell pixel sitting on the image
+    border is also a boundary pixel (it has no neighbour beyond the edge, which would
+    otherwise under-count the boundary and inflate ``contact_fraction`` for cells
+    flush against the frame edge)."""
     diff = np.zeros(lab.shape, bool)
     diff[:-1, :] |= lab[:-1, :] != lab[1:, :]
     diff[1:, :] |= lab[1:, :] != lab[:-1, :]
     diff[:, :-1] |= lab[:, :-1] != lab[:, 1:]
     diff[:, 1:] |= lab[:, 1:] != lab[:, :-1]
+    diff[0, :] = diff[-1, :] = diff[:, 0] = diff[:, -1] = True   # image-border = boundary
     return diff & (lab > 0)
 
 
@@ -172,23 +176,22 @@ def frame_interfaces(lab, scale=1.0, max_gap_px=None,
 
 
 def contact_episodes(frames, in_contact):
-    """``(n_events, [durations_in_frames])`` of contiguous in-contact runs over a
-    cell's present frames — a frame gap (the cell vanished) also breaks a run."""
-    frames = np.asarray(frames)
+    """``(n_events, [durations_in_present-frames])`` of contiguous in-contact runs
+    over a cell's present frames.
+
+    A run is broken only by a present frame that is **not** in contact — a tracking
+    gap (the cell briefly vanished) does *not* split one sustained contact into two
+    "events", which would over-count formations/breakages. Durations count
+    in-contact present frames (gap frames, being unobserved, are not added)."""
     ic = np.asarray(in_contact, bool)
     durations: list = []
     run = 0
-    prev = None
-    for f, c in zip(frames.tolist(), ic.tolist()):
-        if prev is not None and f != prev + 1 and run:   # a gap closes the run
-            durations.append(run)
-            run = 0
+    for c in ic.tolist():
         if c:
             run += 1
-        elif run:
+        elif run:                                        # present but not in contact
             durations.append(run)
             run = 0
-        prev = f
     if run:
         durations.append(run)
     return len(durations), durations

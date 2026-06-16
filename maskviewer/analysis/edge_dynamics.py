@@ -66,6 +66,18 @@ def _smooth_angular(v: np.ndarray) -> np.ndarray:
     return v
 
 
+def _nan_gaussian1d(mat, sigma):
+    """Gaussian smooth down the time axis, ignoring (not propagating) NaNs — a
+    normalized convolution, so a missing-edge sector doesn't blank its whole column."""
+    finite = np.isfinite(mat).astype(float)
+    num = ndimage.gaussian_filter1d(np.where(finite > 0, mat, 0.0), sigma, axis=0)
+    den = ndimage.gaussian_filter1d(finite, sigma, axis=0)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = num / den
+    out[den == 0] = np.nan
+    return out
+
+
 def _present_frames(labels, cell_id):
     return [t for t in range(labels.shape[0]) if (labels[t] == cell_id).any()]
 
@@ -100,15 +112,20 @@ def edge_velocity_kymograph(labels, cell_id, um_per_px=None, dt_min=None,
         ra, ca = np.nonzero(ma)
         rb, cb = np.nonzero(mb)
         cen = ((ra.mean() + rb.mean()) / 2.0, (ca.mean() + cb.mean()) / 2.0)
-        rprev, rcurr = _radii(ma, cen), _radii(mb, cen)
+        rprev_raw, rcurr_raw = _radii(ma, cen), _radii(mb, cen)
         if smooth:
-            rprev = _smooth_angular(_interp_circular(rprev))
-            rcurr = _smooth_angular(_interp_circular(rcurr))
-        vel.append((rcurr - rprev) * scale / ((b - a) * dt))
+            rprev = _smooth_angular(_interp_circular(rprev_raw))
+            rcurr = _smooth_angular(_interp_circular(rcurr_raw))
+        else:
+            rprev, rcurr = rprev_raw, rcurr_raw
+        v = (rcurr - rprev) * scale / ((b - a) * dt)
+        if smooth:                                 # a sector with no edge pixel in either
+            v[~np.isfinite(rprev_raw) | ~np.isfinite(rcurr_raw)] = np.nan  # frame = no measure
+        vel.append(v)
         pairs.append(b)
     mat = np.array(vel) if vel else np.zeros((0, N_SECTORS))
     if smooth and mat.shape[0] >= 3:
-        mat = ndimage.gaussian_filter1d(mat, TEMPORAL_SIGMA, axis=0)
+        mat = _nan_gaussian1d(mat, TEMPORAL_SIGMA)
     return np.array(pairs), mat
 
 
@@ -123,8 +140,8 @@ def edge_summary(velmat: np.ndarray) -> dict:
     ruffle = float(np.nanmean(np.nanstd(velmat[:, enough], axis=0))) \
         if enough.any() else np.nan
     return {
-        "mean_protrusion_velocity": float(prot.mean()) if prot.size else 0.0,
-        "mean_retraction_velocity": float(retr.mean()) if retr.size else 0.0,
+        "mean_protrusion_velocity": float(prot.mean()) if prot.size else np.nan,
+        "mean_retraction_velocity": float(retr.mean()) if retr.size else np.nan,
         "protrusion_fraction": float((v > 0).mean()) if v.size else np.nan,
         "net_velocity": float(v.mean()) if v.size else np.nan,
         "max_protrusion": float(v.max()) if v.size else np.nan,
