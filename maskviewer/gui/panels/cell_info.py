@@ -38,10 +38,13 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.shape_mode_provider = None        # callable -> shape-mode model | None
         self.divisions = []                    # division events for lineage info
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
-        dis = self._settings.value("cell_metrics_disabled", [])
-        if isinstance(dis, str):                       # QSettings may unwrap a 1-list
-            dis = [dis]
-        self._disabled = set(dis) if dis else set()
+        saved = self._settings.value("cell_metrics_enabled")
+        if saved is None:                              # first run → minimal fast default
+            self._enabled = set(cell_metrics.DEFAULT_PLOT_METRICS)
+        else:
+            if isinstance(saved, str):                 # QSettings may unwrap a 1-list
+                saved = [saved]
+            self._enabled = set(saved)
 
         self.title = QtWidgets.QLabel("No cell selected")
         self.title.setStyleSheet("font-weight: bold;")
@@ -81,17 +84,17 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.available = cell_metrics.available_frame_metrics(channel_names)
 
     def enabled(self):
-        return [k for k in self.available if k not in self._disabled]
+        return [k for k in self.available if k in self._enabled]
 
     def is_enabled(self, key):
-        return key not in self._disabled
+        return key in self._enabled
 
     def set_metric_enabled(self, key, on):
         if on:
-            self._disabled.discard(key)
+            self._enabled.add(key)
         else:
-            self._disabled.add(key)
-        self._settings.setValue("cell_metrics_disabled", sorted(self._disabled))
+            self._enabled.discard(key)
+        self._settings.setValue("cell_metrics_enabled", sorted(self._enabled))
         if self._ctx and self.cell_id:
             self._compute()                    # recompute + re-list immediately
 

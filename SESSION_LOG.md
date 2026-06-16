@@ -5,6 +5,30 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Minimal/fast defaults: heavy analysis is now opt-in
+
+Set the GUI's analysis defaults to a fast **basic** state so a fresh session stays
+responsive on large stacks; the advanced analyses are opt-in via Config ▸ Settings.
+- **Cell-Info metrics** now default to a cheap subset (`cell_metrics.DEFAULT_PLOT_METRICS`:
+  area, eccentricity, aspect ratio, extent, state, speed, displacement, turning) — all
+  from the moment pass / centroid track. The costly ones (perimeter / circularity /
+  convexity, solidity, per-channel intensity & membrane, nearest-neighbour, contacts,
+  shape mode) are **off until enabled**, so a cell click no longer triggers convex
+  hulls / per-channel sampling / a contact KD-tree per frame. `cell_info` switched from
+  a persisted *disabled*-set to an *enabled*-set (`cell_metrics_enabled`), defaulting to
+  the minimal set on first run (a one-time reset to fast).
+- **Comparison-analysis toggles** now **all default OFF** (`COMPARE_OPTIONS`: contacts +
+  state-segmented were on → off; solidity / edge / CIL already off). A basic comparison
+  (shape + motion + NN + MSD + direction autocorrelation) computes fast; the user
+  enables contacts / state-segmented / solidity / edge / CIL as needed.
+- **Population** table defaults `with_solidity=False` + `with_contacts=False` (the
+  per-cell-frame convex hull + KD-tree) so the population overview computes fast.
+
+`pytest` **117 passed**; smoke green; all files < 500. Verified (isolated QSettings):
+fresh defaults are all-minimal; opt-in toggles persist + recompute.
+
+---
+
 ## 2026-06-15 — PR8: cell-level QC flags (exclude individual cells)
 
 Final of the 8-part program. The project had recording-level include/exclude;

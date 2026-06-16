@@ -216,14 +216,23 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   shift the channel, masks are FOV-cropped) and reach **both display and analysis**
   (the viewer + `compare.build_comparison(corrections=…)`). Raw files are untouched.
 - **Config ▸ Settings…** (`Ctrl+,`, `gui/config_window.py`): one tabbed window for
-  all analysis settings —
+  all analysis settings. **The GUI ships in a minimal/fast state — only cheap basic
+  analysis runs by default; the heavier analyses are opt-in here** (so a fresh session
+  stays responsive on large stacks).
   - **Cell plot metrics**: choose which per-frame metrics are calculated + offered
-    in the Cell-Info plot menu (persisted; toggling recomputes at once).
+    in the Cell-Info plot menu (persisted; toggling recomputes at once). **Default =
+    the cheap subset** `cell_metrics.DEFAULT_PLOT_METRICS` (area, eccentricity, aspect
+    ratio, extent, state, speed, displacement, turning); perimeter/circularity/
+    convexity, solidity, per-channel intensity/membrane, nearest-neighbour, contacts
+    and shape-mode are **off until enabled** (they add a hull / perimeter trace /
+    per-channel sampling / contact KD-tree per frame on every cell selection).
   - **Comparison analysis**: toggle which (heavier) analysis families the Comparison
     window computes — **cell–cell contacts**, **state-segmented metrics**,
-    **solidity** (`compare_tables.COMPARE_OPTIONS`, QSettings-persisted, folded into
-    the compute cache key so a change recomputes). Skipping a family speeds the
-    per-recording pass + drops its columns.
+    **solidity**, **edge dynamics**, **contact-inhibition (CIL)**
+    (`compare_tables.COMPARE_OPTIONS`, QSettings-persisted, folded into the compute
+    cache key so a change recomputes). **All default OFF** → a basic comparison
+    (shape + motion + nearest-neighbour + MSD + direction autocorrelation) computes
+    fast; enabling a family adds its columns (and its compute cost).
   - **Pixel size & time scale**: manually set **µm/px** and/or **min/frame** for when
     a file's metadata is lost or incorrect. Stored on the `Project` (`px_size` /
     `frame_interval`), applied to **every** recording (`Project.scaled`) — scale bar,
