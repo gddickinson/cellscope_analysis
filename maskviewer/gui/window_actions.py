@@ -373,5 +373,7 @@ class WindowActionsMixin:
             "← / →   step frame\n"
             "Space   play / pause\n"
             "Ctrl+O   open recording      Ctrl+E   export CSV\n"
+            "Ctrl+,   settings (metrics / comparison / scale)\n"
+            "Ctrl+Shift+C   comparison window\n"
             "Ctrl+=, Ctrl+-, Ctrl+0   zoom in / out / fit      Z   zoom to cell\n"
             "Ctrl+Shift+A   auto contrast      Ctrl+Shift+P   screenshot")

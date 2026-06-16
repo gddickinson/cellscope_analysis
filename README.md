@@ -21,7 +21,16 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   gamma, colormap (LUT), invert, auto; per channel; **composite** multi-channel
   blend (DIC grey + SiR-actin Cy5 magenta).
 - **Colour cells by any metric** with a **units colour bar** (area, circularity,
-  speed, nearest-neighbour, shape mode, …); per-frame state colouring.
+  speed, nearest-neighbour, **contact fraction / count / class**, shape mode, …);
+  per-frame state colouring.
+- **Cell–cell contact** — *where cells physically touch* (shared mask boundary),
+  distinct from centroid proximity. Per frame each cell gets a **contact fraction**
+  (share of its membrane engaged), interface length, contact count and a class —
+  **free / point / extensive**. A **Cell contacts** overlay draws the touching
+  interfaces (blue point / red extensive); over a track it measures **contact
+  episodes** (formation/breakage frequency + duration); and an **Export CSV ▸
+  cell-pair contacts** table records **which cells touch, when, and the degree**.
+  Available as colour-by, per-cell plots, and **cross-treatment comparison metrics**.
 - **Per-cell inspection** — click a cell → metrics + plot of *any* per-frame
   characteristic (shape, perimeter, circularity, convexity, state, speed,
   displacement, turning, IoU, nearest-neighbour, per-channel intensity / membrane
@@ -55,8 +64,11 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   switch between **Recent Projects** without restarting. Recordings are analysed
   independently, so a project may mix **different image sizes and lengths** —
   e.g. **single-cell crops** that vary in shape and span only the frames where the
-  cell is present. **Config ▸ Pixel size & time scale** sets µm/px + min/frame
-  manually (for all recordings) when a file's metadata is missing or wrong.
+  cell is present. **Config ▸ Settings…** (`Ctrl+,`) is one tabbed window for all
+  analysis settings — **cell-plot metrics** (which per-frame metrics are computed),
+  **comparison analysis** (toggle the heavier families — contacts / state-segmented
+  / solidity — the comparison computes), and **pixel size & time scale** (µm/px +
+  min/frame overrides for when a file's metadata is missing or wrong).
 - **Comparison window** — a dedicated space (**Analysis ▸ Comparison window**,
   `Ctrl+Shift+C`) for cross-recording / treatment analysis (**recording =
   experimental unit**): tabbed **Distributions** (strip / box+Bonferroni /
@@ -68,9 +80,12 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   used; the right panel is tabbed — **Stats** (per-contrast p / Bonferroni /
   Cohen's d / covariate-adjusted OLS + per-arm KW + vehicle) · **Histogram**
   (per-cell distribution by group) · **Data** (per-recording + per-group tables,
-  unit-tagged). A **multivariate phenotype test** (Results ▾) reports per-arm
-  **PERMANOVA p + leave-one-recording-out AUC** over all metrics — catching
-  separation single metrics miss. It offers **whole-track** metrics and
+  unit-tagged). The Stats tab's **Ranked report…** lists *every* group-vs-group
+  pair for the current metric **ordered by the likelihood of a significant
+  difference** (Mann–Whitney U + Cohen's d + Bonferroni; CSV-exportable) — beyond
+  the design's control-vs-test contrasts. A **multivariate phenotype test**
+  (Results ▾) reports per-arm **PERMANOVA p + leave-one-recording-out AUC** over all
+  metrics — catching separation single metrics miss. It offers **whole-track** metrics and
   **state-segmented** ones
   (`mean_speed_spread`, `persistence_spread`, …) that reproduce the original
   CellScope state-aware analysis. A **Help** button + per-metric tooltips explain
@@ -95,9 +110,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   compared: min frames tracked, track-quality, min cells/recording, cell state,
   **nearest-neighbour crowding** (NN distance + neighbour count, min/max), and
   **distance from the image edge**.
-- **Sortable per-cell table**, **CSV export** (per-frame / per-cell / tracks,
-  for Origin/Prism), **save any plot** (PNG/SVG), and a **Help ▸ Metrics
-  Reference** documenting every metric + tooltips throughout.
+- **Sortable per-cell table**, **CSV export** (per-frame / per-cell / tracks /
+  **cell-pair contacts**, for Origin/Prism), **save any plot** (PNG/SVG), and a
+  **Help ▸ Metrics Reference** documenting every metric + tooltips throughout.
 
 | Cell inspection | Population (flower) | Shape modes |
 |---|---|---|
@@ -114,7 +129,13 @@ retracting edges (negative r, highly significant):*
 
 ![divisions overlay — parent→daughter links inferred from the masks (cell 8 → cell 11), drawn as an open circle (parent) joined to a diamond (daughter) on a real WT cell](docs/screenshots/division_links.png)
 
+![cell–cell contact — two real WT cells coloured by contact class (red = extensive) with the shared-membrane interface drawn where they touch](docs/screenshots/contacts.png)
+
+![the unified Config ▸ Settings window — the Comparison-analysis tab toggles which heavier families (contacts / state-segmented / solidity) the comparison computes; sibling tabs hold the cell-plot metrics and the pixel/time scale](docs/screenshots/settings.png)
+
 ![the Comparison window — a metric across conditions (recording = unit), arm-aware box plots + filters + per-contrast stats table](docs/screenshots/comparison.png)
+
+![the Stats-tab Ranked report — every group pair for the current metric, ranked by the likelihood of a significant difference (Mann–Whitney U + Cohen's d + Bonferroni); synthetic data](docs/screenshots/ranked_report.png)
 
 ![the Comparison window Histogram tab — per-cell distribution by group, units on the axis](docs/screenshots/comparison_histogram.png)
 
@@ -129,9 +150,10 @@ retracting edges (negative r, highly significant):*
 ![the Groups & Comparisons editor — assign recordings to groups, include/exclude, pick controls + vehicle](docs/screenshots/groups_editor.png)
 
 *(The single-recording / per-cell panels — overview, cell inspection, population,
-shape modes, edge dynamics, alignment, divisions — use a **WT-control** recording
-from the study (baseline only, no treatment-comparison data). The cross-condition
-Comparison-window screenshots use synthetic data.)*
+shape modes, edge dynamics, alignment, divisions, **cell contacts**, **settings** —
+use a **WT-control** recording from the study (baseline only, no treatment-comparison
+data). The cross-condition Comparison-window screenshots — including the **ranked
+report** — use synthetic data.)*
 
 ## Environment
 

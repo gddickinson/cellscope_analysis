@@ -25,6 +25,16 @@ OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
             ("ids", "Cell IDs", False), ("trails", "Track trails", False),
             ("colorbar", "Colour bar", True), ("divisions", "Divisions", False),
             ("contacts", "Cell contacts", False)]
+_OV_TIPS = {
+    "scalebar": "Scale bar (µm), sized to the current view",
+    "info": "Frame number / elapsed time text",
+    "ids": "Draw each cell's track ID at its centroid",
+    "trails": "Draw each cell's path up to the current frame",
+    "colorbar": "Units colour bar for the colour-by metric",
+    "divisions": "Parent→daughter links for masks-inferred divisions",
+    "contacts": "Highlight cell–cell contact interfaces this frame "
+                "(blue = point contact, red = extensive)",
+}
 
 
 class DisplayPanel(QtWidgets.QWidget):
@@ -105,6 +115,7 @@ class DisplayPanel(QtWidgets.QWidget):
         for key, label, default in OVERLAYS:
             cb = QtWidgets.QCheckBox(label)
             cb.setChecked(default)
+            cb.setToolTip(_OV_TIPS.get(key, ""))
             cb.toggled.connect(lambda on, k=key: self.overlayToggled.emit(k, on))
             self.ov[key] = cb
             ovl.addWidget(cb)

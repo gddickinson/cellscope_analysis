@@ -5,6 +5,29 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Docs / screenshots / help / tooltips refresh (contacts + config + ranked report)
+
+Brought the user-facing surfaces up to date with the session's new features.
+- **Screenshots** (`docs/screenshots/`): `contacts.png` (real WT Pos10 — two cells
+  in extensive contact, coloured by class + the interface overlay), `settings.png`
+  (the unified Config window, Comparison-analysis tab), `ranked_report.png`
+  (synthetic). README gallery + Highlights updated (cell–cell contact bullet,
+  colour-by + CSV + ranked-report mentions, Config ▸ Settings replaces the old
+  scale-only item). Data policy note extended (WT-control for contacts/settings;
+  synthetic for the ranked report).
+- **Help ▸ Metrics Reference** (`metric_docs.as_html`): added a **Cell–cell contact**
+  section + **Ranked report** / **what-gets-computed** paragraphs to the comparison
+  help (the per-frame contact metrics already auto-listed).
+- **Tooltips**: overlay checkboxes now carry tooltips (`_OV_TIPS`), incl. the new
+  **Cell contacts** overlay; the comparison-analysis toggles, ranked-report button,
+  colour-by contact modes already had them.
+- **Shortcuts** dialog: added `Ctrl+,` (Settings) + `Ctrl+Shift+C` (Comparison).
+
+GUI test-drive (offscreen): contacts overlay + colour-by, Settings (3 tabs), Metrics
+Reference, Shortcuts all open clean. `pytest` **99 passed**; all files < 500.
+
+---
+
 ## 2026-06-15 — Ranked group-comparison report (Comparison ▸ Stats)
 
 The Stats tab showed only the design-driven contrasts (control-vs-test within
