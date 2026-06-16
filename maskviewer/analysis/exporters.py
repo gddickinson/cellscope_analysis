@@ -161,6 +161,22 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
         row[f"furth_D_{u}2_per_min" if dt_min else "furth_D"] = fu["D"]
         row["persistence_time_min" if dt_min else "persistence_time"] = \
             fu["persistence_time"]
+        # run-and-tumble decomposition (directed runs vs reorientation tumbles)
+        rt = motion.run_and_tumble(cen * scale, dt_min)
+        row["n_runs"] = rt["n_runs"]
+        row["mean_run_steps"] = rt["mean_run_steps"]
+        row["frac_tumble"] = rt["frac_tumble"]
+        row["mean_tumble_angle_deg"] = rt["mean_tumble_angle_deg"]
+        if dt_min:
+            row["mean_run_duration_min"] = rt["mean_run_duration"]
+            row["tumble_rate_per_min"] = rt["tumble_rate"]
+        else:
+            row["tumble_rate_per_frame"] = rt["tumble_rate"]
+        # track-continuity QC: displacement-outlier steps (suspected ID swaps)
+        nj, max_step, frac_j = motion.jump_steps(cen * scale)
+        row["n_track_jumps"] = nj
+        row[f"max_step_{u}"] = max_step
+        row["frac_track_jumps"] = frac_j
         # density-stratified speed + isolation (contact-inhibition readout)
         area_col = "area_um2" if um_per_px else "area_px"
         if not getattr(sub, "empty", True):

@@ -359,3 +359,29 @@ def test_cell_series_and_history():
     hist = cell_metrics.centroid_history(m.labels)
     assert set(hist) == {int(c) for c in m.cell_ids()}
     assert hist[cid].shape == (m.n_frames, 2)
+
+
+def test_run_and_tumble_straight_vs_zigzag():
+    # a straight line → one run, no tumbles
+    straight = np.column_stack([np.zeros(10), np.arange(10.0)])
+    r = motion.run_and_tumble(straight, dt_min=2.0, turn_threshold_deg=60.0)
+    assert r["n_runs"] == 1 and r["frac_tumble"] == 0.0
+    assert r["mean_run_duration"] == r["mean_run_steps"] * 2.0
+    # a sharp zigzag (±90° turns every step) → a tumble at every joint
+    zig = np.array([[0, 0], [0, 1], [1, 1], [1, 2], [2, 2], [2, 3]], float)
+    z = motion.run_and_tumble(zig, turn_threshold_deg=60.0)
+    assert z["frac_tumble"] == 1.0 and z["n_runs"] > 1
+    assert z["mean_tumble_angle_deg"] > 60.0
+    # degenerate (< 3 points) → NaN, no crash
+    assert np.isnan(motion.run_and_tumble(np.zeros((2, 2)))["n_runs"])
+
+
+def test_jump_steps_flags_outlier():
+    # smooth track with one big jump (ID-swap-like)
+    pts = np.column_stack([np.zeros(8), np.arange(8.0)])
+    pts[5] = [0, 50]                                            # one wild step
+    nj, max_step, frac = motion.jump_steps(pts, factor=5.0)
+    assert nj >= 1 and max_step > 40 and 0 < frac < 1
+    # a clean track has no jumps
+    clean = np.column_stack([np.zeros(8), np.arange(8.0)])
+    assert motion.jump_steps(clean)[0] == 0

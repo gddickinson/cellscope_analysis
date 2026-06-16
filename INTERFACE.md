@@ -331,7 +331,11 @@ Read this before opening source files. Update it when modules change.
 - **motion.py** — centroid-track motion: `instantaneous_speed`,
   `displacement_metrics` (net/path/straightness/speed), `direction_autocorrelation`
   + `persistence` (lag-1, speed-unbiased), `msd` + `fit_msd` (D, α exponent),
-  `fit_furth` (Fürth/PRW D + persistence-time), `turning_angles`, `motion_summary`.
+  `fit_furth` (Fürth/PRW D + persistence-time), `turning_angles`, **`run_and_tumble`**
+  (directed runs vs reorientation tumbles → run length/duration + tumble rate/angle),
+  **`jump_steps`** (displacement-outlier steps = suspected ID-swap track QC),
+  `motion_summary`. The run-and-tumble + track-jump columns flow to the per-cell table
+  + comparison.
 - **membrane.py** — boundary/membrane quality from mask + image channel:
   `boundary_confidence` (gradient along contour), `intensity_contrast`,
   `texture_contrast`, `membrane_score` (composite). PIEZO1-relevant.
