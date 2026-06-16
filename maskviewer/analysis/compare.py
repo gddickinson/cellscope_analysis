@@ -300,6 +300,49 @@ def cohens_d(control, test):
     return float((b.mean() - a.mean()) / sp) if sp > 0 else np.nan
 
 
+def ranked_group_comparisons(per_recording, metric, groups=None) -> list:
+    """**Every** group pair compared on one metric, ranked by the likelihood of a
+    significant difference (smallest p first). Recording = unit; Mann-Whitney U
+    (two-sided) + Cohen's d, with a Bonferroni correction over the tested pairs.
+
+    Unlike the design-driven per-contrast Stats table (control-vs-test within arms),
+    this enumerates *all* unordered group pairs. Returns a list of dicts (group_a,
+    group_b, n_a, n_b, mean_a, mean_b, p, p_bonferroni, cohen_d), p-ascending."""
+    from scipy import stats as _ss
+    cols = getattr(per_recording, "columns", [])
+    if per_recording is None or metric not in cols or "condition" not in cols:
+        return []
+    conds = list(groups) if groups else sorted(
+        per_recording["condition"].dropna().unique())
+    vals = {}
+    for g in conds:
+        v = per_recording.loc[per_recording["condition"] == g, metric].to_numpy(float)
+        vals[g] = v[np.isfinite(v)]
+    rows = []
+    for i, a in enumerate(conds):
+        for b in conds[i + 1:]:
+            va, vb = vals.get(a, np.array([])), vals.get(b, np.array([]))
+            p = np.nan
+            if (va.size and vb.size and va.size + vb.size >= 3
+                    and not (np.ptp(va) == 0 and np.ptp(vb) == 0)):
+                try:
+                    p = float(_ss.mannwhitneyu(va, vb, alternative="two-sided").pvalue)
+                except ValueError:
+                    p = np.nan
+            rows.append({"group_a": a, "group_b": b,
+                         "n_a": int(va.size), "n_b": int(vb.size),
+                         "mean_a": float(va.mean()) if va.size else np.nan,
+                         "mean_b": float(vb.mean()) if vb.size else np.nan,
+                         "p": p, "cohen_d": cohens_d(va, vb)})
+    m = sum(1 for r in rows if np.isfinite(r["p"]))
+    for r in rows:
+        r["p_bonferroni"] = (min(r["p"] * m, 1.0)
+                             if np.isfinite(r["p"]) and m else np.nan)
+    rows.sort(key=lambda r: (not np.isfinite(r["p"]),
+                             r["p"] if np.isfinite(r["p"]) else 1.0))
+    return rows
+
+
 def effect_sizes(by_cond, arms=None):
     """[{arm, contrast, n_ctrl, n_test, cohen_d}] per within-arm test vs control."""
     from . import feature_tables

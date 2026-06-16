@@ -217,9 +217,7 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         lay.addWidget(self.omnibus)
         self.table = self._mk_table()
         lay.addWidget(self.table, 1)
-        self._save_btn = QtWidgets.QPushButton("Save plot…")
-        self._save_btn.clicked.connect(self._save_current_plot)
-        lay.addWidget(self._save_btn)
+        self._add_stats_buttons(lay)                   # Save plot… + Ranked report…
         return w
 
     def _build_hist_tab(self):

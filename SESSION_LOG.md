@@ -5,6 +5,25 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Ranked group-comparison report (Comparison ▸ Stats)
+
+The Stats tab showed only the design-driven contrasts (control-vs-test within
+arms). New **Ranked report…** button lists **every** group-vs-group pair for the
+current metric, ordered by the likelihood of a significant difference (smallest p
+first). `compare.ranked_group_comparisons(per_rec, metric)` (pure) — recording =
+unit, Mann-Whitney U (two-sided) + Cohen's d + Bonferroni over the tested pairs;
+`gui/ranked_report.py::RankedReportDialog` renders a sortable table (p / Bonferroni
+/ Cohen d / ★ stars) with CSV export. The button + opener live in
+`StatsTablesMixin` (`_add_stats_buttons` / `_show_ranked_report`); `_update_stats`
+caches the per-recording table for it. Moving the button creation into the mixin
+**freed 2 lines** in `compare_window` (499 → 497).
+
+Real data (DMSO/GOF/KO × 3 each, `frac_spread`): ranks **DMSO vs KO first**
+(p=0.10, Cohen d=−2.14 — the strongest contrast), overlapping pairs last. Tests +2
+(ordering + edge cases). `pytest` **99 passed**; smoke green; all files < 500.
+
+---
+
 ## 2026-06-15 — Pairwise contact tracking (which cells touch, when, degree)
 
 Answering "do you keep track of which cells touch, when, and the degree?" — the

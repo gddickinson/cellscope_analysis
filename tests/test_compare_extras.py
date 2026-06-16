@@ -152,3 +152,36 @@ def test_per_condition_summary():
     # empty / missing metric → []
     assert compare.per_condition_summary(per_rec, "nope") == []
     assert compare.per_condition_summary(pd.DataFrame(), "mean_area_um2") == []
+
+
+def _per_rec_three_groups():
+    rows = []
+    for v in (1.0, 1.1, 0.9, 1.05):
+        rows.append({"recording": f"w{v}", "condition": "WT", "m": v})
+    for v in (5.0, 5.2, 4.8, 5.1):                 # KO clearly separated from WT/GOF
+        rows.append({"recording": f"k{v}", "condition": "KO", "m": v})
+    for v in (1.05, 0.95, 1.1, 1.0):               # GOF overlaps WT
+        rows.append({"recording": f"g{v}", "condition": "GOF", "m": v})
+    return pd.DataFrame(rows)
+
+
+def test_ranked_group_comparisons_orders_by_significance():
+    res = compare.ranked_group_comparisons(_per_rec_three_groups(), "m")
+    assert len(res) == 3                                       # every group pair
+    assert [tuple(sorted((r["group_a"], r["group_b"]))) for r in res]  # all pairs present
+    ps = [r["p"] for r in res]
+    assert ps == sorted(ps)                                   # ranked ascending by p
+    # the overlapping WT–GOF pair is the least likely to differ → last
+    assert {res[-1]["group_a"], res[-1]["group_b"]} == {"WT", "GOF"}
+    # KO (separated) appears in the top contrast
+    assert "KO" in (res[0]["group_a"], res[0]["group_b"])
+    for r in res:                                             # Bonferroni ≥ raw p, n tagged
+        assert r["p_bonferroni"] >= r["p"] - 1e-9
+        assert r["n_a"] == 4 and r["n_b"] == 4
+
+
+def test_ranked_group_comparisons_edge_cases():
+    df = _per_rec_three_groups()
+    assert compare.ranked_group_comparisons(df, "missing_metric") == []   # no such col
+    one = df[df["condition"] == "WT"]
+    assert compare.ranked_group_comparisons(one, "m") == []               # single group
