@@ -5,6 +5,20 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR2: run-and-tumble decomposition + ID-swap track QC
+
+`motion.run_and_tumble`: split a track into directed **runs** and reorientation
+**tumbles** (a step turning >60° from the previous is a tumble) → `n_runs`,
+`mean_run_steps`/`mean_run_duration_min`, `tumble_rate_per_min`, `frac_tumble`,
+`mean_tumble_angle_deg` — a persistence readout that resolves run length from turn
+frequency (more sensitive than a single autocorrelation, useful for the underpowered
+YODA1 arm). `motion.jump_steps`: displacement-outlier steps (>5× median) as a
+track-continuity / ID-swap QC → `n_track_jumps`, `frac_track_jumps`, `max_step_um`.
+Both wired into `per_cell_table` → the Comparison readouts; metric_docs + tooltips.
+Tests +2. `pytest` **105 passed**; all files < 500.
+
+---
+
 ## 2026-06-15 — PR1: front–rear edge polarity + lagged actin↔edge + edge in the comparison
 
 First of an 8-part improvement program. **Edge polarity** (`edge_dynamics.edge_polarity`):

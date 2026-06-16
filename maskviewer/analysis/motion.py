@@ -149,6 +149,60 @@ def fit_furth(tau: np.ndarray, msd_vals: np.ndarray) -> dict:
         return {"D": np.nan, "persistence_time": np.nan}
 
 
+def run_and_tumble(cen: np.ndarray, dt_min: float | None = None,
+                   turn_threshold_deg: float = 60.0) -> dict:
+    """Decompose a track into directed **runs** and reorientation **tumbles**.
+
+    A step whose turning angle (vs the previous step) exceeds ``turn_threshold_deg``
+    is a *tumble*; the directed segments between tumbles are *runs*. Returns
+    ``n_runs``, ``mean_run_steps`` / ``mean_run_duration`` (min), ``tumble_rate``
+    (tumbles per min), ``frac_tumble`` (fraction of step-joints that are tumbles) and
+    ``mean_tumble_angle_deg``. A more sensitive persistence readout than a single
+    autocorrelation number. NaNs for < 3 finite points."""
+    keys = ("n_runs", "mean_run_steps", "mean_run_duration", "tumble_rate",
+            "frac_tumble", "mean_tumble_angle_deg")
+    turns = turning_angles(cen)                       # one per step-joint
+    if turns.size == 0:
+        return {k: np.nan for k in keys}
+    dt = float(dt_min) if dt_min else 1.0
+    is_tumble = np.abs(turns) > np.deg2rad(turn_threshold_deg)
+    run_steps, cur = [], 1                             # first step opens a run
+    for t in is_tumble:
+        if t:
+            run_steps.append(cur); cur = 1
+        else:
+            cur += 1
+    run_steps.append(cur)
+    run_steps = np.asarray(run_steps, float)
+    n_steps = turns.size + 1                           # steps = joints + 1
+    tumble_ang = np.abs(turns[is_tumble])
+    return {
+        "n_runs": int(run_steps.size),
+        "mean_run_steps": float(run_steps.mean()),
+        "mean_run_duration": float(run_steps.mean()) * dt,
+        "tumble_rate": float(is_tumble.sum() / (n_steps * dt)) if n_steps else np.nan,
+        "frac_tumble": float(is_tumble.mean()),
+        "mean_tumble_angle_deg": (float(np.rad2deg(tumble_ang.mean()))
+                                  if tumble_ang.size else np.nan),
+    }
+
+
+def jump_steps(cen: np.ndarray, factor: float = 5.0, min_px: float = 0.0) -> tuple:
+    """Track-continuity QC: step indices whose displacement is an outlier — a
+    suspected tracking error / ID swap.
+
+    A step is a *jump* when its length exceeds ``factor``× the median step length
+    (and ≥ ``min_px``). Returns ``(n_jumps, max_step, frac_jumps)``. Operates on the
+    raw centroid units (px unless ``cen`` is pre-scaled)."""
+    seg = instantaneous_speed(cen)                    # per-step length (no dt → length)
+    if seg.size == 0:
+        return 0, np.nan, np.nan
+    med = float(np.median(seg))
+    thr = max(factor * med, float(min_px))
+    jumps = seg > thr if thr > 0 else np.zeros(seg.size, bool)
+    return int(jumps.sum()), float(seg.max()), float(jumps.mean())
+
+
 def motion_summary(cen: np.ndarray, dt_min: float | None = None) -> dict:
     """One-row motion summary for a track: displacement metrics + persistence."""
     out = displacement_metrics(cen, dt_min)

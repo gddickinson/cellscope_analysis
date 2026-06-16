@@ -139,6 +139,15 @@ EXTRA = {
         "0.5·frames-present + 0.3·(1 − area CV) + 0.2·(path / 50 µm)."),
     "area_stability": ("Area-jump QC.",
         "area CV, max/min ratio, and # of >30% consecutive area changes."),
+    "run_and_tumble": ("Directed runs vs reorientation tumbles.",
+        "A step turning > 60° from the previous one is a tumble; the directed "
+        "segments between tumbles are runs. n_runs, mean run length (steps) / duration "
+        "(min), tumble rate (per min) + mean tumble angle — a sensitive persistence "
+        "readout that resolves run length from turn frequency."),
+    "track_jumps": ("Track-continuity QC (suspected ID swaps).",
+        "Steps whose length exceeds 5× the cell's median step — abnormal displacement "
+        "that suggests a tracking error / ID swap. n_track_jumps, frac_track_jumps and "
+        "the max single step."),
     "edge velocity": ("Membrane protrusion (+) / retraction (−) speed.",
                       "Per-angular-sector change in boundary radius about the "
                       "mid-centroid ÷ interval (µm/min)."),
@@ -276,6 +285,11 @@ _KEY_ALIASES = {
     "edge_piezo_slope": "edge_piezo_corr",
     "piezo_protr_minus_retr": "edge_piezo_corr",
     "edge_piezo_peak_lag": "edge_piezo_lag", "edge_piezo_peak_r": "edge_piezo_lag",
+    "n_runs": "run_and_tumble", "run_steps": "run_and_tumble",
+    "run_duration": "run_and_tumble", "tumble_rate": "run_and_tumble",
+    "frac_tumble": "run_and_tumble", "tumble_angle_deg": "run_and_tumble",
+    "n_track_jumps": "track_jumps", "max_step": "track_jumps",
+    "frac_track_jumps": "track_jumps",
 }
 
 
