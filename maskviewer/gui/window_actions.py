@@ -139,14 +139,22 @@ class WindowActionsMixin:
         return self._pop_df
 
     def _shape_modes_model(self, progress_cb=None):
-        """VAMPIRE shape-mode model for the recording (lazy + cached)."""
+        """VAMPIRE shape-mode model for the recording (lazy, in-memory + disk cached).
+
+        The disk cache (keyed by the masks' content) skips the ~15-30 s KMeans refit
+        when the same recording is re-opened or revisited within / across sessions."""
         if self._shape_model is None and self.masks is not None:
+            from ..analysis import cache as _cache
             sync = progress_cb is None
             if sync:
                 QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
             try:
-                self._shape_model = shape_modes.fit_shape_modes(
-                    self.masks.labels, progress_cb=progress_cb)
+                key = _cache.content_key("shape_modes", self.masks.labels,
+                                         n_modes=shape_modes.N_MODES,
+                                         n_pcs=shape_modes.N_PCS)
+                self._shape_model = _cache.load_or_compute(
+                    key, lambda: shape_modes.fit_shape_modes(
+                        self.masks.labels, progress_cb=progress_cb))
             finally:
                 if sync:
                     QtWidgets.QApplication.restoreOverrideCursor()

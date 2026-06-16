@@ -91,7 +91,7 @@ def overlay_lut(win, lab):
                                                         (130, 130, 130)), 255)
         return lut, None                               # categorical → no bar
     if mode in ("contact_state", "contact_fraction", "n_contacts"):
-        fc = cell_contacts.frame_contacts(lab, float(um) if um else 1.0)
+        fc = win._frame_contacts(win.timeline.value(), lab)
         if mode == "contact_state":                    # categorical → no bar
             lut = np.zeros((mx + 1, 4), dtype=np.ubyte)
             for cid, r in fc.items():

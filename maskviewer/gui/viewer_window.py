@@ -64,6 +64,8 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._track_len = None          # lazy {cid: int} for colour-by track
         self._mean_speed = None         # lazy {cid: float} for colour-by speed
         self._shape_model = None        # lazy VAMPIRE shape-mode model
+        self._contact_cache = {}        # {frame: frame_contacts} for colour-by/overlay
+        self._iface_cache = {}          # {frame: frame_interfaces} for the overlay
         self._pop_df = None             # lazy population table (fixed scale + panel)
         self.divisions = []             # division events for the recording
         self._cur_lab = None
@@ -204,6 +206,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.selected = 0
         self._cent_hist = self._track_len = self._mean_speed = None
         self._shape_model = self._pop_df = None
+        self._contact_cache, self._iface_cache = {}, {}     # per-recording contact memo
         labels = self.masks.labels if self.masks is not None else None
         # Lineage is derived from the loaded masks themselves (track topology), not
         # the pipeline's pre-cleaning divisions.json — so old/removed IDs can never
@@ -362,6 +365,21 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                         counts[int(i)] = counts.get(int(i), 0) + 1
             self._track_len = counts
 
+    def _cached_frame(self, store, t, lab, fn):
+        """Memoise a per-frame contact computation ``fn(lab, scale)`` (cleared on
+        recording change) — reused by colour-by-contact + the contact overlay."""
+        c = store.get(t)
+        if c is None:
+            um = self.recording.um_per_px if self.recording else None
+            c = store[t] = fn(lab, float(um) if um else 1.0)
+        return c
+
+    def _frame_contacts(self, t, lab):
+        return self._cached_frame(self._contact_cache, t, lab, contacts.frame_contacts)
+
+    def _frame_interfaces(self, t, lab):
+        return self._cached_frame(self._iface_cache, t, lab, contacts.frame_interfaces)
+
     def _update_overlays(self, t, lab):
         ov = self.canvas.overlays.show
         centroids = bbox = history = None
@@ -382,8 +400,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                     division_links.append((tuple(p), tuple(c)))
         contact_interfaces = None
         if lab is not None and self.canvas.overlays.show["contacts"]:
-            contact_interfaces = contacts.frame_interfaces(
-                lab, self.recording.um_per_px or 1.0)
+            contact_interfaces = self._frame_interfaces(t, lab)
         self.canvas.overlays.update_overlay(
             info_text=self._info_text(t), centroids=centroids, history=history,
             frame=t, selected=self.selected, bbox=bbox, division_links=division_links,

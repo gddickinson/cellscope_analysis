@@ -5,6 +5,21 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR6: performance — per-recording disk cache for heavy passes
+
+New `analysis/cache.py`: a per-recording disk cache keyed by a fast **content
+fingerprint** of the label stack (shape/dtype/nonzero + a strided byte sample) +
+params, so it auto-invalidates when the masks or params change; stored under the
+gitignored `analysis_out/cache/`, graceful on read/write failure. The **VAMPIRE
+shape-mode model** now routes through it (`window_actions._shape_modes_model`): the
+~15-30 s KMeans refit is skipped on re-open / revisit — measured **1665 ms → 2 ms**
+on a cache hit (in-memory + disk). The viewer also memoises **per-frame contacts**
+(`_frame_contacts` / `_frame_interfaces`, cleared on recording change) so colour-by-
+contact + the contact overlay don't recompute when stepping back over frames. Tests
++2; smoke green; `viewer_window` factored to stay at 498. `pytest` **114 passed**.
+
+---
+
 ## 2026-06-15 — PR5: plotting — rose + 2D phenotype density + effect-size forest
 
 Three new visualizations that turn the data into figures.

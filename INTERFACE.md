@@ -334,6 +334,11 @@ Read this before opening source files. Update it when modules change.
   **membrane-score**). `metrics=`
   selects which series to compute. `available_frame_metrics` / `metric_label` /
   `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
+- **cache.py** — per-recording **disk cache** for expensive passes: `content_key`
+  (fast content fingerprint of a label stack + params), `load_or_compute` (pickle in
+  `analysis_out/cache/`, graceful on failure). Used for the VAMPIRE shape-mode model
+  (~15-30 s refit → ~ms on a cache hit); the viewer also memoises per-frame contacts
+  in-memory for colour-by + the overlay.
 - **cil.py** — **contact-inhibition of locomotion**: `contact_locomotion`
   (per-cell speed free-vs-in-contact + `speed_ratio_contact`, speed change at contact
   **onset**, and **velocity alignment** with contacting neighbours — collective
