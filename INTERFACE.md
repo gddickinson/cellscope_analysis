@@ -106,7 +106,11 @@ Read this before opening source files. Update it when modules change.
   them from a project entry. `channel_names_of(tif)` reads just the sidecar's
   channel names (no tif load — for a cheap channel picker).
 - **masks.py** — `load_masks(npz)` → `Masks` (`labels` `(T,H,W)`,
-  `.frame(t)`, `.max_label`, `.cell_ids()`, `.n_cells_per_frame()`).
+  `.frame(t)`, `.max_label`, `.cell_ids()`, `.n_cells_per_frame()`). Also locates the
+  pipeline `fusion_source_stack` (in the loaded npz or a sibling
+  `masks_precleanup`/`masks_original`) → `.source_stack()` (lazy) + `.cell_sources()`
+  (`{cell_id: 1 DIC / 2 Cy5 / 3 both}` majority vote) for the **Mask source** colour-by
+  (`SOURCE_CODE_NAME` / `SOURCE_CODE_COLOR`); display/QC only, not used in analysis.
 - **dataset.py** — `discover(roots)` → sorted `[Entry]`; an `Entry`
   (`label`, `condition`, `recording_path`, `mask_path`) loads its recording
   / masks lazily. A folder qualifies if it has a `*.ome.tif` + (ideally)

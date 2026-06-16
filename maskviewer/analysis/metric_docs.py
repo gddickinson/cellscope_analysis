@@ -70,6 +70,11 @@ METRICS = {
     "contact_state": ("Contact class: free / point / extensive.",
                       "From max_contact_fraction: free (no contact), point (a small "
                       "contact < 25% of the boundary) or extensive (≥ 25%)."),
+    "source": ("Detection source: which channel detected the cell (red = DIC, "
+               "yellow = Cy5, lime = both).",
+               "Majority vote of the pipeline's fusion_source_stack over the cell's "
+               "track (DIC↔Cy5 detection fusion). Display/QC only — read from the "
+               "sibling pre-cleaning artifact; needs a fused (multichannel) recording."),
     "frac_in_contact": ("Fraction of a cell's time in contact with any other cell.",
                         "Frames classed point or extensive ÷ all present frames."),
     "frac_point_contact": ("Fraction of time in a small (point) contact.",
