@@ -95,6 +95,37 @@ def test_clear_cell_resets_pending(app):
     assert p._pending is None and p.cell_id == 0
 
 
+def test_revisit_is_cache_hit(app):
+    from maskviewer.gui.panels.edge_panel import EdgePanel
+    p, lab = EdgePanel(), _labels()
+    _show(p)
+    p.set_cell(1, lab, 0.5, 10.0, recording=_Rec(lab))
+    key = (1, p.fluor.currentText())
+    cached_vel = p._cache[key]["_vel"]              # computed + cached
+    p.set_cell(2, lab, 0.5, 10.0, recording=_Rec(lab))
+    p.set_cell(1, lab, 0.5, 10.0, recording=_Rec(lab))   # revisit same recording
+    assert p._vel is cached_vel                     # restored from cache, not recomputed
+
+
+def test_precompute_all_caches_every_cell(app):
+    from maskviewer.gui.panels.edge_panel import EdgePanel
+    p, lab = EdgePanel(), _labels()
+    p.set_context(lab, 0.5, 10.0, recording=_Rec(lab))
+    p.precompute_all()                              # run_async None -> synchronous
+    fluor = p.fluor.currentText()
+    assert (1, fluor) in p._cache and (2, fluor) in p._cache
+
+
+def test_new_recording_clears_cache(app):
+    from maskviewer.gui.panels.edge_panel import EdgePanel
+    p, lab = EdgePanel(), _labels()
+    _show(p)
+    p.set_cell(1, lab, 0.5, 10.0, recording=_Rec(lab))
+    assert p._cache
+    p.set_context(_labels(), 0.5, 10.0, recording=_Rec(lab))   # different labels object
+    assert p._cache == {}
+
+
 def test_all_render_modes_after_split(app):
     """Every view mode draws without error (validates the edge_render split)."""
     from maskviewer.gui.panels.edge_panel import EdgePanel

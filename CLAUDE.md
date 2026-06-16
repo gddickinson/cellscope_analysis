@@ -138,7 +138,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
   Per-cell results are cached (revisits instant); a **Precompute all cells** button
   computes every cell up front (off the GUI thread, status-bar ETA) so swapping
-  between cells to compare them has no recompute lag.
+  between cells to compare them has no recompute lag — and also **warms the Edge
+  Dynamics cache** for every cell (the edge panel is itself lazy + per-cell cached,
+  so it only computes when its tab is in front, and revisits/precomputed cells are
+  instant).
 - **Edge Dynamics** dock: velocity/radius/**curvature** kymograph (angle×time) **and a
   per-frame edge map** (the cell's boundary in the current frame coloured by any
   per-sector metric — velocity, radius, **curvature**, or fluorescence intensity) +

@@ -30,6 +30,7 @@ from PyQt5 import QtWidgets
 
 from ...analysis import edge_dynamics, edge_intensity
 from ..plot_export import save_plot
+from ..task_runner import AsyncComputeMixin
 from .edge_render import EdgeRenderMixin, _MODES, _EDGE_FRAME
 
 _NONE = "(none)"
@@ -50,7 +51,12 @@ def _lut(name):
             ).astype(np.ubyte)
 
 
-class EdgePanel(EdgeRenderMixin, QtWidgets.QWidget):
+class EdgePanel(AsyncComputeMixin, EdgeRenderMixin, QtWidgets.QWidget):
+    # per-cell computed state cached by (cell_id, fluor channel name)
+    _SNAP_KEYS = ("_vfr", "_vel", "_rfr", "_rad", "_cfr", "_curv", "_half",
+                  "_ifr", "_int", "_disp", "_inten", "_summary",
+                  "_title_txt", "_summary_txt")
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.cell_id = 0
@@ -60,6 +66,8 @@ class EdgePanel(EdgeRenderMixin, QtWidgets.QWidget):
         self._frame = None
         self._pending = None            # deferred (cell, …) compute while this dock is hidden
         self._visible = False           # tracked via show/hide events (tabbed docks)
+        self._cache = {}                # (cell_id, fluor) -> snapshot (instant revisits)
+        self._title_txt = self._summary_txt = ""
         self._half = None               # max cell radius (px) → stable edge crop
         self._vfr = self._vel = self._rfr = self._rad = None
         self._cfr = self._curv = None   # curvature kymograph (frames, per-sector)
@@ -118,19 +126,22 @@ class EdgePanel(EdgeRenderMixin, QtWidgets.QWidget):
         lay.addLayout(brow)
 
     # -- public ----------------------------------------------------------
+    def set_context(self, labels, um_per_px=None, dt_min=None, recording=None):
+        """Store the recording context (no compute) so lazy compute / precompute
+        have what they need; drops the per-cell cache when the recording changes."""
+        if labels is not self._labels:
+            self._cache = {}                         # new recording → stale cache
+        self._dt, self._um, self._labels, self._rec = dt_min, um_per_px, labels, recording
+        self._populate_fluor(recording)              # cheap (just the channel picker)
+
     def set_cell(self, cell_id, labels, um_per_px=None, dt_min=None, recording=None):
         if not cell_id:
             return self.clear_cell()
+        self.set_context(labels, um_per_px, dt_min, recording)
         self.cell_id = int(cell_id)
-        self._dt = dt_min
-        self._um = um_per_px
-        self._labels = labels
-        self._rec = recording
-        self._populate_fluor(recording)              # cheap (just the channel picker)
-        # The heavy kymograph + fluorescence compute is **deferred until this dock
-        # is actually visible** — the right-hand docks are tabbed, so when the user
-        # is on another tab (e.g. Cell Info) clicking cells must not pay for edge
-        # dynamics they aren't looking at. Showing the tab computes the pending cell.
+        # Heavy compute is **deferred until this dock is the visible tab** (docks are
+        # tabbed) so clicking cells while on another tab (e.g. Cell Info) stays
+        # instant; results are cached per (cell, fluor) so revisits are instant too.
         self._pending = self.cell_id
         if self._visible:
             self._ensure_computed()
@@ -145,29 +156,38 @@ class EdgePanel(EdgeRenderMixin, QtWidgets.QWidget):
         self._visible = False                        # tabbed behind / closed → defer
 
     def _ensure_computed(self):
-        """Run the deferred per-cell compute if one is pending (i.e. the panel just
-        became visible, or the cell changed while it was already visible)."""
+        """Compute (or restore from cache) the pending cell once this dock is visible."""
         if self._pending is None or self._labels is None:
             return
         self._pending = None
-        self._compute_cell()
+        key = (self.cell_id, self.fluor.currentText())
+        snap = self._cache.get(key)
+        if snap is None:
+            snap = self._compute_snapshot(self.cell_id, self._labels,
+                                          self._channel_stack(), self.fluor.currentText())
+            self._cache[key] = snap
+        self._apply_snapshot(snap)
+        self._replot()
 
-    def _compute_cell(self):
-        labels, um_per_px, dt_min = self._labels, self._um, self._dt
-        self._vfr, self._vel = edge_dynamics.edge_velocity_kymograph(
-            labels, self.cell_id, um_per_px, dt_min)
-        self._rfr, self._rad = edge_dynamics.radius_kymograph(
-            labels, self.cell_id, um_per_px)
-        self._cfr, self._curv = edge_dynamics.curvature_kymograph(
-            labels, self.cell_id, um_per_px)
-        self._half = (float(np.nanmax(self._rad)) / (um_per_px or 1.0)
-                      if self._rad.size and np.isfinite(self._rad).any() else None)
-        self._compute_fluor()
-        s = edge_dynamics.edge_summary(self._vel)
-        ev = edge_dynamics.edge_events(self._vel, dt_min)
+    def _compute_snapshot(self, cell_id, labels, image, fluor):
+        """One cell's edge state as a dict — **no self mutation, no Qt** (safe off the
+        GUI thread). `image` (the fluor channel stack, or None) and `fluor` (its name)
+        are captured on the GUI thread by the caller."""
+        um, dt = self._um, self._dt
+        vfr, vel = edge_dynamics.edge_velocity_kymograph(labels, cell_id, um, dt)
+        rfr, rad = edge_dynamics.radius_kymograph(labels, cell_id, um)
+        cfr, curv = edge_dynamics.curvature_kymograph(labels, cell_id, um)
+        half = (float(np.nanmax(rad)) / (um or 1.0)
+                if rad.size and np.isfinite(rad).any() else None)
+        ifr = intt = disp = inten = None
+        summary = {}
+        if image is not None:
+            (_, _, ifr, intt, disp, inten, summary) = edge_intensity.analyze_cell(
+                labels, image, cell_id, um, dt)
+        s = edge_dynamics.edge_summary(vel)
+        ev = edge_dynamics.edge_events(vel, dt)
         vu = self._vel_units()
-        tu = "min" if dt_min else "frames"
-        self.title.setText(f"Cell {self.cell_id} — edge dynamics")
+        tu = "min" if dt else "frames"
         txt = (
             f"protrusion: {s['mean_protrusion_velocity']:.3f} {vu}    "
             f"retraction: {s['mean_retraction_velocity']:.3f} {vu}<br>"
@@ -177,23 +197,62 @@ class EdgePanel(EdgeRenderMixin, QtWidgets.QWidget):
             f"events: {ev['n_protrusions']} protr / {ev['n_retractions']} retr"
             f"  ·  mean dur {ev['mean_protrusion_duration']:.1f} / "
             f"{ev['mean_retraction_duration']:.1f} {tu}")
-        if self._curv is not None and np.isfinite(self._curv).any():
-            cu = "1/µm" if self._um else "1/px"
-            txt += (f"<br>mean curvature: {np.nanmean(self._curv):.3f} {cu}  ·  "
-                    f"|κ| (edge roughness): {np.nanmean(np.abs(self._curv)):.3f} {cu}")
-        self.summary.setText(txt + self._fluor_summary_html())
+        if curv is not None and np.isfinite(curv).any():
+            cu = "1/µm" if um else "1/px"
+            txt += (f"<br>mean curvature: {np.nanmean(curv):.3f} {cu}  ·  "
+                    f"|κ| (edge roughness): {np.nanmean(np.abs(curv)):.3f} {cu}")
+        return {"_vfr": vfr, "_vel": vel, "_rfr": rfr, "_rad": rad, "_cfr": cfr,
+                "_curv": curv, "_half": half, "_ifr": ifr, "_int": intt,
+                "_disp": disp, "_inten": inten, "_summary": summary,
+                "_title_txt": f"Cell {cell_id} — edge dynamics",
+                "_summary_txt": txt + self._fluor_summary_html(summary, fluor)}
+
+    def _apply_snapshot(self, snap):
+        for k, v in snap.items():
+            setattr(self, k, v)
+        self.title.setText(self._title_txt)
+        self.summary.setText(self._summary_txt)
         self.export_btn.setEnabled(True)
-        self._replot()
+
+    def precompute_all(self):
+        """Compute + cache every cell's edge dynamics for the current fluor channel
+        (off the GUI thread, status-bar progress + ETA) so switching cells on the
+        Edge tab is instant. Folded into the Cell-Info 'Precompute all cells' pass."""
+        if self._labels is None:
+            return
+        labels, image, fluor = self._labels, self._channel_stack(), self.fluor.currentText()
+        ids = [int(c) for c in np.unique(labels) if c > 0]
+        if not ids:
+            return
+
+        def work(progress_cb):
+            out = {}
+            for i, cid in enumerate(ids):
+                out[(cid, fluor)] = self._compute_snapshot(cid, labels, image, fluor)
+                if progress_cb:
+                    progress_cb(i + 1, len(ids))
+            return out
+
+        def apply(snaps):
+            self._cache.update(snaps)
+            if self.cell_id and self._visible:       # refresh the open cell from cache
+                self._pending = self.cell_id
+                self._ensure_computed()
+
+        self._dispatch("Edge dynamics (all cells)", work, apply)
 
     def _vel_units(self):
         return "µm/min" if (self._um and self._dt) else (
             "µm/frame" if self._um else "px/step")
 
-    def _fluor_summary_html(self):
-        p = self._summary
+    def _snapshot(self):
+        return {k: getattr(self, k) for k in self._SNAP_KEYS}
+
+    def _fluor_summary_html(self, p=None, ch=None):
+        p = self._summary if p is None else p
         if not p or not np.isfinite(p.get("edge_move_intensity_r", np.nan)):
             return ""
-        ch = self.fluor.currentText()
+        ch = self.fluor.currentText() if ch is None else ch
         line = (f"<br><b>{ch}</b> ↔ edge movement: r = "
                 f"{p['edge_move_intensity_r']:+.2f} "
                 f"(R² = {p.get('edge_move_intensity_r2', float('nan')):.2f}, "
@@ -252,9 +311,10 @@ class EdgePanel(EdgeRenderMixin, QtWidgets.QWidget):
         if not self._visible:                  # defer; recomputed (incl. fluor) when shown
             self._pending = self.cell_id
             return
-        self._compute_fluor()
-        base = self.summary.text().split("<br><b>")[0]
-        self.summary.setText(base + self._fluor_summary_html())
+        self._compute_fluor()                  # kymographs are fluor-independent — reuse
+        self._summary_txt = self._summary_txt.split("<br><b>")[0] + self._fluor_summary_html()
+        self.summary.setText(self._summary_txt)
+        self._cache[(self.cell_id, self.fluor.currentText())] = self._snapshot()
         self._replot()
 
     def set_frame(self, t):
@@ -263,9 +323,12 @@ class EdgePanel(EdgeRenderMixin, QtWidgets.QWidget):
             self._replot()
 
     def clear_cell(self):
+        # Deselect only — keep the recording context + per-cell cache so a misclick
+        # doesn't discard a precompute (the cache is dropped when the recording
+        # changes, in set_context).
         self.cell_id = 0
         self._pending = None
-        self._vel = self._rad = self._labels = None
+        self._vel = self._rad = None
         self._cfr = self._curv = None
         self._ifr = self._int = self._disp = self._inten = None
         self._summary = {}

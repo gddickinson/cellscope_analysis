@@ -111,3 +111,13 @@ def test_set_auto_precompute_precomputes_current_recording(app):
     assert not p._precomputed
     p.set_auto_precompute(True)                     # enabling it precomputes now
     assert p._precomputed and set(p._cache) == {1, 2, 3}
+
+
+def test_precompute_chains_after_hook(app):
+    """The viewer folds edge-dynamics precompute in via `after_precompute`."""
+    p, lab = _panel(), _labels()
+    p.set_context(lab, 0.5, 10.0)
+    called = []
+    p.after_precompute = lambda: called.append(True)
+    p.precompute_all()                              # synchronous (run_async None)
+    assert called == [True]
