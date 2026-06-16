@@ -213,13 +213,20 @@ Read this before opening source files. Update it when modules change.
 - **compare_tables.py** — `ComputeWorker` (off-thread `build_comparison`: lag count
   + optional fluorescence channel + project `corrections`); `corrections_tag` +
   `channel_tag` (cache-key fingerprints — corrections/scale, and a fluor channel
-  name hashed so distinct names never collide); `StatsTablesMixin`: fills the right-panel **Stats** +
-  **Data** tables (`_update_stats`, `_fill_data`, `_set_table`); `ResultsIOMixin`:
+  name hashed so distinct names never collide); `COMPARE_OPTIONS` + `compare_options()`
+  (Comparison-analysis toggles → `build_comparison` gating); `StatsTablesMixin`: fills
+  the right-panel **Stats** + **Data** tables (`_update_stats`, `_fill_data`,
+  `_set_table`) + the **Ranked report** button (`_add_stats_buttons` /
+  `_show_ranked_report` → `ranked_report.RankedReportDialog`); `ResultsIOMixin`:
   **save / load** the computed results (`_save_results`/`_load_results` →
   `compare.save_results`/`load_results`, restoring design + exclusions), CSV
   **`_export`**, and `_show_multivariate`; `multivariate_dialog`/`show_multivariate`
   (PERMANOVA + LORO-AUC table) + `show_metrics_help(parent)`. Split out to keep
   `compare_window` small.
+- **ranked_report.py** — `RankedReportDialog`: the Stats-tab **Ranked report** — a
+  sortable table of every group-pair comparison for the current metric, ordered by
+  likelihood of a significant difference (p-asc), with Bonferroni / Cohen d / stars
+  and CSV export (`compare.ranked_group_comparisons`).
 - **compare_filters.py** — `FilterMixin`: builds the cell/recording filter widgets,
   lays them out in a non-modal **Filters…** dialog, and applies them in `_filtered`
   (min frames · track-quality · min cells/recording · state · NN distance min/max ·
@@ -403,7 +410,9 @@ Read this before opening source files. Update it when modules change.
   `build_comparison` returns both `msd_long` + `autocorr_long`; optional
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
-  `per_condition_summary` (per-group n / mean / SEM / median over recordings —
+  `ranked_group_comparisons` (**every** group pair for one metric ranked by p —
+  recording = unit, Mann-Whitney U + Cohen d + Bonferroni — the Stats-tab Ranked
+  report), `per_condition_summary` (per-group n / mean / SEM / median over recordings —
   the Data tab), `multivariate_contrasts` (per-arm **PERMANOVA p + leave-one-
   recording-out AUC** over all metrics, reusing `multivariate.py` — the
   multivariate phenotype in the GUI), `save_results` / `load_results` (pickle the

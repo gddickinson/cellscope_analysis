@@ -151,7 +151,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   min/max · neighbour count min/max · distance-from-image-edge**); and a tabbed
   right panel — **Stats** (sortable
   per-contrast p / Bonferroni / Cohen's d / optional covariate-adjusted **OLS**
-  after frac_spread + density + omnibus KW + vehicle) · **Histogram** (per-cell
+  after frac_spread + density + omnibus KW + vehicle, plus a **Ranked report…**
+  button — *every* group-pair comparison for the current metric ranked by
+  significance, Mann-Whitney U + Bonferroni, `compare.ranked_group_comparisons`)
+  · **Histogram** (per-cell
   distribution by group) · **Data** (per-recording + per-group tables, unit-tagged).
   A **fluor channel** selector adds a per-cell **edge-movement ↔ fluorescence**
   correlation (`edge_piezo_corr` = Pearson r; tagged PIEZO1, SiR-actin, or any

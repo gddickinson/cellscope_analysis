@@ -230,7 +230,37 @@ class StatsTablesMixin:
             return ""
         return self._filter_note(groups=False)
 
+    def _add_stats_buttons(self, lay):
+        """Stats-tab action row: Save plot… + Ranked report… (built here to keep
+        compare_window lean)."""
+        row = QtWidgets.QHBoxLayout()
+        self._save_btn = QtWidgets.QPushButton("Save plot…")
+        self._save_btn.clicked.connect(self._save_current_plot)
+        rank = QtWidgets.QPushButton("Ranked report…")
+        rank.setToolTip("All group-pair comparisons for the current metric, ranked "
+                        "by likelihood of a significant difference (recording = unit)")
+        rank.clicked.connect(self._show_ranked_report)
+        row.addWidget(self._save_btn)
+        row.addWidget(rank)
+        lay.addLayout(row)
+
+    def _show_ranked_report(self):
+        from .ranked_report import RankedReportDialog
+        per_rec = getattr(self, "_stats_per_rec", None)
+        metric = self.metric.currentText()
+        if per_rec is None or per_rec.empty or not metric:
+            QtWidgets.QMessageBox.information(
+                self, "Ranked report", "Compute the comparison first.")
+            return
+        rows = compare.ranked_group_comparisons(per_rec, metric)
+        if not rows:
+            QtWidgets.QMessageBox.information(
+                self, "Ranked report", "Need at least two groups with data.")
+            return
+        RankedReportDialog(metric, rows, self).exec_()
+
     def _update_stats(self, per_rec, metric):
+        self._stats_per_rec = per_rec                 # cache for the ranked report
         d = self.project.design
         bc = compare.by_condition(per_rec, metric)
         kw = feature_tables._kw(list(bc.values()))
