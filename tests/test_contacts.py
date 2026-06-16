@@ -105,6 +105,51 @@ def test_contacts_disabled_omits_columns():
     assert all("contact_fraction" not in r for r in recs)
 
 
+def test_contact_episodes_counts_runs_and_gaps():
+    # frames 0..6 contiguous: in-contact pattern T T F T T T F → 2 episodes (len 2, 3)
+    n, durs = contacts.contact_episodes(
+        [0, 1, 2, 3, 4, 5, 6], [1, 1, 0, 1, 1, 1, 0])
+    assert n == 2 and durs == [2, 3]
+    # a frame gap (5→8) breaks an otherwise-continuous in-contact run
+    n2, durs2 = contacts.contact_episodes([4, 5, 8, 9], [1, 1, 1, 1])
+    assert n2 == 2 and durs2 == [2, 2]
+    assert contacts.contact_episodes([0, 1, 2], [0, 0, 0]) == (0, [])
+
+
+def test_frame_interfaces_returns_contacting_pixels():
+    ys, xs, codes = contacts.frame_interfaces(_two_touching())
+    assert ys.size == xs.size == codes.size and ys.size > 0
+    assert set(codes.tolist()) <= {1, 2}                 # point / extensive codes
+    # an isolated pair yields no interface pixels
+    L = np.zeros((40, 40), np.int32)
+    L[2:8, 2:8] = 1
+    L[30:38, 30:38] = 2
+    iy, ix, ic = contacts.frame_interfaces(L)
+    assert iy.size == 0
+
+
+def test_contact_summary_event_dynamics():
+    L = np.zeros((6, 40, 40), np.int32)
+    for t in range(6):
+        L[t, 5:25, 5:15] = 1                 # cell 1 present all 6 frames
+    L[2:4, 5:25, 15:25] = 2                  # cell 2 touches only frames 2,3
+    s = contacts.contact_summary(L, dt_min=2.0)
+    assert s[1]["n_contact_events"] == 1                 # one contiguous episode
+    assert s[1]["mean_contact_duration"] == 2 * 2.0      # 2 frames × 2 min
+    assert s[1]["contact_event_rate"] == 1 / (6 * 2.0)
+
+
+def test_contact_event_columns_in_per_cell_table():
+    L = np.zeros((4, 40, 40), np.int32)
+    L[:, 5:25, 5:15] = 1
+    L[1:3, 5:25, 15:25] = 2                  # cell 1 in contact frames 1,2
+    pc = exporters.per_cell_table(L, um_per_px=0.5, dt_min=1.0)
+    for col in ("n_contact_events", "mean_contact_duration_min", "contact_events_per_min"):
+        assert col in pc.columns, col
+    r1 = pc[pc["cell_id"] == 1].iloc[0]
+    assert r1["n_contact_events"] == 1 and r1["mean_contact_duration_min"] == 2.0
+
+
 def test_cell_frame_table_contact_series():
     """The per-cell-info plot exposes the contact series for a clicked cell."""
     L = np.zeros((3, 40, 40), np.int32)

@@ -73,33 +73,35 @@ def _free_record(boundary_px, scale) -> dict:
             "partners": {}}
 
 
-def frame_contacts(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
-                   extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX) -> dict:
-    """``{cell_id: record}`` of contact metrics for every cell in one frame.
-
-    ``scale`` is µm/px (1.0 → px). Every present cell gets a record (``free``
-    with zeros when it touches nothing)."""
-    lab = np.asarray(lab)
-    ids = [int(i) for i in np.unique(lab) if i > 0]
+def _contact_pixels(lab, max_gap_px):
+    """``(ys, xs, blab, {pix_idx: {partner labels}})`` — boundary pixels, their
+    cell labels, and for each the *other* cells within ``max_gap_px``."""
     bmask = _boundary_mask(lab)
     ys, xs = np.nonzero(bmask)
     blab = lab[ys, xs]
-    bcount = {c: 0 for c in ids}
-    for c, n in zip(*np.unique(blab, return_counts=True)):
-        bcount[int(c)] = int(n)
-    out = {c: _free_record(bcount[c], scale) for c in ids}
-    if len(ids) < 2 or ys.size < 2:
-        return out
-
-    tree = cKDTree(np.column_stack([ys, xs]))
-    # boundary-pixel index -> set of *other* cell labels within the gap
     pix_partners: dict[int, set] = {}
-    for i, j in tree.query_pairs(r=float(max_gap_px)):
-        a, b = int(blab[i]), int(blab[j])
-        if a != b:
-            pix_partners.setdefault(i, set()).add(b)
-            pix_partners.setdefault(j, set()).add(a)
+    if ys.size >= 2:
+        tree = cKDTree(np.column_stack([ys, xs]))
+        for i, j in tree.query_pairs(r=float(max_gap_px)):
+            a, b = int(blab[i]), int(blab[j])
+            if a != b:
+                pix_partners.setdefault(i, set()).add(b)
+                pix_partners.setdefault(j, set()).add(a)
+    return ys, xs, blab, pix_partners
 
+
+def _boundary_counts(ids, blab):
+    bc = {c: 0 for c in ids}
+    for c, n in zip(*np.unique(blab, return_counts=True)):
+        bc[int(c)] = int(n)
+    return bc
+
+
+def _aggregate(ids, blab, pix_partners, bcount, scale, extensive_frac, min_px):
+    """Per-cell contact records from the shared pixel/partner data."""
+    out = {c: _free_record(bcount[c], scale) for c in ids}
+    if not pix_partners:
+        return out
     contact_px = defaultdict(int)                  # cell -> distinct boundary px in contact
     pair_px = defaultdict(lambda: defaultdict(int))  # cell -> {partner: px}
     for i, parts in pix_partners.items():
@@ -107,7 +109,6 @@ def frame_contacts(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
         contact_px[c] += 1
         for p in parts:
             pair_px[c][p] += 1
-
     for c in ids:
         bc = bcount[c] or 1
         partners = {p: px for p, px in pair_px.get(c, {}).items() if px >= min_px}
@@ -126,6 +127,59 @@ def frame_contacts(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
     return out
 
 
+def frame_contacts(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
+                   extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX) -> dict:
+    """``{cell_id: record}`` of contact metrics for every cell in one frame.
+
+    ``scale`` is µm/px (1.0 → px). Every present cell gets a record (``free``
+    with zeros when it touches nothing)."""
+    lab = np.asarray(lab)
+    ids = [int(i) for i in np.unique(lab) if i > 0]
+    ys, xs, blab, pix_partners = _contact_pixels(lab, max_gap_px)
+    return _aggregate(ids, blab, pix_partners, _boundary_counts(ids, blab),
+                      scale, extensive_frac, min_px)
+
+
+def frame_interfaces(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
+                     extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX):
+    """``(ys, xs, codes)`` of the contacting boundary pixels for one frame — for the
+    contact overlay. ``codes`` is the owning cell's contact-class code (1 = point,
+    2 = extensive); pixels of cells classed ``free`` are dropped."""
+    lab = np.asarray(lab)
+    ids = [int(i) for i in np.unique(lab) if i > 0]
+    ys, xs, blab, pix_partners = _contact_pixels(lab, max_gap_px)
+    if not pix_partners:
+        return np.empty(0, int), np.empty(0, int), np.empty(0, int)
+    recs = _aggregate(ids, blab, pix_partners, _boundary_counts(ids, blab),
+                      scale, extensive_frac, min_px)
+    idx = [i for i in sorted(pix_partners) if recs[int(blab[i])]["contact_code"] > 0]
+    codes = np.array([recs[int(blab[i])]["contact_code"] for i in idx], int)
+    return ys[idx], xs[idx], codes
+
+
+def contact_episodes(frames, in_contact):
+    """``(n_events, [durations_in_frames])`` of contiguous in-contact runs over a
+    cell's present frames — a frame gap (the cell vanished) also breaks a run."""
+    frames = np.asarray(frames)
+    ic = np.asarray(in_contact, bool)
+    durations: list = []
+    run = 0
+    prev = None
+    for f, c in zip(frames.tolist(), ic.tolist()):
+        if prev is not None and f != prev + 1 and run:   # a gap closes the run
+            durations.append(run)
+            run = 0
+        if c:
+            run += 1
+        elif run:
+            durations.append(run)
+            run = 0
+        prev = f
+    if run:
+        durations.append(run)
+    return len(durations), durations
+
+
 def contacts_over_time(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
                        extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX,
                        progress_cb=None) -> list:
@@ -141,25 +195,32 @@ def contacts_over_time(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
 
 def contact_summary(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
                     extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX,
-                    per_frame=None) -> dict:
+                    per_frame=None, dt_min=None) -> dict:
     """``{cell_id: summary}`` over each track's present frames.
 
     Summary: ``frac_in_contact`` / ``frac_point_contact`` / ``frac_extensive_contact``
     (time-in-class), ``mean_contact_fraction`` / ``max_contact_fraction``,
-    ``mean_n_contacts`` and ``mean_contact_length``. Pass a precomputed
-    ``per_frame`` (from ``contacts_over_time``) to avoid recomputing."""
+    ``mean_n_contacts`` / ``mean_contact_length``, and **contact-episode dynamics**:
+    ``n_contact_events`` (distinct in-contact episodes), ``mean_contact_duration``
+    (frames, or min if ``dt_min``) and ``contact_event_rate`` (episodes per frame /
+    per min). Pass a precomputed ``per_frame`` (``contacts_over_time``) to reuse it."""
     labels = np.asarray(labels)
     pf = per_frame if per_frame is not None else contacts_over_time(
         labels, scale, max_gap_px, extensive_frac, min_px)
+    dt = float(dt_min) if dt_min else 1.0
     acc: dict[int, list] = defaultdict(list)
-    for fc in pf:
+    for t, fc in enumerate(pf):
         for cid, rec in fc.items():
-            acc[cid].append(rec)
+            acc[cid].append((t, rec))
     summary = {}
-    for cid, recs in acc.items():
+    for cid, tr in acc.items():
+        tr.sort()
+        frames = [t for t, _ in tr]
+        recs = [r for _, r in tr]
         n = len(recs)
         classes = [r["contact_class"] for r in recs]
         fr = np.array([r["contact_fraction"] for r in recs], float)
+        n_ev, durs = contact_episodes(frames, [c != "free" for c in classes])
         summary[int(cid)] = {
             "frac_in_contact": float(sum(c != "free" for c in classes) / n) if n else np.nan,
             "frac_point_contact": float(classes.count("point") / n) if n else np.nan,
@@ -169,5 +230,8 @@ def contact_summary(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
                                               default=0.0)),
             "mean_n_contacts": float(np.mean([r["n_contacts"] for r in recs])) if n else np.nan,
             "mean_contact_length": float(np.mean([r["contact_length"] for r in recs])) if n else np.nan,
+            "n_contact_events": int(n_ev),
+            "mean_contact_duration": (float(np.mean(durs)) * dt) if durs else 0.0,
+            "contact_event_rate": float(n_ev / (n * dt)) if n else np.nan,
         }
     return summary

@@ -5,6 +5,30 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Contact overlay + contact-event dynamics (contacts follow-ups)
+
+The two follow-ups noted in the contacts PR.
+- **Contact overlay** (`overlays.py` + `display_panel` toggle "Cell contacts" +
+  `viewer_window` render): draws the **shared-interface pixels** on the canvas,
+  coloured by class (blue = point, red = extensive), via new
+  `contacts.frame_interfaces` (refactored to share `_contact_pixels` / `_aggregate`
+  with `frame_contacts`). Verified on Pos60 frame 68 — blue traces exactly where
+  cell 11 meets cells 8 and 7.
+- **Contact-event dynamics** (`contacts.contact_episodes` + `contact_summary` +
+  `exporters.per_cell_table`): per-track in-contact episodes (a frame gap ends a
+  run) → `n_contact_events`, `mean_contact_duration_min`, `contact_events_per_min`
+  — contact formation/breakage frequency + duration, flowing into the per-cell CSV
+  and the Comparison readouts. Real data: cell 11 has 3 episodes (mean 73 min,
+  76% time-in-contact); isolated cells 0.
+- `metric_docs` entries + a `_per_min`/`_per_frame` label/units fix so the rate
+  columns render cleanly.
+
+Tests +4 (`contact_episodes` runs/gaps, `frame_interfaces`, `contact_summary`
+event dynamics, per-cell event columns). `pytest` **94 passed**; smoke green; all
+files < 500 lines (`viewer_window` 481).
+
+---
+
 ## 2026-06-15 — Cell–cell contact detection + classification (new analysis)
 
 The analysis was missing any measure of when cells **physically touch** (only

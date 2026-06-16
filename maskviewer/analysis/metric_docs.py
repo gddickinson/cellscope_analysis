@@ -76,6 +76,13 @@ METRICS = {
                            "point-class frames ÷ all present frames."),
     "frac_extensive_contact": ("Fraction of time in an extensive contact.",
                                "extensive-class frames ÷ all present frames."),
+    "n_contact_events": ("How many distinct contact episodes the cell has.",
+                         "Contiguous in-contact runs over its track (a frame gap "
+                         "ends a run) — contact formation/breakage frequency."),
+    "contact_duration": ("Average length of a contact episode.",
+                         "Mean in-contact run length × frame interval (min)."),
+    "contact_events": ("Contact formation rate.",
+                       "Number of contact episodes ÷ the cell's tracked time."),
     "frac_rounded": ("Fraction of a cell's classifiable time spent rounded.",
                      "rounded frames / (rounded + spread frames); edge-truncated "
                      "and undefined frames are excluded from the denominator."),
@@ -203,8 +210,10 @@ def column_label(col: str) -> str:
             c = c[: -len(suf)]
             break
     else:
-        if c.endswith("_min"):
-            c = c[:-4]
+        for suf in ("_per_min", "_per_frame", "_min"):   # bare rate / time suffixes
+            if c.endswith(suf):
+                c = c[: -len(suf)]
+                break
     lab = c.replace("_", " ").strip()
     return f"{lab} [{st}]" if st else lab
 
@@ -264,8 +273,10 @@ def _metric_key(col: str) -> str:
             base = base[: -len(suf)]
             break
     else:
-        if base.endswith("_min"):
-            base = base[:-4]
+        for suf in ("_per_min", "_per_frame", "_min"):
+            if base.endswith(suf):
+                base = base[: -len(suf)]
+                break
     base = base.strip("_").lower()
     return _KEY_ALIASES.get(base, base)
 
