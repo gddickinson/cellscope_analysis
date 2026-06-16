@@ -97,7 +97,7 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
             "selection) so switching between cells to compare them is instant — and "
             "also warms the Edge-dynamics cache for every cell. Re-run after "
             "enabling more metrics.")
-        self.precompute_btn.clicked.connect(self.precompute_all)
+        self.precompute_btn.clicked.connect(lambda: self.precompute_all(chain=True))
         self.cache_label = QtWidgets.QLabel("")
         self.cache_label.setStyleSheet("color: gray;")
         prow = QtWidgets.QHBoxLayout()
@@ -206,9 +206,11 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
         self._update_info()
         self._rebuild_combo()
 
-    def precompute_all(self):
+    def precompute_all(self, chain=False):
         """Compute every cell's metrics up front (off-thread, with the status-bar
-        progress + ETA) so subsequent cell switches are instant lookups."""
+        progress + ETA) so subsequent cell switches are instant lookups. ``chain``
+        (only the explicit button) also warms the heavier Edge-dynamics cache via
+        ``after_precompute``; auto-precompute stays cell-info-only (lightweight)."""
         if not self._ctx or self._ctx[0] is None:
             self.cache_label.setText("Load a recording first.")
             return
@@ -238,7 +240,7 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
                 self._cft = cache[self.cell_id]
                 self._update_info()
                 self._rebuild_combo()
-            if self.after_precompute:          # chain the edge-dynamics precompute
+            if chain and self.after_precompute:   # explicit button → also precompute edge
                 self.after_precompute()
 
         self.cache_label.setText(f"Precomputing {len(ids)} cells…")

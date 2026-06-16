@@ -185,8 +185,9 @@ Read this before opening source files. Update it when modules change.
     cells while viewing another tab (e.g. Cell Info) stays instant; `showEvent` runs
     the pending cell. Results are **cached** per (cell, fluor channel) (`_compute_snapshot`
     → `_cache`) so revisits are instant; `precompute_all` (off-thread via `run_async`)
-    warms every cell — folded into the Cell-Info "Precompute all cells" pass (the viewer
-    chains it via `cell_info.after_precompute` → `_precompute_edge`). Rendering lives in
+    warms every cell — folded into the Cell-Info "Precompute all cells" pass (only the
+    explicit button, `cell_info.precompute_all(chain=True)` → `after_precompute` →
+    `_precompute_edge`; auto-precompute stays cell-info-only / lightweight). Rendering lives in
     **edge_render.py** `EdgeRenderMixin` (split out to keep each file < 500 lines).
   - **edge_render.py** `EdgeRenderMixin` — the Edge panel's view layer (mixed into
     `EdgePanel`): `_replot` + all `_draw_*` (kymographs, per-frame edge map,

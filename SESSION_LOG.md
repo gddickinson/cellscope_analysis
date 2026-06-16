@@ -5,6 +5,35 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Fix: edge precompute fired automatically (+ tests polluted QSettings)
+
+**Report.** Edge-dynamics precompute seemed to run on switching to the Cell Info
+tab, before pressing the button. **Two causes:**
+
+1. **Tests polluted the real QSettings.** `tests/test_cell_info_precompute.py`
+   constructed `CellInfoPanel` without isolating `_settings`, so
+   `set_auto_precompute(True)` / `set_metric_enabled(...)` wrote the *developer's*
+   `cellscope_analysis/viewer` settings — leaving **`cell_info/auto_precompute =
+   True`**. With auto on, `set_context` (fired on load **and** on the first cell
+   click, which auto-raises the Cell Info tab) ran the precompute.
+2. **Auto-precompute also did the heavy edge pass.** Once auto fired, it chained
+   the Edge-dynamics precompute — surprising + heavy.
+
+**Fixes.**
+- `precompute_all(chain=False)`: only the explicit **Precompute all cells** button
+  (`clicked → precompute_all(chain=True)`) chains the edge precompute via
+  `after_precompute`; **auto-precompute stays Cell-Info-only** (lightweight). Auto
+  toggle tooltip updated to say so.
+- **Tests isolate settings**: `_panel(tmp_path)` points `_settings` at a temp ini —
+  verified the full suite leaves the real `cell_info/auto_precompute` /
+  `cell_metrics_enabled` keys untouched. Reset both polluted keys to default on this
+  machine.
+
+Tests: `test_button_precompute_chains_edge` (button → chain) +
+`test_auto_precompute_does_not_chain_edge` (auto → no chain). Full suite 167 passed;
+ViewerWindow smoke confirms auto-off cell click does **not** all-cells-precompute,
+while the button warms the edge cache.
+
 ## 2026-06-16 — Edge dynamics: per-cell cache + folded into "Precompute all cells"
 
 Follow-up so the Edge tab is fast too (when it's the front tab, switching cells

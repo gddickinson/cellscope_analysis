@@ -63,9 +63,10 @@ class ConfigWindow(QtWidgets.QDialog):
                           "menu (grouped by kind; toggling recomputes at once). The "
                           "default is a cheap subset — enable more as you need them."))
         auto = QtWidgets.QCheckBox("Auto-precompute all cells when a recording loads")
-        auto.setToolTip("Run 'Precompute all cells' automatically on load so switching "
-                        "between cells is instant. Off by default; the first pass runs "
-                        "in the background with a progress bar.")
+        auto.setToolTip("Precompute every cell's Cell-Info metrics automatically when a "
+                        "recording loads so switching between cells is instant. Off by "
+                        "default; runs in the background with a progress bar. (The heavier "
+                        "Edge-dynamics precompute stays on the 'Precompute all cells' button.)")
         auto.setChecked(info._auto_precompute)
         auto.toggled.connect(info.set_auto_precompute)
         v.addWidget(auto)
