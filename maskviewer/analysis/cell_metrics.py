@@ -301,6 +301,15 @@ BASE_FRAME_METRICS = ["area", "rel_area", "perimeter", "circularity",
                       "contact_fraction", "n_contacts", "contact_length",
                       "contact_state_code"]
 
+# The cheap, always-useful subset enabled by default in the Cell-Info plot menu so a
+# fresh session stays fast — every one comes from the per-frame moment pass or the
+# centroid track (no convex hull, perimeter trace, per-channel sampling or contact
+# KD-tree). Everything else (perimeter/circularity/convexity, solidity, intensity /
+# membrane, nearest-neighbour, contacts, shape mode, …) is opt-in via Config.
+DEFAULT_PLOT_METRICS = ["area", "eccentricity", "aspect_ratio", "extent",
+                        "state_code", "speed", "displacement_from_start",
+                        "turning_angle"]
+
 
 def available_frame_metrics(channel_names=None) -> list:
     """All selectable per-frame metric keys (intensity / membrane-contrast keys

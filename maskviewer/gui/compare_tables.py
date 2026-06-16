@@ -23,9 +23,9 @@ _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
 # computes). Keyed for QSettings ("compare/opt_<key>"); the cache key folds them in,
 # so changing a toggle recomputes. Edge↔fluorescence is set by the channel selector.
 COMPARE_OPTIONS = [
-    ("contacts", "Cell–cell contacts", True,
+    ("contacts", "Cell–cell contacts", False,
      "Per-cell contact fraction / count / interface / class + episode dynamics."),
-    ("state_segmented", "State-segmented metrics (rounded / spread)", True,
+    ("state_segmented", "State-segmented metrics (rounded / spread)", False,
      "Speed / persistence / area split by cell state — the CellScope reproduction."),
     ("solidity", "Solidity (convex hull)", False,
      "area ÷ convex-hull area per frame — slower (a SciPy hull per cell-frame)."),
