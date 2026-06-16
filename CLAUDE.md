@@ -240,7 +240,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
     ratio, extent, state, speed, displacement, turning); perimeter/circularity/
     convexity, solidity, per-channel intensity/membrane, nearest-neighbour, contacts
     and shape-mode are **off until enabled** (they add a hull / perimeter trace /
-    per-channel sampling / contact KD-tree per frame on every cell selection).
+    per-channel sampling / contact KD-tree per frame on every cell selection). Also an
+    **auto-precompute all cells on load** toggle (`cell_info/auto_precompute`, **default
+    off**): when on, every recording load kicks off the Cell-Info precompute so swapping
+    between cells is instant.
   - **Comparison analysis**: toggle which (heavier) analysis families the Comparison
     window computes — **cell–cell contacts**, **state-segmented metrics**,
     **solidity**, **edge dynamics**, **contact-inhibition (CIL)**, **fluorescence

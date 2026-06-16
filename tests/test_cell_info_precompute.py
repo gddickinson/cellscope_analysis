@@ -42,6 +42,7 @@ def _panel():
     p = CellInfoPanel()
     p.set_available(["DIC"], 0.5)
     p._enabled = set(cell_metrics.DEFAULT_PLOT_METRICS)   # deterministic (ignore QSettings)
+    p._auto_precompute = False                            # ditto — don't depend on stored prefs
     return p
 
 
@@ -86,3 +87,27 @@ def test_set_cell_memoises_without_precompute(app):
     p.set_cell(2, lab, 0.5, 10.0, recording=None)
     p.set_cell(1, lab, 0.5, 10.0, recording=None)   # revisit -> cache hit
     assert p._cft is first
+
+
+def test_auto_precompute_on_context_when_enabled(app):
+    p, lab = _panel(), _labels()
+    p._auto_precompute = True                       # as if the Config toggle is on
+    p.set_context(lab, 0.5, 10.0)                   # load -> auto precompute (sync here)
+    assert p._precomputed
+    assert set(p._cache) == {1, 2, 3}
+
+
+def test_no_auto_precompute_when_disabled(app):
+    p, lab = _panel(), _labels()
+    assert p._auto_precompute is False              # default off
+    p.set_context(lab, 0.5, 10.0)
+    assert not p._precomputed
+    assert p._cache == {}
+
+
+def test_set_auto_precompute_precomputes_current_recording(app):
+    p, lab = _panel(), _labels()
+    p.set_context(lab, 0.5, 10.0)                   # loaded, not precomputed
+    assert not p._precomputed
+    p.set_auto_precompute(True)                     # enabling it precomputes now
+    assert p._precomputed and set(p._cache) == {1, 2, 3}

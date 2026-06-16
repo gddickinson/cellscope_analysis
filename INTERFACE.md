@@ -167,7 +167,9 @@ Read this before opening source files. Update it when modules change.
     **Precompute all cells** button (`precompute_all`, off-thread via `run_async`)
     fills the cache so switching cells to compare them never lags. The cache is keyed
     by recording + enabled metrics (`_cache_key`) and self-invalidates on change;
-    `set_context` primes it from the loaded recording before any cell is clicked.
+    `set_context` primes it from the loaded recording before any cell is clicked, and
+    auto-runs the precompute there when the Config **auto-precompute on load** toggle
+    is on (`set_auto_precompute`, QSettings `cell_info/auto_precompute`, default off).
   - **edge_panel.py** `EdgePanel` — velocity / radius / **curvature** **kymograph**
     (angle×time, blue=retraction/red=protrusion; curvature red=convex/blue=concave),
     a per-frame **edge-this-frame** map (the cell boundary coloured by any per-sector

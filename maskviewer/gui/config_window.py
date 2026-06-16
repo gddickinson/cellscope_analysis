@@ -2,7 +2,8 @@
 
 One dialog gathering the project's configurable analysis settings as tabs —
 **Cell plot metrics** (which per-frame metrics the Cell-Info plot computes /
-offers), **Comparison analysis** (which families the Comparison window computes),
+offers, plus an *auto-precompute all cells on load* toggle), **Comparison
+analysis** (which families the Comparison window computes),
 and **Pixel size & time scale** (manual µm/px + min/frame overrides). Opened from
 Config ▸ Settings… (Ctrl+,). The metric / comparison toggles apply live (the
 comparison ones on its next Recompute); the scale tab applies on its button.
@@ -61,6 +62,13 @@ class ConfigWindow(QtWidgets.QDialog):
         v.addWidget(_wrap("Per-frame metrics computed + offered in the Cell-Info plot "
                           "menu (grouped by kind; toggling recomputes at once). The "
                           "default is a cheap subset — enable more as you need them."))
+        auto = QtWidgets.QCheckBox("Auto-precompute all cells when a recording loads")
+        auto.setToolTip("Run 'Precompute all cells' automatically on load so switching "
+                        "between cells is instant. Off by default; the first pass runs "
+                        "in the background with a progress bar.")
+        auto.setChecked(info._auto_precompute)
+        auto.toggled.connect(info.set_auto_precompute)
+        v.addWidget(auto)
         host = QtWidgets.QWidget()
         hv = QtWidgets.QVBoxLayout(host)
         avail = list(info.available)
