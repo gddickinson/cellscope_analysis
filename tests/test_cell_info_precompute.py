@@ -17,7 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 pytest.importorskip("PyQt5")
-from PyQt5 import QtWidgets  # noqa: E402
+from PyQt5 import QtCore, QtWidgets  # noqa: E402
 from maskviewer.analysis import cell_metrics  # noqa: E402
 
 
@@ -37,17 +37,20 @@ def _labels():
     return lab
 
 
-def _panel():
+def _panel(tmp_path):
     from maskviewer.gui.panels.cell_info import CellInfoPanel
     p = CellInfoPanel()
+    # Isolate persisted settings to a temp ini so the test never writes the real
+    # QSettings (set_metric_enabled / set_auto_precompute would otherwise pollute it).
+    p._settings = QtCore.QSettings(str(tmp_path / "viewer.ini"), QtCore.QSettings.IniFormat)
     p.set_available(["DIC"], 0.5)
     p._enabled = set(cell_metrics.DEFAULT_PLOT_METRICS)   # deterministic (ignore QSettings)
     p._auto_precompute = False                            # ditto — don't depend on stored prefs
     return p
 
 
-def test_precompute_caches_all_cells(app):
-    p, lab = _panel(), _labels()
+def test_precompute_caches_all_cells(app, tmp_path):
+    p, lab = _panel(tmp_path), _labels()
     p.set_context(lab, 0.5, 10.0)
     assert p._cache == {}
     p.precompute_all()                          # run_async is None -> runs synchronously
@@ -59,8 +62,8 @@ def test_precompute_caches_all_cells(app):
     assert p.cell_id == 2
 
 
-def test_metric_change_invalidates_cache(app):
-    p, lab = _panel(), _labels()
+def test_metric_change_invalidates_cache(app, tmp_path):
+    p, lab = _panel(tmp_path), _labels()
     p.set_context(lab, 0.5, 10.0)
     p.precompute_all()
     assert p._precomputed and p._cache
@@ -69,8 +72,8 @@ def test_metric_change_invalidates_cache(app):
     assert p._cache == {}
 
 
-def test_new_recording_invalidates_cache(app):
-    p, lab = _panel(), _labels()
+def test_new_recording_invalidates_cache(app, tmp_path):
+    p, lab = _panel(tmp_path), _labels()
     p.set_context(lab, 0.5, 10.0)
     p.precompute_all()
     assert p._cache
@@ -79,8 +82,8 @@ def test_new_recording_invalidates_cache(app):
     assert not p._precomputed
 
 
-def test_set_cell_memoises_without_precompute(app):
-    p, lab = _panel(), _labels()
+def test_set_cell_memoises_without_precompute(app, tmp_path):
+    p, lab = _panel(tmp_path), _labels()
     p.set_cell(1, lab, 0.5, 10.0, recording=None)
     first = p._cft
     assert 1 in p._cache
@@ -89,35 +92,45 @@ def test_set_cell_memoises_without_precompute(app):
     assert p._cft is first
 
 
-def test_auto_precompute_on_context_when_enabled(app):
-    p, lab = _panel(), _labels()
+def test_auto_precompute_on_context_when_enabled(app, tmp_path):
+    p, lab = _panel(tmp_path), _labels()
     p._auto_precompute = True                       # as if the Config toggle is on
     p.set_context(lab, 0.5, 10.0)                   # load -> auto precompute (sync here)
     assert p._precomputed
     assert set(p._cache) == {1, 2, 3}
 
 
-def test_no_auto_precompute_when_disabled(app):
-    p, lab = _panel(), _labels()
+def test_no_auto_precompute_when_disabled(app, tmp_path):
+    p, lab = _panel(tmp_path), _labels()
     assert p._auto_precompute is False              # default off
     p.set_context(lab, 0.5, 10.0)
     assert not p._precomputed
     assert p._cache == {}
 
 
-def test_set_auto_precompute_precomputes_current_recording(app):
-    p, lab = _panel(), _labels()
+def test_set_auto_precompute_precomputes_current_recording(app, tmp_path):
+    p, lab = _panel(tmp_path), _labels()
     p.set_context(lab, 0.5, 10.0)                   # loaded, not precomputed
     assert not p._precomputed
     p.set_auto_precompute(True)                     # enabling it precomputes now
     assert p._precomputed and set(p._cache) == {1, 2, 3}
 
 
-def test_precompute_chains_after_hook(app):
-    """The viewer folds edge-dynamics precompute in via `after_precompute`."""
-    p, lab = _panel(), _labels()
+def test_button_precompute_chains_edge(app, tmp_path):
+    """The explicit button (chain=True) folds in edge precompute via after_precompute."""
+    p, lab = _panel(tmp_path), _labels()
     p.set_context(lab, 0.5, 10.0)
     called = []
     p.after_precompute = lambda: called.append(True)
-    p.precompute_all()                              # synchronous (run_async None)
+    p.precompute_all(chain=True)                    # synchronous (run_async None)
     assert called == [True]
+
+
+def test_auto_precompute_does_not_chain_edge(app, tmp_path):
+    """Auto-precompute (chain=False, default) stays cell-info-only — no heavy edge pass."""
+    p, lab = _panel(tmp_path), _labels()
+    p._auto_precompute = True
+    called = []
+    p.after_precompute = lambda: called.append(True)
+    p.set_context(lab, 0.5, 10.0)                   # load → auto precompute (no chain)
+    assert p._precomputed and called == []          # cell-info done, edge NOT chained
