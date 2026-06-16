@@ -5,6 +5,40 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Edge curvature, rectangle positioning, track-length metric
+
+Three user-requested viewer/analysis additions:
+
+- **Edge curvature** (`edge_dynamics.curvature_kymograph`) — per-sector boundary
+  curvature κ from the polar boundary `r(θ)` (`(r²+2r'²−r·r'')/(r²+r'²)^1.5`, circular
+  finite differences), in 1/µm; +convex / −concave. Verified: a disk gives κ≈1/R, an
+  ellipse spikes at the tips. Added to the **Edge Dynamics** dock as a *Curvature
+  kymograph* + *Edge this frame: curvature* view (diverging colour, red convex / blue
+  concave), a mean-κ + mean-|κ| line in the summary, and a CSV export tag.
+- **Sampling-rectangle positioning** (from the original `cell_edge_analysis` step6) —
+  `edge_intensity.rectangle_intensity` gained a `rotation` mode (`none` / `flip` /
+  `search` over `RECT_SEARCH_ANGLES`): when the straight inward rectangle falls below
+  `min_coverage` (concave edge / image border) it rotates to recover the best in-cell
+  coverage (verified: on a crescent cell at coverage 0.8, valid sectors 57→61→65 for
+  none→flip→search; no change on a convex cell). Exposed as a **categorical** analysis
+  parameter (`ANALYSIS_CHOICES`, a combo) + a numeric search-angles spinbox.
+- **Track length for plotting** — already existed for **colouring** (Display ▸ Colour
+  by ▸ "Track length") and as a comparison metric (`frames_tracked`) + the cell-info
+  summary; added `track_length_min` (track *duration*) to `per_cell_table` so both
+  frames and minutes are selectable comparison metrics (auto-labeled "track length
+  (frames|min)").
+
+Infra: the Config window's option/parameter definitions moved to a new
+`gui/analysis_params.py` (COMPARE_OPTIONS / ANALYSIS_PARAMS / **ANALYSIS_CHOICES** +
+`compare_options` / `analysis_params` / `analysis_choices` / `apply_analysis_params` /
+`analysis_params_tag`), re-exported from `compare_tables` for back-compat — keeps
+`compare_tables` under 500 (now 355). The params tab renders numeric spinboxes **and**
+categorical combos grouped by section. The rotation choice folds into the comparison
+cache key. Tests +6 (`tests/test_edge_features.py`); `pytest` **141 passed**; GUI smoke
+(all 10 edge views + the rotation combo) green; all files < 500.
+
+---
+
 ## 2026-06-16 — Fix the remaining audit items (no longer just documented)
 
 Turned every low-severity audit finding into an actual fix:

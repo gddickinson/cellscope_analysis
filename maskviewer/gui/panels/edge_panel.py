@@ -29,12 +29,14 @@ from ..plot_export import save_plot
 _MODES = ["Velocity kymograph", "Radius kymograph", "Intensity kymograph",
           "Edge movement ↔ intensity", "Edge this frame: velocity",
           "Edge this frame: radius", "Edge this frame: intensity",
-          "Sampling rectangles"]
+          "Sampling rectangles", "Curvature kymograph",
+          "Edge this frame: curvature"]
 _INTENSITY_KYMO = 2
 _SCATTER = 3
 _RECTANGLES = 7
-_EDGE_FRAME = (4, 5, 6, 7)       # mode indices drawn on the current frame
-_FRAME_METRIC = {4: "velocity", 5: "radius", 6: "intensity"}
+_CURV_KYMO = 8
+_EDGE_FRAME = (4, 5, 6, 7, 9)    # mode indices drawn on the current frame
+_FRAME_METRIC = {4: "velocity", 5: "radius", 6: "intensity", 9: "curvature"}
 _NONE = "(none)"
 # brightfield / transmitted / placeholder channel names (NOT fluorescence)
 _NON_FLUOR = ("dic", "bright", "bf", "phase", "trans", "label", "none", "empty")
@@ -63,6 +65,7 @@ class EdgePanel(QtWidgets.QWidget):
         self._frame = None
         self._half = None               # max cell radius (px) → stable edge crop
         self._vfr = self._vel = self._rfr = self._rad = None
+        self._cfr = self._curv = None   # curvature kymograph (frames, per-sector)
         self._rec = None                # Recording (for the fluorescence channel)
         self._chan_names = None
         self._ifr = self._int = None    # rectangle-intensity kymograph
@@ -131,6 +134,8 @@ class EdgePanel(QtWidgets.QWidget):
             labels, self.cell_id, um_per_px, dt_min)
         self._rfr, self._rad = edge_dynamics.radius_kymograph(
             labels, self.cell_id, um_per_px)
+        self._cfr, self._curv = edge_dynamics.curvature_kymograph(
+            labels, self.cell_id, um_per_px)
         self._half = (float(np.nanmax(self._rad)) / (um_per_px or 1.0)
                       if self._rad.size and np.isfinite(self._rad).any() else None)
         self._compute_fluor()
@@ -148,6 +153,10 @@ class EdgePanel(QtWidgets.QWidget):
             f"events: {ev['n_protrusions']} protr / {ev['n_retractions']} retr"
             f"  ·  mean dur {ev['mean_protrusion_duration']:.1f} / "
             f"{ev['mean_retraction_duration']:.1f} {tu}")
+        if self._curv is not None and np.isfinite(self._curv).any():
+            cu = "1/µm" if self._um else "1/px"
+            txt += (f"<br>mean curvature: {np.nanmean(self._curv):.3f} {cu}  ·  "
+                    f"|κ| (edge roughness): {np.nanmean(np.abs(self._curv)):.3f} {cu}")
         self.summary.setText(txt + self._fluor_summary_html())
         self.export_btn.setEnabled(True)
         self._replot()
@@ -228,6 +237,7 @@ class EdgePanel(QtWidgets.QWidget):
     def clear_cell(self):
         self.cell_id = 0
         self._vel = self._rad = self._labels = None
+        self._cfr = self._curv = None
         self._ifr = self._int = self._disp = self._inten = None
         self._summary = {}
         self.title.setText("No cell selected")
@@ -254,8 +264,10 @@ class EdgePanel(QtWidgets.QWidget):
             self._draw_move_intensity_scatter()
         elif idx == _INTENSITY_KYMO:
             self._draw_intensity_kymograph()
+        elif idx == _CURV_KYMO:
+            self._draw_kymograph("curvature")
         else:
-            self._draw_kymograph(velocity=(idx == 0))
+            self._draw_kymograph("velocity" if idx == 0 else "radius")
 
     def _need_fluor(self):
         if self._int is None or self._int.size == 0:
@@ -302,17 +314,21 @@ class EdgePanel(QtWidgets.QWidget):
         self.plot.setLabel("left", "fluorescence intensity")
         self.plot.autoRange()
 
-    def _draw_kymograph(self, velocity):
-        mat = self._vel if velocity else self._rad
-        frames = self._vfr if velocity else self._rfr
+    def _draw_kymograph(self, kind):
+        mat = {"velocity": self._vel, "radius": self._rad,
+               "curvature": self._curv}[kind]
+        frames = {"velocity": self._vfr, "radius": self._rfr,
+                  "curvature": self._cfr}[kind]
         if mat is None or mat.size == 0:
             return
         self.img.setImage(mat, autoLevels=False)
-        if velocity:
+        if kind in ("velocity", "curvature"):
             vmax = float(np.nanmax(np.abs(mat))) or 1.0
             self.img.setLookupTable(self._lut_div)
             self.img.setLevels((-vmax, vmax))
-            self.plot.setTitle("blue = retraction · red = protrusion")
+            self.plot.setTitle("blue = retraction · red = protrusion" if kind == "velocity"
+                               else f"curvature ({'1/µm' if self._um else '1/px'}); "
+                                    "red convex · blue concave")
         else:
             lo, hi = float(np.nanmin(mat)), float(np.nanmax(mat))
             self.img.setLookupTable(self._lut_seq)
@@ -376,6 +392,17 @@ class EdgePanel(QtWidgets.QWidget):
             lut = self._lut_seq
             lo, hi = float(np.nanmin(self._int)), float(np.nanmax(self._int))
             self.plot.setTitle(f"{self.fluor.currentText()} intensity (this frame)")
+        elif metric == "curvature":
+            hit = np.where(self._cfr == t)[0] if self._cfr is not None else np.array([])
+            if hit.size == 0:
+                self.scatter.clear()
+                self.plot.setTitle("no curvature for this frame")
+                return
+            val = self._curv[hit[0]][sect]            # binned about this frame's centroid
+            vmax = float(np.nanmax(np.abs(self._curv))) or 1.0
+            lut, lo, hi = self._lut_div, -vmax, vmax
+            self.plot.setTitle(f"edge curvature ({'1/µm' if self._um else '1/px'}; "
+                               "red convex · blue concave)")
         else:                                          # radius (per-point distance)
             val = np.sqrt((by - cy) ** 2 + (bx - cx) ** 2) * (self._um or 1.0)
             lut, lo, hi = self._lut_seq, float(np.nanmin(val)), float(np.nanmax(val))
@@ -437,6 +464,8 @@ class EdgePanel(QtWidgets.QWidget):
             return
         if idx in (_INTENSITY_KYMO, 6, _RECTANGLES):   # intensity kymo / edge-int / rects
             mat, frames, tag = self._int, self._ifr, "fluor_intensity"
+        elif idx in (_CURV_KYMO, 9):                   # curvature kymo / edge-curvature
+            mat, frames, tag = self._curv, self._cfr, "boundary_curvature"
         elif idx in (1, 5):                            # radius kymo / edge-radius
             mat, frames, tag = self._rad, self._rfr, "boundary_radius"
         else:                                          # velocity kymo / edge-velocity

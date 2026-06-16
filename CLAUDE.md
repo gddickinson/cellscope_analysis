@@ -126,10 +126,12 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   solidity, axes, orientation, extent, state, speed, displacement, turning,
   consecutive IoU, area-change, **nearest-neighbour** dist/count, per-channel
   intensity + membrane contrast) over time, or MSD (log-log **or linear**, α/D fit).
-- **Edge Dynamics** dock: velocity/radius kymograph (angle×time) **and a
+- **Edge Dynamics** dock: velocity/radius/**curvature** kymograph (angle×time) **and a
   per-frame edge map** (the cell's boundary in the current frame coloured by any
-  per-sector metric — velocity, radius, or fluorescence intensity) + summary + CSV
-  export. With a **Fluor channel**
+  per-sector metric — velocity, radius, **curvature**, or fluorescence intensity) +
+  summary + CSV export. (**Curvature** = polar boundary curvature κ per sector,
+  1/µm: red convex / blue concave — local protrusion-tip vs indentation; see
+  `analysis/edge_dynamics.curvature_kymograph`.) With a **Fluor channel**
   chosen (tagged PIEZO1, **SiR-actin**, or any fluorescent signal) it adds the
   **faithful `cell_edge_analysis` reproduction** (`analysis/edge_intensity.py`): a
   rectangle-intensity kymograph, the **edge-movement ↔ intensity scatter** coloured
@@ -243,8 +245,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
     state / frac_rounded / all state-segmented metrics) · **Shape modes** (number of
     modes) · **Motion** (run/tumble turn angle °, jump-step factor) · **Edge dynamics**
     (front/rear half-cone °, kymograph time σ + angular window) · **Edge↔fluorescence
-    sampling** (rectangle depth/width px, min in-cell coverage) · **Contact inhibition**
-    (CIL speed window). All via `compare_tables.ANALYSIS_PARAMS` → `apply_analysis_params`,
+    sampling** (rectangle depth/width px, min in-cell coverage, **rectangle positioning**
+    none/flip/search + search angles — after the original cell_edge_analysis step6) ·
+    **Contact inhibition** (CIL speed window). Via `analysis_params.ANALYSIS_PARAMS`
+    (numeric) + `ANALYSIS_CHOICES` (categorical) → `apply_analysis_params`,
     which sets the analysis-module globals that the (sentinel-`None`-defaulted) functions
     read at call time, so a change applies to **both** the comparison (recompute — folded
     into the cache key via `analysis_params_tag`) **and** the interactive overlays /

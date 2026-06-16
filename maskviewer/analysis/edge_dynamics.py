@@ -95,6 +95,36 @@ def radius_kymograph(labels, cell_id, um_per_px=None):
     return np.array(frames), mat
 
 
+def curvature_kymograph(labels, cell_id, um_per_px=None, smooth=True):
+    """(present_frames, (n, N_SECTORS) signed boundary curvature) for one cell.
+
+    Curvature of the polar boundary ``r(θ)`` about the centroid:
+    ``κ = (r² + 2r'² − r·r'') / (r² + r'²)^1.5`` (circular finite differences over the
+    angular sectors). Units are **1/µm** when ``um_per_px`` is given (else 1/px).
+    Positive = locally convex (the edge bulges outward, e.g. a protrusion tip);
+    negative = concave (an indentation / where a neighbour presses in)."""
+    labels = np.asarray(labels)
+    scale = float(um_per_px) if um_per_px else 1.0
+    frames = _present_frames(labels, cell_id)
+    dth = 2 * np.pi / N_SECTORS
+    mat = np.full((len(frames), N_SECTORS), np.nan)
+    for i, t in enumerate(frames):
+        m = labels[t] == cell_id
+        rr, cc = np.nonzero(m)
+        r = _interp_circular(_radii(m, (rr.mean(), cc.mean())))
+        if smooth:
+            r = _smooth_angular(r)
+        if not np.isfinite(r).all():
+            continue
+        rp = (np.roll(r, -1) - np.roll(r, 1)) / (2 * dth)            # r'(θ)
+        rpp = (np.roll(r, -1) - 2 * r + np.roll(r, 1)) / (dth * dth)  # r''(θ)
+        denom = np.power(r * r + rp * rp, 1.5)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            kappa = (r * r + 2 * rp * rp - r * rpp) / denom
+        mat[i] = np.where(denom > 0, kappa, np.nan) / scale          # px⁻¹ → µm⁻¹
+    return np.array(frames), mat
+
+
 def edge_velocity_kymograph(labels, cell_id, um_per_px=None, dt_min=None,
                             smooth=True):
     """(later-frame indices, (n_pairs, N_SECTORS) edge velocity) for one cell.

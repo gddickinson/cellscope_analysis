@@ -12,7 +12,8 @@ from __future__ import annotations
 from PyQt5 import QtCore, QtWidgets
 
 from ..analysis import cell_metrics, metric_docs
-from .compare_tables import COMPARE_OPTIONS, ANALYSIS_PARAMS, apply_analysis_params
+from .compare_tables import (COMPARE_OPTIONS, ANALYSIS_PARAMS, ANALYSIS_CHOICES,
+                             apply_analysis_params)
 from .scale_dialog import ScalePanel
 
 _METRIC_ORDER = ["Shape & state", "Motion & dynamics", "Neighbours & contact",
@@ -96,22 +97,37 @@ class ConfigWindow(QtWidgets.QDialog):
         host = QtWidgets.QWidget()
         hv = QtWidgets.QVBoxLayout(host)
         self._param_spins = {}
-        section = None
-        form = None
-        for key, label, default, lo, hi, dec, sect, tip in ANALYSIS_PARAMS:
-            if sect != section:                            # new section → header + form
-                section = sect
-                hv.addWidget(QtWidgets.QLabel(f"<b>{sect}</b>"))
-                form = QtWidgets.QFormLayout()
-                hv.addLayout(form)
-            sp = QtWidgets.QDoubleSpinBox()
-            sp.setRange(lo, hi)
-            sp.setDecimals(dec)
-            sp.setValue(self._settings.value(f"analysis/{key}", default, type=float))
-            sp.setToolTip(tip)
-            sp.valueChanged.connect(lambda val, k=key: self._set_param(k, val))
-            self._param_spins[key] = sp
-            form.addRow(label, sp)
+        self._param_combos = {}
+        sections = []                                      # first-appearance order
+        for *_a, sect, _t in list(ANALYSIS_PARAMS) + list(ANALYSIS_CHOICES):
+            if sect not in sections:
+                sections.append(sect)
+        for sect in sections:
+            hv.addWidget(QtWidgets.QLabel(f"<b>{sect}</b>"))
+            form = QtWidgets.QFormLayout()
+            hv.addLayout(form)
+            for key, label, default, lo, hi, dec, s, tip in ANALYSIS_PARAMS:
+                if s != sect:
+                    continue
+                sp = QtWidgets.QDoubleSpinBox()
+                sp.setRange(lo, hi)
+                sp.setDecimals(dec)
+                sp.setValue(self._settings.value(f"analysis/{key}", default, type=float))
+                sp.setToolTip(tip)
+                sp.valueChanged.connect(lambda val, k=key: self._set_param(k, val))
+                self._param_spins[key] = sp
+                form.addRow(label, sp)
+            for key, label, default, choices, s, tip in ANALYSIS_CHOICES:
+                if s != sect:
+                    continue
+                cb = QtWidgets.QComboBox()
+                cb.addItems(choices)
+                cur = self._settings.value(f"analysis/{key}", default, type=str)
+                cb.setCurrentText(cur if cur in choices else default)
+                cb.setToolTip(tip)
+                cb.currentTextChanged.connect(lambda txt, k=key: self._set_choice(k, txt))
+                self._param_combos[key] = cb
+                form.addRow(label, cb)
         hv.addStretch(1)
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
@@ -135,9 +151,17 @@ class ConfigWindow(QtWidgets.QDialog):
         if getattr(self.win, "masks", None) is not None:
             self.win._on_frame(self.win.timeline.value())  # redraw with the new params
 
+    def _set_choice(self, key, text):
+        self._settings.setValue(f"analysis/{key}", str(text))
+        apply_analysis_params(self._settings)
+        if getattr(self.win, "masks", None) is not None:
+            self.win._on_frame(self.win.timeline.value())
+
     def _reset_params(self):
         for key, _l, default, *_ in ANALYSIS_PARAMS:
             self._param_spins[key].setValue(default)
+        for key, _l, default, *_ in ANALYSIS_CHOICES:
+            self._param_combos[key].setCurrentText(default)
 
     # -- Comparison analysis --------------------------------------------
     def _compare_tab(self):

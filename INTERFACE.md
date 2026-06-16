@@ -149,9 +149,10 @@ Read this before opening source files. Update it when modules change.
     membrane contrast) over time + MSD (log-log **or linear**) with α/D fit. Owns
     the enabled-metric set (QSettings-persisted); `set_metric_enabled` recomputes
     immediately.
-  - **edge_panel.py** `EdgePanel` — velocity / radius **kymograph** (angle×time,
-    blue=retraction/red=protrusion), a per-frame **edge-this-frame** map (the cell
-    boundary coloured by any per-sector metric — velocity / radius / intensity),
+  - **edge_panel.py** `EdgePanel` — velocity / radius / **curvature** **kymograph**
+    (angle×time, blue=retraction/red=protrusion; curvature red=convex/blue=concave),
+    a per-frame **edge-this-frame** map (the cell boundary coloured by any per-sector
+    metric — velocity / radius / **curvature** / intensity),
     **and (with a Fluor channel chosen — PIEZO1, SiR-actin, any signal) the faithful
     edge-movement ↔
     intensity views**: a rectangle-intensity kymograph, the **edge-displacement vs
@@ -203,12 +204,18 @@ Read this before opening source files. Update it when modules change.
   `registration`) + manual dy/dx, **Auto-detect FOV** (via `fov`) + manual rectangle,
   a live overlay preview (reference grey + align-channel magenta + FOV box), and
   Apply → writes a non-destructive correction onto the project (`on_apply`).
+- **analysis_params.py** — the Config window's data: `COMPARE_OPTIONS` (comparison
+  family toggles), `ANALYSIS_PARAMS` (numeric tunables), `ANALYSIS_CHOICES` (categorical,
+  e.g. **rectangle positioning** none/flip/search), `compare_options` / `analysis_params`
+  / `analysis_choices` readers, `apply_analysis_params` (push onto analysis-module
+  globals, read at call time) + `analysis_params_tag` (compute-cache key). Split out of
+  `compare_tables` for size; re-exported there for back-compat.
 - **config_window.py** — `ConfigWindow(QDialog)`: the unified **Config ▸ Settings…**
   (Ctrl+,) tabbed window — **Cell plot metrics** (checkboxes bound to `cell_info`,
   **grouped by category**), **Comparison analysis** (toggles
-  `compare_tables.COMPARE_OPTIONS` → QSettings → what `build_comparison` computes),
-  **Analysis parameters** (`ANALYSIS_PARAMS` spinboxes → `apply_analysis_params` sets
-  the analysis module globals: NN radius / contact gap / extensive threshold) and
+  `analysis_params.COMPARE_OPTIONS` → QSettings → what `build_comparison` computes),
+  **Analysis parameters** (`ANALYSIS_PARAMS` spinboxes + `ANALYSIS_CHOICES` combos →
+  `apply_analysis_params`, grouped by section, scrollable) and
   **Pixel size & time scale** (embeds `ScalePanel`).
 - **scale_dialog.py** — `ScalePanel(QWidget)` (the override controls, reused by the
   Config window's scale tab) + `ScaleDialog(QDialog)` wrapping it: **pixel size & time
@@ -388,7 +395,9 @@ Read this before opening source files. Update it when modules change.
   canvas overlay, CSV columns + a **contact-pairs CSV**, and comparison readouts.
 - **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
-  mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
+  mid-centroid; +protrusion/−retraction), `radius_kymograph`, **`curvature_kymograph`**
+  (per-sector boundary curvature κ from the polar r(θ); +convex/−concave, 1/µm),
+  `edge_summary`
   (protrusion/retraction/net/ruffling), `edge_events` (ADAPT-style discrete
   events), **`edge_polarity`** (rotate sectors to the migration direction →
   front/rear/side velocity + `polarity_index` + `rear_retraction_fraction`, the
@@ -398,7 +407,9 @@ Read this before opening source files. Update it when modules change.
   (tagged PIEZO1, SiR-actin, any signal); a faithful reproduction of the lab's
   `cell_edge_analysis` pipeline adapted to closed tracked cells. `rectangle_intensity`
   /`intensity_kymograph` (mean fluorescence in a `depth`×`width` px rectangle reaching
-  **into the cell** along the inward normal per sector), `movement_intensity_pairs`
+  **into the cell** along the inward normal per sector; a configurable `rotation`
+  positioning — none/flip/search over `search_angles` — recovers low-coverage
+  rectangles on concave edges, after the original step6), `movement_intensity_pairs`
   (local radial displacement ↔ rectangle intensity, `past`/`future`),
   `correlation_summary` (Pearson **r / R² / p / slope**, protruding/retracting/stable
   counts + mean intensities, protrude−retract Δ, t-test + Mann-Whitney),
