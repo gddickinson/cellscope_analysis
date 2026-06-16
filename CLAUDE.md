@@ -228,11 +228,19 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
     per-channel sampling / contact KD-tree per frame on every cell selection).
   - **Comparison analysis**: toggle which (heavier) analysis families the Comparison
     window computes — **cell–cell contacts**, **state-segmented metrics**,
-    **solidity**, **edge dynamics**, **contact-inhibition (CIL)**
+    **solidity**, **edge dynamics**, **contact-inhibition (CIL)**, **fluorescence
+    intensity + membrane** (per channel), **shape-mode usage**
     (`compare_tables.COMPARE_OPTIONS`, QSettings-persisted, folded into the compute
     cache key so a change recomputes). **All default OFF** → a basic comparison
     (shape + motion + nearest-neighbour + MSD + direction autocorrelation) computes
-    fast; enabling a family adds its columns (and its compute cost).
+    fast; enabling a family adds its columns (and its compute cost). Enabling these
+    makes **every main-GUI metric comparable** (incl. per-channel intensity / membrane,
+    shape modes, contacts, edge polarity).
+  - **Analysis parameters**: tune the **neighbour radius** (µm), **contact gap
+    tolerance** (px) and **extensive-contact threshold** (`compare_tables.ANALYSIS_PARAMS`
+    → `apply_analysis_params` sets the analysis module globals, read at call time so a
+    change applies to **both** the comparison (recompute — folded into the cache key)
+    **and** the interactive overlays / colour-by).
   - **Pixel size & time scale**: manually set **µm/px** and/or **min/frame** for when
     a file's metadata is lost or incorrect. Stored on the `Project` (`px_size` /
     `frame_interval`), applied to **every** recording (`Project.scaled`) — scale bar,

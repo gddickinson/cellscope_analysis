@@ -50,6 +50,47 @@ def compare_options(settings=None) -> dict:
             for k, _label, d, _tip in COMPARE_OPTIONS}
 
 
+# Tunable analysis parameters (Config ▸ Analysis parameters). Each:
+# (key, label, default, min, max, decimals, tooltip). Applied to the analysis module
+# globals so they take effect everywhere — comparison + interactive overlay / colour-by.
+ANALYSIS_PARAMS = [
+    ("nn_radius", "Neighbour radius (µm)", 50.0, 1.0, 2000.0, 0,
+     "Cells within this centroid distance count as neighbours (n_neighbors / crowding "
+     "/ density-stratified speed)."),
+    ("contact_gap", "Contact gap tolerance (px)", 1.5, 0.5, 10.0, 1,
+     "Max boundary-pixel separation treated as a cell–cell contact (touching masks "
+     "sit ~1 px apart)."),
+    ("extensive_frac", "Extensive-contact threshold", 0.25, 0.05, 1.0, 2,
+     "A neighbour interface ≥ this fraction of the cell's boundary is 'extensive' "
+     "(else 'point')."),
+]
+
+
+def analysis_params(settings=None) -> dict:
+    s = settings or QtCore.QSettings("cellscope_analysis", "viewer")
+    return {k: float(s.value(f"analysis/{k}", d, type=float))
+            for k, _l, d, *_ in ANALYSIS_PARAMS}
+
+
+def apply_analysis_params(settings=None):
+    """Push the configured analysis parameters onto the analysis module globals so
+    every computation (comparison + interactive) reads them at call time."""
+    from ..analysis import neighbors, contacts
+    p = analysis_params(settings)
+    neighbors.DEFAULT_RADIUS_UM = p["nn_radius"]
+    contacts.DEFAULT_GAP_PX = p["contact_gap"]
+    contacts.EXTENSIVE_FRAC = p["extensive_frac"]
+
+
+def analysis_params_tag(settings=None) -> str:
+    """Cache-key fragment for the analysis params (only when non-default) so the
+    comparison recomputes when they change."""
+    p = analysis_params(settings)
+    if all(abs(p[k] - d) < 1e-9 for k, _l, d, *_ in ANALYSIS_PARAMS):
+        return ""
+    return "_p" + "_".join(f"{p[k]:g}" for k, *_ in ANALYSIS_PARAMS)
+
+
 def corrections_tag(corrections, scale=None):
     """Short stable fingerprint of the project's pre-analysis corrections + manual
     scale overrides, for keying the compute cache (alignment / FOV / pixel-size /

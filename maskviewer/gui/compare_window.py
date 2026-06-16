@@ -21,7 +21,8 @@ from . import compare_plots
 from .plot_export import save_plot
 from .status_progress import StatusProgress
 from .compare_tables import (StatsTablesMixin, ResultsIOMixin, ComputeWorker,
-                             corrections_tag, channel_tag, compare_options, show_metrics_help)
+                             corrections_tag, channel_tag, compare_options,
+                             analysis_params_tag, show_metrics_help)
 from ..io import recording as _recording
 from .compare_filters import FilterMixin
 from .plot_style import PlotStyle, PlotStyleMixin
@@ -341,7 +342,7 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
     def _cache_path(self):
         o = compare_options(); opt = "".join(k[:2] for k, v in o.items() if v)
         return os.path.join(PROJECT_ROOT, "analysis_out", f"_compare_{self._safe}_lag"
-            f"{self.lags.value()}_o{opt}{channel_tag(self._fluor_choice())}{corrections_tag(self.project.corrections, self.project.scale_override)}.pkl")
+            f"{self.lags.value()}_o{opt}{analysis_params_tag()}{channel_tag(self._fluor_choice())}{corrections_tag(self.project.corrections, self.project.scale_override)}.pkl")
 
     def _compute(self):
         if self._thread is not None and self._thread.isRunning():

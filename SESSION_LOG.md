@@ -5,6 +5,25 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Options panel: grouped metrics + Analysis-parameters tab
+
+Second half of the options audit. **Cell-plot-metrics tab** is now **grouped by
+category** (Shape & state / Motion & dynamics / Neighbours & contact / Fluorescence
+per channel) with headers, instead of a flat 30-checkbox grid — much easier to scan.
+New **Analysis parameters** tab (`compare_tables.ANALYSIS_PARAMS`) exposes the
+previously-hardcoded tunables: **neighbour radius** (µm), **contact gap tolerance**
+(px) and **extensive-contact threshold**. `apply_analysis_params` writes them onto the
+analysis module globals (`neighbors.DEFAULT_RADIUS_UM`, `contacts.DEFAULT_GAP_PX`,
+`EXTENSIVE_FRAC`), and the affected leaf functions (`frame_nn`, `frame_contacts` /
+`frame_interfaces` + the contact wrappers, `cell_frame_table`'s nn) now read those
+globals **at call time** (sentinel `None` defaults) — so a change applies uniformly to
+the comparison (recompute; folded into the cache key via `analysis_params_tag`) *and*
+the interactive overlay / colour-by / cell-info (the viewer clears its contact memo +
+redraws). Applied at viewer startup so saved values take effect. Tests +1. `pytest`
+**120 passed**; smoke green; all files < 500 (`compare_window` 498).
+
+---
+
 ## 2026-06-16 — Comparison completeness: everything in the main GUI is now comparable
 
 Audit found three main-GUI metric families that never reached the comparison. Closed:

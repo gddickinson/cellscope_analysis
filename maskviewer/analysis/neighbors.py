@@ -12,13 +12,15 @@ import numpy as np
 DEFAULT_RADIUS_UM = 50.0
 
 
-def frame_nn(cys, cxs, scale=1.0, radius=DEFAULT_RADIUS_UM):
+def frame_nn(cys, cxs, scale=1.0, radius=None):
     """Per-cell nearest-neighbour distance + neighbour count for one frame.
 
     ``cys`` / ``cxs`` are centroid row/col arrays (px); distances are returned in
     scaled units (µm when ``scale`` is µm/px). ``nn_dist`` is NaN and the count 0
-    when there are fewer than two cells.
+    when there are fewer than two cells. ``radius=None`` reads the (configurable)
+    module-level ``DEFAULT_RADIUS_UM`` at call time so a GUI setting applies.
     """
+    radius = DEFAULT_RADIUS_UM if radius is None else radius
     cys = np.asarray(cys, float) * scale
     cxs = np.asarray(cxs, float) * scale
     n = cys.size
