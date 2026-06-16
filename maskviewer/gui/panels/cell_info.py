@@ -10,6 +10,12 @@ view with the diffusion-exponent fit.
 Which metrics are computed + offered is controlled by the Config ▸ Cell plot
 metrics menu (the panel owns the enabled set, persisted via QSettings); changing
 one recomputes the selected cell and updates this plot menu immediately.
+
+Per-cell results are memoised, so revisiting a cell is instant. **Precompute all
+cells** computes every cell up front (off the GUI thread, with the status-bar
+progress + ETA) so switching between cells to compare them has no recompute lag.
+The cache is keyed by the recording + the enabled-metric set and drops itself
+when either changes.
 """
 from __future__ import annotations
 
@@ -19,6 +25,7 @@ from PyQt5 import QtCore, QtWidgets
 
 from ...analysis import cell_metrics, motion, metric_docs, lineage
 from ..plot_export import save_plot
+from ..task_runner import AsyncComputeMixin
 
 _MSD = "MSD (log-log)"
 _MSD_LIN = "MSD (linear)"
@@ -26,13 +33,16 @@ _AUTO = "Direction autocorrelation"
 _NN = {"nn_dist", "n_neighbors"}
 
 
-class CellInfoPanel(QtWidgets.QWidget):
+class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.cell_id = 0
         self._cft = {}
         self._dt = None
         self._ctx = None                       # (labels, um, dt, recording)
+        self._cache = {}                       # cell_id -> cft (so revisits are instant)
+        self._cache_sig = None                 # invalidates the cache on ctx/metric change
+        self._precomputed = False
         self.available = []                    # selectable metric keys
         self.neighbor_provider = None          # callable -> {cid:(T,2)} | None
         self.shape_mode_provider = None        # callable -> shape-mode model | None
@@ -77,6 +87,19 @@ class CellInfoPanel(QtWidgets.QWidget):
         mrow.addWidget(self.metric, 1)
         mrow.addWidget(self.save_btn)
         lay.addLayout(mrow)
+
+        self.precompute_btn = QtWidgets.QPushButton("Precompute all cells")
+        self.precompute_btn.setToolTip(
+            "Compute every cell's metrics now (with the current Cell-plot-metrics "
+            "selection) so switching between cells to compare them is instant. "
+            "Re-run after enabling more metrics.")
+        self.precompute_btn.clicked.connect(self.precompute_all)
+        self.cache_label = QtWidgets.QLabel("")
+        self.cache_label.setStyleSheet("color: gray;")
+        prow = QtWidgets.QHBoxLayout()
+        prow.addWidget(self.precompute_btn)
+        prow.addWidget(self.cache_label, 1)
+        lay.addLayout(prow)
         lay.addWidget(self.plot)
 
     # -- config ----------------------------------------------------------
@@ -95,31 +118,113 @@ class CellInfoPanel(QtWidgets.QWidget):
         else:
             self._enabled.discard(key)
         self._settings.setValue("cell_metrics_enabled", sorted(self._enabled))
+        self._invalidate_cache()               # cached cfts are now stale
         if self._ctx and self.cell_id:
             self._compute()                    # recompute + re-list immediately
 
     # -- data ------------------------------------------------------------
+    def set_context(self, labels, um_per_px=None, dt_min=None, recording=None):
+        """Give the panel the recording's data without selecting a cell, so
+        **Precompute all cells** works before anything is clicked. Invalidates the
+        per-cell cache when the recording changes."""
+        ctx = (labels, um_per_px, dt_min, recording)
+        if self._cache_key(ctx, self.enabled()) != self._cache_sig:
+            self._invalidate_cache()
+        self._dt = dt_min
+        self._ctx = ctx
+
     def set_cell(self, cell_id, labels, um_per_px=None, dt_min=None, recording=None):
         if not cell_id:
             return self.clear_cell()
         self.cell_id = int(cell_id)
-        self._dt = dt_min
-        self._ctx = (labels, um_per_px, dt_min, recording)
+        self.set_context(labels, um_per_px, dt_min, recording)
         self._compute()
 
-    def _compute(self):
-        labels, um, dt, rec = self._ctx
-        want = self.enabled()
+    def _cache_key(self, ctx, want):
+        """Signature that must hold for a cached cft to stay valid."""
+        labels, um, dt, rec = ctx
+        return (id(labels), um, dt, id(rec), tuple(sorted(want)))
+
+    def _invalidate_cache(self):
+        self._cache.clear()
+        self._cache_sig = None
+        self._precomputed = False
+        self._update_cache_label()
+
+    def _update_cache_label(self):
+        self.cache_label.setText(
+            f"✓ {len(self._cache)} cells cached — switching is instant"
+            if self._precomputed else "")
+
+    def _providers(self, want):
+        """Fetch the neighbour-history / shape-model inputs (on the GUI thread)
+        only when an enabled metric needs them."""
         nh = self.neighbor_provider() if (self.neighbor_provider
                                           and _NN & set(want)) else None
         sm = self.shape_mode_provider() if (self.shape_mode_provider
                                             and "shape_mode" in want) else None
-        self._cft = cell_metrics.cell_frame_table(
-            labels, self.cell_id, um, dt, recording=rec, metrics=want,
+        return nh, sm
+
+    def _make_cft(self, cell_id, ctx, want, nh, sm):
+        """Pure per-cell compute — safe to call off the GUI thread (numpy only)."""
+        labels, um, dt, rec = ctx
+        return cell_metrics.cell_frame_table(
+            labels, cell_id, um, dt, recording=rec, metrics=want,
             neighbor_history=nh, shape_model=sm)
+
+    def _compute(self):
+        want = self.enabled()
+        sig = self._cache_key(self._ctx, want)
+        if sig != self._cache_sig:             # ctx/metrics changed → drop cache
+            self._cache.clear()
+            self._cache_sig = sig
+            self._precomputed = False
+            self._update_cache_label()
+        cft = self._cache.get(self.cell_id)
+        if cft is None:                        # cache miss → compute + memoise
+            nh, sm = self._providers(want)
+            cft = self._make_cft(self.cell_id, self._ctx, want, nh, sm)
+            self._cache[self.cell_id] = cft
+        self._cft = cft
         self.title.setText(f"Cell {self.cell_id}")
         self._update_info()
         self._rebuild_combo()
+
+    def precompute_all(self):
+        """Compute every cell's metrics up front (off-thread, with the status-bar
+        progress + ETA) so subsequent cell switches are instant lookups."""
+        if not self._ctx or self._ctx[0] is None:
+            self.cache_label.setText("Load a recording first.")
+            return
+        ctx = self._ctx
+        want = self.enabled()
+        sig = self._cache_key(ctx, want)
+        nh, sm = self._providers(want)
+        ids = [int(c) for c in np.unique(ctx[0]) if c > 0]
+        if not ids:
+            self.cache_label.setText("No cells to precompute.")
+            return
+
+        def work(progress_cb):
+            out = {}
+            for i, cid in enumerate(ids):
+                out[cid] = self._make_cft(cid, ctx, want, nh, sm)
+                if progress_cb:
+                    progress_cb(i + 1, len(ids))
+            return out
+
+        def apply(cache):
+            self._cache = cache
+            self._cache_sig = sig
+            self._precomputed = True
+            self._update_cache_label()
+            if self.cell_id in cache:          # refresh the open cell from the cache
+                self._cft = cache[self.cell_id]
+                self._update_info()
+                self._rebuild_combo()
+
+        self.cache_label.setText(f"Precomputing {len(ids)} cells…")
+        self._dispatch("Cell info (all cells)", work, apply)
 
     def _update_info(self):
         s = self._cft.get("series", {})
@@ -169,9 +274,11 @@ class CellInfoPanel(QtWidgets.QWidget):
         self.marker.setValue(t * self._dt if self._dt else t)
 
     def clear_cell(self):
+        # Deselect only — keep the data context + precomputed cache so a misclick
+        # doesn't discard a precompute. The cache is dropped when the recording
+        # (or the enabled metric set) changes, via the signature check.
         self.cell_id = 0
         self._cft = {}
-        self._ctx = None
         self.title.setText("No cell selected")
         self.info.setText("Click a cell in the view to inspect it.")
         self.curve.setData([], [])
