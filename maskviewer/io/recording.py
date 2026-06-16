@@ -20,6 +20,10 @@ from dataclasses import dataclass, field
 import numpy as np
 import tifffile
 
+# tifffile labels position / scene dimensions R (region), I, Q, S(eries) — any of
+# these on a series means the file is part of a multi-position acquisition.
+_POSITION_AXES = "RIQ"
+
 
 @dataclass
 class Recording:
@@ -130,11 +134,81 @@ def _normalise_axes(arr: np.ndarray) -> np.ndarray:
     raise ValueError(f"unexpected recording ndim={arr.ndim} (shape {arr.shape})")
 
 
+def planes_to_tcyx(planes, size_c, size_t, size_z=1, c_fast=True) -> np.ndarray:
+    """Reshape one position's physical planes ``(n, H, W)`` → ``(T, C, H, W)``.
+
+    `c_fast` is the page-order convention: True (Micro-Manager / OME ``XYCZT``)
+    means the channel varies fastest, so plane index = c + C·(z + Z·t); False
+    means time varies fastest. Any Z is folded into C deterministically (these
+    recordings are Z=1). Pure + testable — no TIFF object needed."""
+    planes = np.asarray(planes)
+    n, H, W = planes.shape
+    size_z = size_z or 1
+    size_c = size_c or 1
+    size_t = size_t or (n // max(size_c * size_z, 1))
+    if size_c * size_t * size_z != n:
+        raise ValueError(
+            f"plane count {n} != C·Z·T = {size_c}·{size_z}·{size_t}; this looks "
+            f"like a single file holding multiple positions, which is not "
+            f"supported (expected one position per file)")
+    if c_fast:                              # standard MM: C varies faster than T
+        arr = planes.reshape(size_t, size_z * size_c, H, W)
+    else:                                   # T varies faster than C
+        arr = planes.reshape(size_z * size_c, size_t, H, W).swapaxes(0, 1)
+    return arr
+
+
+def _looks_multiposition(series) -> bool:
+    """True for a multi-position acquisition series (a position/scene axis or
+    >4 dims) — the file's own pages are then just one of those positions."""
+    axes = getattr(series, "axes", "") or ""
+    return getattr(series, "ndim", 0) >= 5 or any(a in axes for a in _POSITION_AXES)
+
+
+def _read_single_position(tf: "tifffile.TiffFile") -> np.ndarray:
+    """Extract THIS file's single position from a multi-position OME-TIFF.
+
+    Micro-Manager writes one physical file per stage position, yet each file's
+    embedded OME-XML describes the *whole* acquisition (every position) — so the
+    naive read reports a phantom ``(R, T, C, H, W)`` stack the viewer rejects.
+    The file's own pages are exactly one position; read just those and reshape
+    to ``(T, C, H, W)``. Sibling-position files are never opened.
+
+    Dimensions come from the (reliable) series axes/shape; in numpy axis order
+    the later of C/T is the faster-varying plane axis. MM ``Summary.Channels``
+    is the fallback channel count when the series lacks a C axis."""
+    series = tf.series[0]
+    axes, shape = series.axes or "", series.shape
+
+    def _dim(letter, default=None):
+        return shape[axes.index(letter)] if letter in axes else default
+
+    size_c, size_t, size_z = _dim("C"), _dim("T"), _dim("Z", 1)
+    if "C" in axes and "T" in axes:
+        c_fast = axes.index("C") > axes.index("T")
+    else:
+        c_fast = True
+    if not size_c:
+        mm = (getattr(tf, "micromanager_metadata", None) or {}).get("Summary", {})
+        size_c = mm.get("Channels")
+    planes = np.stack([p.asarray() for p in tf.pages])          # (n_local, H, W)
+    return planes_to_tcyx(planes, size_c, size_t, size_z, c_fast)
+
+
 def load_recording(tif_path: str) -> Recording:
-    """Read a `.ome.tif` + sidecar into a `Recording`."""
+    """Read a `.ome.tif` + sidecar into a `Recording`.
+
+    Handles both clean per-recording TIFFs and **raw multi-position
+    Micro-Manager OME-TIFFs** (each physical file = one stage position, but its
+    OME-XML names the whole acquisition) — the latter are read down to their own
+    single position so masks still align."""
     if not os.path.exists(tif_path):
         raise FileNotFoundError(tif_path)
-    arr = _normalise_axes(np.asarray(tifffile.imread(tif_path)))
+    with tifffile.TiffFile(tif_path) as tf:
+        series = tf.series[0]
+        arr = (_read_single_position(tf) if _looks_multiposition(series)
+               else np.asarray(series.asarray()))
+    arr = _normalise_axes(arr)
     meta: dict = {}
     sc = _sidecar_path(tif_path)
     if sc:

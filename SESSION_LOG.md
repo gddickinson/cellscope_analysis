@@ -5,6 +5,40 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Load raw multi-position Micro-Manager OME-TIFFs directly
+
+**Why.** Deploying the IC295 project to another machine: the masks are tiny
+(~0.5 GB) but the recordings (~55 GB) already live on the pathaklab share — as
+**raw multi-position Micro-Manager OME-TIFFs**. Each physical
+`IC295__1_MMStack_<pos>.ome.tif` holds one stage position's pixels (291 pages =
+97 T × 3 C), yet its embedded OME-XML describes the *whole* 72-position
+acquisition, so `tifffile` reports a phantom `(72, 97, 3, 2048, 2048)` `RTCYX`
+stack the loader rejected (ndim 5). The clean single-position `_cache` copies the
+viewer used were made by `ic295_copy_from_lab.py` (byte copy + synthesized
+`.ome.json`) → `recompress_recordings.py` (lossless re-compress that rewrites
+single-position OME metadata).
+
+**Change (`maskviewer/io/recording.py`).** `load_recording` now opens via
+`TiffFile`, and when the series looks multi-position (`_looks_multiposition`: a
+position/scene axis or >4 dims) calls `_read_single_position` — reads only the
+file's *own* pages (one position; sibling files never opened) and reshapes via
+the pure, tested `planes_to_tcyx(planes, C, T, Z, c_fast)`. Dimensions come from
+the reliable series axes/shape (`C`/`T`/`Z`); the later of C/T in numpy axis order
+is the faster-varying plane axis (MM is C-fast); MM `Summary.Channels` is the
+channel fallback. Single-position files keep the existing fast path. Verified
+**bit-identical** to the validated `_cache` copy for a real recording.
+
+**Deploy (`scripts/deploy_ic295_masks.py`).** Builds a viewer-discoverable
+`by_condition/<cond>/<label>/` tree at a destination: copies masks + provenance +
+sidecars (~0.5 GB) and a **relative** symlink to each recording already on the
+share (recordings not copied — read in place). Relative links → the tree resolves
+on any machine that mounts the share. Writes a ready `config.json`. Read-only on
+sources; idempotent + `--dry-run`.
+
+**Tests.** `tests/test_multiposition.py` — the C-fast / T-fast reshape, T-inference,
+the one-file-many-positions guard, and `_looks_multiposition` (pure; no real data).
+Existing IO tests still pass (single-position path unchanged).
+
 ## 2026-06-16 — Docs + in-app help sync
 
 Audited every doc / help surface against the recent features (state/shape params,
