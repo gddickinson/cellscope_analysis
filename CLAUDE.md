@@ -210,14 +210,20 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   + FOV stored on the `Project`, applied on read: `Recording.frame`/`aligned_channel`
   shift the channel, masks are FOV-cropped) and reach **both display and analysis**
   (the viewer + `compare.build_comparison(corrections=…)`). Raw files are untouched.
-- **Config ▸ Pixel size & time scale** (`gui/scale_dialog.py`): manually set the
-  **µm/px** and/or **min/frame** for when a file's metadata is lost or incorrect.
-  Stored on the `Project` (`px_size` / `frame_interval`), applied to **every**
-  recording (`Project.scaled`) — scale bar, all µm / µm-per-min metrics, and the
-  comparison (`build_comparison(scale_override=…)`); unset = use each file's own
-  metadata.
-- **Config ▸ Cell plot metrics**: choose which per-frame metrics are calculated
-  + offered in the Cell-Info plot menu (persisted; toggling recomputes at once).
+- **Config ▸ Settings…** (`Ctrl+,`, `gui/config_window.py`): one tabbed window for
+  all analysis settings —
+  - **Cell plot metrics**: choose which per-frame metrics are calculated + offered
+    in the Cell-Info plot menu (persisted; toggling recomputes at once).
+  - **Comparison analysis**: toggle which (heavier) analysis families the Comparison
+    window computes — **cell–cell contacts**, **state-segmented metrics**,
+    **solidity** (`compare_tables.COMPARE_OPTIONS`, QSettings-persisted, folded into
+    the compute cache key so a change recomputes). Skipping a family speeds the
+    per-recording pass + drops its columns.
+  - **Pixel size & time scale**: manually set **µm/px** and/or **min/frame** for when
+    a file's metadata is lost or incorrect. Stored on the `Project` (`px_size` /
+    `frame_interval`), applied to **every** recording (`Project.scaled`) — scale bar,
+    all µm / µm-per-min metrics, and the comparison
+    (`build_comparison(scale_override=…)`); unset = use each file's own metadata.
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
   throughout the GUI.
 - **Menus**: File (open recording / **open+save projects** / **Recent Projects** /

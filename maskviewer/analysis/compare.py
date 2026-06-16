@@ -34,13 +34,16 @@ def _resolve_channel(rec, channel):
 
 
 def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
-                     piezo_channel=None, corrections=None, scale_override=None):
+                     piezo_channel=None, corrections=None, scale_override=None,
+                     with_contacts=True, with_state_segmented=True):
     """(per_cell_df, msd_long_df, autocorr_long_df) across all entries with masks.
 
     per_cell_df: per-cell rows + recording + condition. msd_long_df / autocorr_long_df:
     per-recording ensemble MSD and **DiPer direction autocorrelation** (mean over
     cells) in long form (recording, condition, tau, msd|autocorr) up to ``max_lag``
-    lags. ``piezo_channel`` (channel name or index) → also add
+    lags. ``with_contacts`` / ``with_state_segmented`` / ``with_solidity`` gate the
+    optional (heavier) analysis families — the Config ▸ Comparison-analysis toggles.
+    ``piezo_channel`` (channel name or index) → also add
     per-cell **edge-movement ↔ fluorescence-intensity** columns (`edge_piezo_corr`
     = Pearson r, `edge_piezo_slope`, `piezo_protr_minus_retr`; via `edge_intensity`,
     the faithful ``cell_edge_analysis`` reproduction). ``progress_cb(done, total)``
@@ -71,7 +74,8 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
         labels = fov_mod.apply_fov(masks.labels, rec.fov) if rec.fov else masks.labels
         cents = cell_metrics.centroid_history(labels)         # reused below + by per_cell
         pf = exporters.per_frame_table(labels, rec.um_per_px,
-                                       rec.time_interval_min, with_solidity)
+                                       rec.time_interval_min, with_solidity,
+                                       with_contacts=with_contacts)
         df = exporters.per_cell_table(labels, rec.um_per_px,
                                       rec.time_interval_min, with_solidity,
                                       per_frame_df=pf, centroids=cents)
@@ -80,10 +84,11 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
         df = df.copy()
         # state-segmented metrics (rounded vs spread) — match the original
         # CellScope state-aware analysis; merged alongside the whole-track ones.
-        sdf = state_metrics.per_cell_state_metrics(
-            labels, rec.um_per_px, rec.time_interval_min, per_frame_df=pf)
-        if not sdf.empty:
-            df = df.merge(sdf, on="cell_id", how="left")
+        if with_state_segmented:
+            sdf = state_metrics.per_cell_state_metrics(
+                labels, rec.um_per_px, rec.time_interval_min, per_frame_df=pf)
+            if not sdf.empty:
+                df = df.merge(sdf, on="cell_id", how="left")
         ch = _resolve_channel(rec, piezo_channel)
         if ch is not None:                            # edge movement ↔ intensity
             image = rec.aligned_channel(ch)

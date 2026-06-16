@@ -5,6 +5,34 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — Unified Config window + comparison-analysis controls
+
+Consolidated the scattered Config dialogs into one tabbed **Config ▸ Settings…**
+(Ctrl+,) window (`gui/config_window.py`) with tabs: **Cell plot metrics**
+(checkboxes bound to `cell_info` — same state as before), **Comparison analysis**
+(NEW), and **Pixel size & time scale** (`scale_dialog` refactored to expose a
+reusable `ScalePanel(QWidget)`). The old per-item Config menu (metrics submenu +
+scale item) is replaced by the single Settings entry; Comparison-plot-options
+stays (a live style editor, also linked from the new window).
+
+**Comparison-analysis controls** (the requested "menu controls like cell plot
+metrics, but for the comparison"): `compare_tables.COMPARE_OPTIONS` +
+`compare_options()` define toggles for the optional/heavy analysis families —
+**Cell–cell contacts**, **State-segmented metrics**, **Solidity** — persisted in
+QSettings. `build_comparison` gained `with_contacts` / `with_state_segmented`
+(joining `with_solidity`); `ComputeWorker` passes the toggles; `per_frame_table`
+threads `with_contacts`. Disabling a family **skips its compute** (faster) and
+drops its columns. The compute cache key folds the active options
+(`…_lag30_ocoso.pkl`) so toggling triggers a recompute.
+
+Verified: ConfigWindow builds its 3 tabs (43 metric checkboxes); on 3 real
+recordings, full vs lean `build_comparison` = 14→0 contact cols and 14→0
+state-segmented cols; cache key changes with the toggles. `pytest` **94 passed**
+(+1 per_frame_table gate assertion); smoke green; `compare_window` held at 499,
+all files < 500.
+
+---
+
 ## 2026-06-15 — Contact overlay + contact-event dynamics (contacts follow-ups)
 
 The two follow-ups noted in the contacts PR.

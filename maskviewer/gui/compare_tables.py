@@ -19,6 +19,25 @@ from .. import project as projmod
 _STAT_COLS = ["arm", "contrast", "n ctrl", "n test", "p", "Bonferroni",
               "Cohen d", "OLS β", "OLS p"]
 
+# Comparison-analysis families the Config window toggles (what build_comparison
+# computes). Keyed for QSettings ("compare/opt_<key>"); the cache key folds them in,
+# so changing a toggle recomputes. Edge↔fluorescence is set by the channel selector.
+COMPARE_OPTIONS = [
+    ("contacts", "Cell–cell contacts", True,
+     "Per-cell contact fraction / count / interface / class + episode dynamics."),
+    ("state_segmented", "State-segmented metrics (rounded / spread)", True,
+     "Speed / persistence / area split by cell state — the CellScope reproduction."),
+    ("solidity", "Solidity (convex hull)", False,
+     "area ÷ convex-hull area per frame — slower (a SciPy hull per cell-frame)."),
+]
+
+
+def compare_options(settings=None) -> dict:
+    """``{key: bool}`` comparison-analysis toggles from QSettings (Config window)."""
+    s = settings or QtCore.QSettings("cellscope_analysis", "viewer")
+    return {k: s.value(f"compare/opt_{k}", d, type=bool)
+            for k, _label, d, _tip in COMPARE_OPTIONS}
+
 
 def corrections_tag(corrections, scale=None):
     """Short stable fingerprint of the project's pre-analysis corrections + manual
@@ -48,21 +67,26 @@ class ComputeWorker(QtCore.QObject):
     done = QtCore.pyqtSignal(object)
 
     def __init__(self, entries, max_lag=0, piezo_channel=None, corrections=None,
-                 scale_override=None):
+                 scale_override=None, options=None):
         super().__init__()
         self.entries = entries
         self.max_lag = max_lag
         self.piezo_channel = piezo_channel
         self.corrections = corrections or {}
         self.scale_override = scale_override
+        self.options = options or {}
         self.cancel = False
 
     def run(self):
+        o = self.options
         try:
             res = compare.build_comparison(
                 self.entries, max_lag=self.max_lag,
                 piezo_channel=self.piezo_channel, corrections=self.corrections,
                 scale_override=self.scale_override,
+                with_solidity=o.get("solidity", False),
+                with_contacts=o.get("contacts", True),
+                with_state_segmented=o.get("state_segmented", True),
                 progress_cb=lambda i, n: (self.progress.emit(i, n)
                                           or not self.cancel))
         except Exception as exc:                          # surface, don't crash
