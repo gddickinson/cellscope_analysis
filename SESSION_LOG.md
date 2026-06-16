@@ -5,6 +5,21 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR4: contact-inhibition of locomotion (CIL)
+
+New `analysis/cil.py` — the payoff of the contact tracking. `contact_locomotion`
+combines the per-frame contact state + partners with centroid velocities → per-cell:
+`speed_free` / `speed_contact` + `speed_ratio_contact` (contact ÷ free; <1 = slows on
+contact, the CIL signature), `delta_speed_onset` (event-triggered speed change as a
+contact forms), `velocity_alignment` (cosine with contacting neighbours' directions —
+collective migration), `n_contact_onsets`. Wired into `build_comparison(with_cil=…)`
+behind a new **Contact-inhibition (CIL)** analysis toggle (default off); metric_docs +
+tooltips. Real Pos60-DMSO: cells 7 & 11 slow on contact (ratio 0.72 / 0.81), cell 10
+co-migrates with its neighbour (alignment 0.69). Tests +2. `pytest` **111 passed**;
+all files < 500.
+
+---
+
 ## 2026-06-15 — PR3: stats power — FDR + bootstrap CI + cluster-robust cell-level test
 
 New `analysis/stats_extra.py` (dependency-free, np+scipy — the project stays

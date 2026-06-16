@@ -32,6 +32,9 @@ COMPARE_OPTIONS = [
     ("edge_dynamics", "Edge dynamics (protrusion / retraction / polarity)", False,
      "Per-cell membrane protrusion/retraction summary + events + front–rear "
      "polarity — slowest (a radial edge-velocity kymograph per cell)."),
+    ("cil", "Contact-inhibition of locomotion (CIL)", False,
+     "Per-cell speed free-vs-in-contact, speed change at contact onset, and "
+     "velocity alignment with contacting neighbours."),
 ]
 
 
@@ -91,6 +94,7 @@ class ComputeWorker(QtCore.QObject):
                 with_contacts=o.get("contacts", True),
                 with_state_segmented=o.get("state_segmented", True),
                 with_edge=o.get("edge_dynamics", False),
+                with_cil=o.get("cil", False),
                 progress_cb=lambda i, n: (self.progress.emit(i, n)
                                           or not self.cancel))
         except Exception as exc:                          # surface, don't crash

@@ -230,3 +230,37 @@ def test_cell_frame_table_contact_series():
     assert np.all(frac > 0.25)               # extensive interface every frame
     code, _ = out["series"]["contact_state_code"]
     assert np.all(code == contacts.CONTACT_CODE["extensive"])
+
+
+def test_cil_speed_free_vs_contact_and_alignment():
+    """A cell that moves fast while free then stops on contact reads
+    speed_ratio_contact < 1; an isolated cell has only speed_free."""
+    from maskviewer.analysis import cil
+    L = np.zeros((8, 60, 80), np.int32)
+    L[:, 20:35, 50:60] = 2                              # stationary block (cell 2)
+    # cell 1 block moves right (big steps) frames 0-4, then stops adjacent to cell 2
+    x0 = [5, 13, 21, 30, 38, 38, 38, 38]                # right edge col 49, adjacent to 50
+    for t in range(8):
+        L[t, 20:35, x0[t]:x0[t] + 12] = 1
+    out = cil.contact_locomotion(L, scale=1.0, dt_min=1.0)
+    assert out[1]["n_contact_onsets"] >= 1
+    assert np.isfinite(out[1]["speed_free"]) and np.isfinite(out[1]["speed_contact"])
+    assert out[1]["speed_contact"] < out[1]["speed_free"]    # stopped on contact
+    assert out[1]["speed_ratio_contact"] < 1.0
+    assert out[1]["delta_speed_onset"] < 0                   # slows as contact forms
+    # a lone cell → contact metrics NaN, 0 onsets
+    lone = np.zeros((5, 60, 60), np.int32)
+    lone[:, 10:20, 10:20] = 1
+    o2 = cil.contact_locomotion(lone)
+    assert o2[1]["n_contact_onsets"] == 0 and np.isnan(o2[1]["speed_ratio_contact"])
+
+
+def test_cil_table_and_alignment_range():
+    from maskviewer.analysis import cil
+    L = np.zeros((6, 60, 60), np.int32)
+    L[:, 10:24, 10:24] = 1
+    L[:, 10:24, 24:38] = 2                               # two touching cells
+    df = cil.contact_locomotion_table(L, um_per_px=0.5, dt_min=1.0)
+    assert list(df.columns)[0] == "cell_id" and "velocity_alignment" in df.columns
+    al = df["velocity_alignment"].dropna()
+    assert ((al >= -1.001) & (al <= 1.001)).all()

@@ -35,7 +35,8 @@ def _resolve_channel(rec, channel):
 
 def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
                      piezo_channel=None, corrections=None, scale_override=None,
-                     with_contacts=True, with_state_segmented=True, with_edge=False):
+                     with_contacts=True, with_state_segmented=True, with_edge=False,
+                     with_cil=False):
     """(per_cell_df, msd_long_df, autocorr_long_df) across all entries with masks.
 
     per_cell_df: per-cell rows + recording + condition. msd_long_df / autocorr_long_df:
@@ -89,6 +90,12 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
                 labels, rec.um_per_px, rec.time_interval_min, per_frame_df=pf)
             if not sdf.empty:
                 df = df.merge(sdf, on="cell_id", how="left")
+        if with_cil:                                  # contact-inhibition of locomotion
+            from . import cil
+            cldf = cil.contact_locomotion_table(labels, rec.um_per_px,
+                                                rec.time_interval_min)
+            if not cldf.empty:
+                df = df.merge(cldf, on="cell_id", how="left")
         ch = _resolve_channel(rec, piezo_channel)
         if ch is not None:                            # edge movement ↔ intensity
             image = rec.aligned_channel(ch)
