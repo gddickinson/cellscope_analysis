@@ -23,7 +23,8 @@ COLOR_BY = [
 ]
 OVERLAYS = [("scalebar", "Scale bar", True), ("info", "Frame / time", True),
             ("ids", "Cell IDs", False), ("trails", "Track trails", False),
-            ("colorbar", "Colour bar", True), ("divisions", "Divisions", False)]
+            ("colorbar", "Colour bar", True), ("divisions", "Divisions", False),
+            ("contacts", "Cell contacts", False)]
 
 
 class DisplayPanel(QtWidgets.QWidget):

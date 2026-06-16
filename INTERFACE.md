@@ -333,9 +333,13 @@ Read this before opening source files. Update it when modules change.
   centroid proximity): `frame_contacts` (per-cell contact fraction / count /
   interface length / class from boundary-pixel adjacency within `DEFAULT_GAP_PX`
   via a KD-tree), `classify_contact` → free / point / extensive (`CONTACT_CODE`,
-  `CONTACT_COLOR`, split on `EXTENSIVE_FRAC`), `contacts_over_time`,
-  `contact_summary` (per-cell time-in-class + means). Surfaced as per-frame plot
-  metrics, colour-by, CSV columns, and comparison readouts.
+  `CONTACT_COLOR`, split on `EXTENSIVE_FRAC`), `frame_interfaces` (contacting pixel
+  coords + class codes — for the **contacts overlay**), `contact_episodes`
+  (in-contact runs → formation/breakage events), `contacts_over_time`,
+  `contact_summary` (per-cell time-in-class + means + **episode dynamics**:
+  `n_contact_events`, `mean_contact_duration`, `contact_event_rate`). Surfaced as
+  per-frame plot metrics, colour-by, a canvas overlay, CSV columns, and comparison
+  readouts.
 - **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`

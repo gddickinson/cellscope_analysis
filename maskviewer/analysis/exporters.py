@@ -18,7 +18,7 @@ import os
 
 import numpy as np
 
-from . import label_stats, cell_metrics, motion, edge_dynamics
+from . import label_stats, cell_metrics, motion, edge_dynamics, contacts
 
 
 def per_frame_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
@@ -116,11 +116,23 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
             row["frac_rounded"] = float((cls == "rounded").sum() / n) if n else np.nan
             row["frac_spread"] = float((cls == "spread").sum() / n) if n else np.nan
         if "contact_state" in getattr(sub, "columns", []):   # time-in-contact-class
-            cs = sub["contact_state"].to_numpy()
+            ss_c = sub.sort_values("frame")
+            cs = ss_c["contact_state"].to_numpy()
             n = cs.size
             row["frac_in_contact"] = float((cs != "free").sum() / n) if n else np.nan
             row["frac_point_contact"] = float((cs == "point").sum() / n) if n else np.nan
             row["frac_extensive_contact"] = float((cs == "extensive").sum() / n) if n else np.nan
+            # contact-episode dynamics (formation/breakage frequency + duration)
+            n_ev, durs = contacts.contact_episodes(ss_c["frame"].to_numpy(), cs != "free")
+            row["n_contact_events"] = int(n_ev)
+            md = float(np.mean(durs)) if durs else 0.0
+            tot = n * (float(dt_min) if dt_min else 1.0)
+            if dt_min:
+                row["mean_contact_duration_min"] = md * float(dt_min)
+                row["contact_events_per_min"] = float(n_ev / tot) if tot else 0.0
+            else:
+                row["mean_contact_duration_frames"] = md
+                row["contact_events_per_frame"] = float(n_ev / tot) if tot else 0.0
         m = motion.motion_summary(cen * scale, dt_min)
         row[f"net_disp_{u}"] = m["net_disp"]
         row[f"total_path_{u}"] = m["total_path"]

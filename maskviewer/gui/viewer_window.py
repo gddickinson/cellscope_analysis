@@ -30,7 +30,7 @@ from .window_actions import WindowActionsMixin
 from .status_progress import StatusProgress
 from .task_runner import TaskRunner
 from . import colorby
-from ..analysis import label_stats, cell_metrics, metric_docs, lineage
+from ..analysis import label_stats, cell_metrics, metric_docs, lineage, contacts
 
 _RIGHT = QtCore.Qt.RightDockWidgetArea
 _BOTTOM = QtCore.Qt.BottomDockWidgetArea
@@ -380,9 +380,14 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                 p, c = d.get("parent_centroid"), d.get("daughter_centroid")
                 if d["frame"] == t and p and c:
                     division_links.append((tuple(p), tuple(c)))
+        contact_interfaces = None
+        if lab is not None and self.canvas.overlays.show["contacts"]:
+            contact_interfaces = contacts.frame_interfaces(
+                lab, self.recording.um_per_px or 1.0)
         self.canvas.overlays.update_overlay(
             info_text=self._info_text(t), centroids=centroids, history=history,
-            frame=t, selected=self.selected, bbox=bbox, division_links=division_links)
+            frame=t, selected=self.selected, bbox=bbox, division_links=division_links,
+            contact_interfaces=contact_interfaces)
 
     def _info_text(self, t):
         r = self.recording
