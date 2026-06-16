@@ -21,8 +21,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   gamma, colormap (LUT), invert, auto; per channel; **composite** multi-channel
   blend (DIC grey + SiR-actin Cy5 magenta).
 - **Colour cells by any metric** with a **units colour bar** (area, circularity,
-  speed, nearest-neighbour, **contact fraction / count / class**, shape mode, …);
-  per-frame state colouring.
+  speed, nearest-neighbour, **contact fraction / count / class**, shape mode,
+  track length, …); per-frame state colouring + a **mask source** mode (which
+  channel detected each cell — DIC / Cy5 / both, from the detection fusion).
 - **Cell–cell contact** — *where cells physically touch* (shared mask boundary),
   distinct from centroid proximity. Per frame each cell gets a **contact fraction**
   (share of its membrane engaged), interface length, contact count and a class —
@@ -37,15 +38,17 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
   metrics) + MSD (log/linear, α/D + Fürth persistence-time) + direction
   autocorrelation. **Zoom to Cell** (`Z`) frames the view on the selected cell —
   handy in a large sparse field of view.
-- **Membrane dynamics** — protrusion/retraction **kymograph** + a per-frame edge
-  map coloured by edge velocity, with event detection. With a **fluorescence
-  channel** (tagged **PIEZO1**, **SiR-actin**, or any signal), correlate **edge
-  movement ↔ fluorescence intensity** — at each edge point a rectangle reaches into
-  the cell and its mean intensity is plotted against the local protrusion/retraction
-  (scatter coloured by movement class, regression line, **Pearson r / R² / p**, plus
-  protrude-vs-retract means and a t-test/Mann–Whitney). A faithful reproduction of
-  the lab's `cell_edge_analysis` pipeline, adapted to closed tracked cells. Available
-  per cell and as a **cross-treatment comparison metric**.
+- **Membrane dynamics** — protrusion/retraction, **boundary radius** and
+  **edge-curvature** **kymographs** (+ matching per-frame edge maps coloured by edge
+  velocity / radius / curvature / intensity), with event detection. With a
+  **fluorescence channel** (tagged **PIEZO1**, **SiR-actin**, or any signal),
+  correlate **edge movement ↔ fluorescence intensity** — at each edge point a
+  rectangle reaches into the cell (configurable **positioning** — straight inward, or
+  flip/search to recover concave edges) and its mean intensity is plotted against the
+  local protrusion/retraction (scatter coloured by movement class, regression line,
+  **Pearson r / R² / p**, plus protrude-vs-retract means and a t-test/Mann–Whitney). A
+  faithful reproduction of the lab's `cell_edge_analysis` pipeline, adapted to closed
+  tracked cells. Available per cell and as a **cross-treatment comparison metric**.
 - **Pre-analysis: channel alignment & FOV** — DIC↔fluorescence channels are often
   offset by a small shift and recordings can carry black borders, both of which bias
   mask-relative sampling. **Analysis ▸ Channel Alignment & FOV** aligns a channel to a

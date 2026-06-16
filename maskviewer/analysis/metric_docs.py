@@ -140,6 +140,10 @@ EXTRA = {
     "speed_isolated / speed_crowded / frac_isolated": ("Contact effect on speed.",
         "Mean step speed split by neighbour count at the step (0 vs ≥1 neighbours), "
         "and the fraction of frames with no neighbour."),
+    "track_length": ("Track duration — how long the cell is tracked.",
+        "Number of frames the cell is present (= frames_tracked), × the frame interval "
+        "for minutes (track_length_min). Also a colour-by ('Track length') + a per-cell "
+        "comparison metric."),
     "track_quality": ("Composite 0–1 track-reliability score.",
         "0.5·frames-present + 0.3·(1 − area CV) + 0.2·(path / 50 µm)."),
     "area_stability": ("Area-jump QC.",
@@ -169,6 +173,11 @@ EXTRA = {
                       "mid-centroid ÷ interval (µm/min)."),
     "ruffling": ("Edge activity.",
                  "Mean over sectors of the temporal std of edge velocity."),
+    "curvature": ("Cell-edge curvature (1/µm; + convex / − concave).",
+                  "Per-sector boundary curvature from the polar boundary r(θ): "
+                  "(r²+2r'²−r·r'')/(r²+r'²)^1.5. Shown as the Edge Dynamics "
+                  "<i>Curvature kymograph</i> / per-frame edge map (red convex, blue "
+                  "concave) — protrusion tips are sharply convex, indentations concave."),
     "edge_front_velocity": ("Edge velocity at the cell front (migration direction).",
         "Mean edge velocity in the forward cone after rotating each frame-pair's "
         "sectors to the cell's migration direction (+protrusion; µm/min). Includes "
