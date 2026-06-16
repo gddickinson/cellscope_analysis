@@ -246,3 +246,28 @@ def test_forest_data_ranks_by_effect_size():
     assert fd[0]["metric"] == "big"                      # largest |d| first
     assert abs(fd[0]["d"]) > abs(fd[-1]["d"])
     assert all("lo" in r and "hi" in r and "p" in r for r in fd)
+
+
+def test_analysis_params_apply_and_tag(tmp_path):
+    from PyQt5 import QtCore
+    from maskviewer.gui.compare_tables import (apply_analysis_params,
+                                               analysis_params_tag, analysis_params)
+    from maskviewer.analysis import neighbors, contacts
+    s = QtCore.QSettings(str(tmp_path / "a.ini"), QtCore.QSettings.IniFormat)
+    assert analysis_params_tag(s) == ""                 # defaults → no cache tag
+    assert analysis_params(s)["nn_radius"] == 50.0
+    s.setValue("analysis/contact_gap", 3.0)
+    s.setValue("analysis/nn_radius", 120.0)
+    try:
+        apply_analysis_params(s)
+        assert contacts.DEFAULT_GAP_PX == 3.0 and neighbors.DEFAULT_RADIUS_UM == 120.0
+        assert analysis_params_tag(s) != ""             # non-default → recompute key
+        # a leaf function with no explicit arg now reads the live global
+        L = np.zeros((30, 30), np.int32)
+        L[5:25, 5:14] = 1
+        L[5:25, 16:25] = 2                              # 2-px background gap
+        assert contacts.frame_contacts(L)[1]["n_contacts"] == 1   # detected at gap 3
+    finally:
+        contacts.DEFAULT_GAP_PX = 1.5
+        contacts.EXTENSIVE_FRAC = 0.25
+        neighbors.DEFAULT_RADIUS_UM = 50.0

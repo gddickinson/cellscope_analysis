@@ -204,9 +204,12 @@ Read this before opening source files. Update it when modules change.
   a live overlay preview (reference grey + align-channel magenta + FOV box), and
   Apply → writes a non-destructive correction onto the project (`on_apply`).
 - **config_window.py** — `ConfigWindow(QDialog)`: the unified **Config ▸ Settings…**
-  (Ctrl+,) tabbed window — **Cell plot metrics** (checkboxes bound to `cell_info`),
-  **Comparison analysis** (toggles `compare_tables.COMPARE_OPTIONS` → QSettings → what
-  `build_comparison` computes) and **Pixel size & time scale** (embeds `ScalePanel`).
+  (Ctrl+,) tabbed window — **Cell plot metrics** (checkboxes bound to `cell_info`,
+  **grouped by category**), **Comparison analysis** (toggles
+  `compare_tables.COMPARE_OPTIONS` → QSettings → what `build_comparison` computes),
+  **Analysis parameters** (`ANALYSIS_PARAMS` spinboxes → `apply_analysis_params` sets
+  the analysis module globals: NN radius / contact gap / extensive threshold) and
+  **Pixel size & time scale** (embeds `ScalePanel`).
 - **scale_dialog.py** — `ScalePanel(QWidget)` (the override controls, reused by the
   Config window's scale tab) + `ScaleDialog(QDialog)` wrapping it: **pixel size & time
   scale** — checkboxes + spinboxes for µm/px + min/frame, prefilled from the project

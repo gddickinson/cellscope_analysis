@@ -331,7 +331,7 @@ def metric_label(key: str, um_per_px=None) -> str:
 def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
                      dt_min=None, recording=None, with_solidity=True,
                      metrics=None, neighbor_history=None,
-                     nn_radius=_nbr.DEFAULT_RADIUS_UM, shape_model=None) -> dict:
+                     nn_radius=None, shape_model=None) -> dict:
     """Rich per-frame metrics for ONE cell (for the cell-info panel / plots).
 
     Returns {frame, time_min, series{name: (values, ylabel)}, summary}. ``series``
@@ -345,6 +345,7 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
     returned, so unselected/expensive ones (solidity, intensity, nn) are skipped.
     """
     labels = np.asarray(labels)
+    nn_radius = _nbr.DEFAULT_RADIUS_UM if nn_radius is None else nn_radius
     T = labels.shape[0]
     H, W = labels.shape[-2], labels.shape[-1]
     scale = float(um_per_px) if um_per_px else None

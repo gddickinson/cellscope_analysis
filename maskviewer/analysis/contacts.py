@@ -44,6 +44,14 @@ CONTACT_COLOR = {"free": (130, 130, 130), "point": (31, 119, 180),
                  "extensive": (214, 39, 40)}
 
 
+def _resolve(max_gap_px, extensive_frac, min_px):
+    """Fill ``None`` args from the (GUI-configurable) module-level defaults, read at
+    call time so a Config ▸ Analysis-parameters change applies everywhere."""
+    return (DEFAULT_GAP_PX if max_gap_px is None else max_gap_px,
+            EXTENSIVE_FRAC if extensive_frac is None else extensive_frac,
+            MIN_CONTACT_PX if min_px is None else min_px)
+
+
 def classify_contact(max_partner_frac, contact_px, extensive_frac=EXTENSIVE_FRAC,
                      min_px=MIN_CONTACT_PX) -> str:
     """Classify a cell's contact state from its largest neighbour interface.
@@ -127,12 +135,14 @@ def _aggregate(ids, blab, pix_partners, bcount, scale, extensive_frac, min_px):
     return out
 
 
-def frame_contacts(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
-                   extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX) -> dict:
+def frame_contacts(lab, scale=1.0, max_gap_px=None,
+                   extensive_frac=None, min_px=None) -> dict:
     """``{cell_id: record}`` of contact metrics for every cell in one frame.
 
     ``scale`` is µm/px (1.0 → px). Every present cell gets a record (``free``
-    with zeros when it touches nothing)."""
+    with zeros when it touches nothing). ``None`` gap/threshold args use the
+    configurable module defaults."""
+    max_gap_px, extensive_frac, min_px = _resolve(max_gap_px, extensive_frac, min_px)
     lab = np.asarray(lab)
     ids = [int(i) for i in np.unique(lab) if i > 0]
     ys, xs, blab, pix_partners = _contact_pixels(lab, max_gap_px)
@@ -140,11 +150,12 @@ def frame_contacts(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
                       scale, extensive_frac, min_px)
 
 
-def frame_interfaces(lab, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
-                     extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX):
+def frame_interfaces(lab, scale=1.0, max_gap_px=None,
+                     extensive_frac=None, min_px=None):
     """``(ys, xs, codes)`` of the contacting boundary pixels for one frame — for the
     contact overlay. ``codes`` is the owning cell's contact-class code (1 = point,
     2 = extensive); pixels of cells classed ``free`` are dropped."""
+    max_gap_px, extensive_frac, min_px = _resolve(max_gap_px, extensive_frac, min_px)
     lab = np.asarray(lab)
     ids = [int(i) for i in np.unique(lab) if i > 0]
     ys, xs, blab, pix_partners = _contact_pixels(lab, max_gap_px)
@@ -180,8 +191,8 @@ def contact_episodes(frames, in_contact):
     return len(durations), durations
 
 
-def contacts_over_time(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
-                       extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX,
+def contacts_over_time(labels, scale=1.0, max_gap_px=None,
+                       extensive_frac=None, min_px=None,
                        progress_cb=None) -> list:
     """Per-frame list of ``frame_contacts`` dicts across a ``(T, H, W)`` stack."""
     labels = np.asarray(labels)
@@ -193,8 +204,8 @@ def contacts_over_time(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
     return out
 
 
-def contact_summary(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
-                    extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX,
+def contact_summary(labels, scale=1.0, max_gap_px=None,
+                    extensive_frac=None, min_px=None,
                     per_frame=None, dt_min=None) -> dict:
     """``{cell_id: summary}`` over each track's present frames.
 
@@ -237,8 +248,8 @@ def contact_summary(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
     return summary
 
 
-def contact_pairs(labels, scale=1.0, dt_min=None, max_gap_px=DEFAULT_GAP_PX,
-                  extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX,
+def contact_pairs(labels, scale=1.0, dt_min=None, max_gap_px=None,
+                  extensive_frac=None, min_px=None,
                   per_frame=None) -> list:
     """**Which cells touch, when, and how much** — one record per unordered cell pair
     that is in contact in ≥1 frame.

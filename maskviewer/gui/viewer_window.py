@@ -110,6 +110,8 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self._task.progress.connect(self.busy.update)
 
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
+        from .compare_tables import apply_analysis_params
+        apply_analysis_params(self._settings)     # configured NN / contact params → globals
         build_menubar(self)                       # reads _settings for Recent Projects
         self._wire()
         self._default_state = self.saveState()

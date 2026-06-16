@@ -39,7 +39,7 @@ def _unit_steps(cen: np.ndarray):
 
 
 def contact_locomotion(labels, scale=1.0, dt_min=None,
-                       max_gap_px=_contacts.DEFAULT_GAP_PX, window=DEFAULT_WINDOW,
+                       max_gap_px=None, window=DEFAULT_WINDOW,
                        per_frame=None) -> dict:
     """``{cell_id: CIL readouts}`` for one recording (see module docstring)."""
     labels = np.asarray(labels)
