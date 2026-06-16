@@ -58,10 +58,17 @@ def track_table(labels, um_per_px=None, dt_min=None):
 
 def contact_pairs_table(labels, um_per_px=None, dt_min=None):
     """DataFrame: one row per cell **pair** that touches — which cells, when
-    (first/last frame, frames-in-contact, episodes) and the contact degree."""
+    (first/last frame, frames-in-contact, episodes) and the contact degree.
+
+    Always carries the full column header (even with no contacts) so the CSV is
+    readable when a recording has 0 cell pairs (e.g. a single-cell crop)."""
     import pandas as pd
     scale = float(um_per_px) if um_per_px else 1.0
-    return pd.DataFrame(contacts.contact_pairs(np.asarray(labels), scale, dt_min))
+    cols = ["cell_a", "cell_b", "first_frame", "last_frame", "n_frames_in_contact",
+            "n_episodes", "mean_episode_min" if dt_min else "mean_episode_frames",
+            "mean_contact_fraction", "max_contact_fraction"]
+    return pd.DataFrame(contacts.contact_pairs(np.asarray(labels), scale, dt_min),
+                        columns=cols)
 
 
 def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
