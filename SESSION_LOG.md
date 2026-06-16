@@ -5,6 +5,33 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Fix slow cell switching: edge dynamics now computes lazily
+
+**Report.** After precomputing Cell Info, switching cells was *still* slow.
+**Root cause (not Cell Info):** `select_cell` calls `edge.set_cell` on every
+click, which eagerly computes the velocity/radius/curvature kymographs + the
+fluorescence rectangle sampling — **even though the right-hand docks are tabbed,
+so the Edge dock is hidden when the user is on the Cell Info tab** (and
+`select_cell` even raises Cell Info to the front). Measured ~1.5 s/cell on a
+1024²×30 synthetic (≈19× the ~80 ms Cell-Info cost); far worse on the real
+2048²×97 data. The Cell-Info cache was working; the edge compute was the freeze.
+
+**Fix (`gui/panels/edge_panel.py`).** The heavy per-cell compute is now **lazy**:
+`set_cell` stores the request (`_pending`) and only computes when the dock is the
+visible tab — visibility tracked via `showEvent`/`hideEvent` (which fire on tab
+switches; `isVisible()` is unreliable under the offscreen platform). `showEvent`
+computes the pending cell. So clicking cells while on the Cell Info tab no longer
+pays for edge dynamics → instant (with the Cell-Info cache). `_on_fluor` and
+`clear_cell` respect the same gating. To stay < 500 lines, the panel's view layer
+(`_replot` + all `_draw_*` + `_export`) was split into
+**`gui/panels/edge_render.py` `EdgeRenderMixin`** (mixed into `EdgePanel`); both
+files are now ~270 lines.
+
+**Tests.** `tests/test_edge_panel_lazy.py` — defers while hidden, computes on
+show, re-defers after hide, `clear_cell` resets, and every render mode draws after
+the split. Full suite 162 passed; a headless ViewerWindow smoke confirms
+click-while-hidden defers and showing the Edge tab computes.
+
 ## 2026-06-16 — Cell Info: auto-precompute-on-load toggle (Config)
 
 Follow-up to the precompute feature: a **Config ▸ Cell plot metrics** checkbox
