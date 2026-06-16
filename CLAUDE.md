@@ -42,6 +42,13 @@ where the data came from. Quick summary below.
   carries `um_per_px`, `time_interval_min`, `channel_names` (e.g.
   `["Cy5", "DIC 10x", "None"]`); when that metadata is missing or wrong, set it
   manually via **Config ▸ Pixel size & time scale…** (applies to all recordings).
+  **Raw multi-position Micro-Manager OME-TIFFs** load directly too: each physical
+  file holds one stage position but its OME-XML names the whole acquisition (a
+  phantom `(R,T,C,H,W)` stack), so the loader reads just that file's own pages →
+  `(T,C,H,W)` (`recording._read_single_position` / `planes_to_tcyx`) — letting the
+  viewer open lab-share originals in place without pre-converting them. Deploy a
+  masks-only project beside such originals with `scripts/deploy_ic295_masks.py`
+  (copies masks + relative symlinks to the recordings; recordings not duplicated).
 - **Masks** `pipeline_results/masks.npz`: key `labels`, shape `(T, H, W)`
   int32. `0` = background; a positive integer is one cell, **consistent
   across frames** (same ID = same tracked cell over time).

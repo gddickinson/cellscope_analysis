@@ -23,6 +23,12 @@ Read this before opening source files. Update it when modules change.
 - **scripts/link_data.py** — populates the gitignored `data/` folder with
   symlinks into a CellScope tree (`by_condition`, flat `recordings/`,
   `results/`, `gt/`). Convenience browser + viewer `data_root`. Idempotent.
+- **scripts/deploy_ic295_masks.py** — builds a **masks-only** `by_condition`
+  tree at a destination (e.g. on a lab share): copies each recording's masks +
+  provenance + sidecars and a **relative symlink** to the original recording
+  already on the share (recordings are *not* copied — the loader reads the
+  multi-position originals in place). Writes a ready `config.json`. Read-only on
+  sources; idempotent + `--dry-run`.
 - **scripts/smoke_compare_window.py** — headless (QT offscreen) smoke for the
   Comparison window + Project wiring: drives every tab / dist-kind / OLS / stats
   table on fake multi-arm + single-arm data, checks the editable control combo,
@@ -100,7 +106,12 @@ Read this before opening source files. Update it when modules change.
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
   `(T,C,H,W)`, `channel_names`, `um_per_px`, `time_interval_min`, `.frame(t,c)`).
   Reads the `.ome.json` sidecar; coerces 2-D/3-D inputs to `(T,C,H,W)` so **1-, 2-
-  or N-channel** recordings all work. Non-destructive **corrections**:
+  or N-channel** recordings all work. Also loads **raw multi-position
+  Micro-Manager OME-TIFFs** directly: such a file's OME-XML names the whole
+  acquisition (a phantom `(R,T,C,H,W)` stack), so `_read_single_position` reads only
+  the file's own pages (= one stage position) and `planes_to_tcyx` reshapes them to
+  `(T,C,H,W)` — letting the viewer open the lab-share originals in place, no
+  pre-conversion. Non-destructive **corrections**:
   `channel_shifts` (channel→(dy,dx)) + `fov` ((y0,y1,x0,x1)) — `frame` /
   `aligned_channel(c)` apply the shift on read; `apply_correction(rec, corr)` sets
   them from a project entry. `channel_names_of(tif)` reads just the sidecar's
