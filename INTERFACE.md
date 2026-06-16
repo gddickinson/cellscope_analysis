@@ -328,6 +328,10 @@ Read this before opening source files. Update it when modules change.
   **membrane-score**). `metrics=`
   selects which series to compute. `available_frame_metrics` / `metric_label` /
   `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
+- **stats_extra.py** — extra comparison statistics (dependency-free, np+scipy):
+  `benjamini_hochberg` (FDR q-values), `bootstrap_ci` (percentile CI of any
+  statistic, e.g. Cohen's d), `cluster_robust_p` (cell-level group effect with
+  **recording-clustered** robust SE — a statsmodels-free random-intercept stand-in).
 - **motion.py** — centroid-track motion: `instantaneous_speed`,
   `displacement_metrics` (net/path/straightness/speed), `direction_autocorrelation`
   + `persistence` (lag-1, speed-unbiased), `msd` + `fit_msd` (D, α exponent),
@@ -421,8 +425,9 @@ Read this before opening source files. Update it when modules change.
   τ-bin + max-lag display controls),
   `ols_adjusted` (per-arm covariate-adjusted treatment effect),
   `ranked_group_comparisons` (**every** group pair for one metric ranked by p —
-  recording = unit, Mann-Whitney U + Cohen d + Bonferroni — the Stats-tab Ranked
-  report), `per_condition_summary` (per-group n / mean / SEM / median over recordings —
+  recording = unit, Mann-Whitney U + Cohen d + Bonferroni + **BH FDR q** +
+  **bootstrap CI** + **cell-level cluster-robust p** (via `stats_extra`) — the
+  Stats-tab Ranked report), `per_condition_summary` (per-group n / mean / SEM / median over recordings —
   the Data tab), `multivariate_contrasts` (per-arm **PERMANOVA p + leave-one-
   recording-out AUC** over all metrics, reusing `multivariate.py` — the
   multivariate phenotype in the GUI), `save_results` / `load_results` (pickle the

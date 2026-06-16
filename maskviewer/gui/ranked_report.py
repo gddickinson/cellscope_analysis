@@ -14,10 +14,11 @@ from PyQt5 import QtCore, QtWidgets
 
 from ..analysis import metric_docs
 
-_COLS = ["group A", "group B", "n A", "n B", "mean A", "mean B",
-         "p", "Bonferroni", "Cohen d", "sig"]
+_COLS = ["group A", "group B", "n A", "n B", "mean A", "mean B", "p", "Bonferroni",
+         "q (FDR)", "Cohen d", "Cohen d 95% CI", "cell-level p", "sig"]
 _KEYS = ["group_a", "group_b", "n_a", "n_b", "mean_a", "mean_b",
-         "p", "p_bonferroni", "cohen_d"]
+         "p", "p_bonferroni", "q_fdr", "cohen_d", "cohen_d_lo", "cohen_d_hi",
+         "cluster_p"]
 
 
 def _fmt(v, n=3):
@@ -42,8 +43,9 @@ class RankedReportDialog(QtWidgets.QDialog):
         head = QtWidgets.QLabel(
             f"<b>{name}</b> — every group pair, ranked by the likelihood of a "
             f"significant difference (smallest p first).<br>Recording = unit · "
-            f"Mann-Whitney U (two-sided) · Bonferroni over {n_tested} tested pairs · "
-            f"★ p&lt;0.05, ★★★ Bonferroni&lt;0.05.")
+            f"Mann-Whitney U · Bonferroni + Benjamini-Hochberg <b>q</b> over "
+            f"{n_tested} pairs · Cohen's d ±95% bootstrap CI · <b>cell-level p</b> = "
+            f"recording-clustered robust test · ★ p&lt;0.05, ★★★ q&lt;0.05.")
         head.setWordWrap(True)
         lay.addWidget(head)
 
@@ -52,9 +54,12 @@ class RankedReportDialog(QtWidgets.QDialog):
         table.verticalHeader().setVisible(False)
         table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         for i, r in enumerate(rows):
+            ci = ("" if _is_nan(r.get("cohen_d_lo"))
+                  else f"[{_fmt(r['cohen_d_lo'], 2)}, {_fmt(r['cohen_d_hi'], 2)}]")
             cells = [r["group_a"], r["group_b"], r["n_a"], r["n_b"],
                      _fmt(r["mean_a"]), _fmt(r["mean_b"]), _fmt(r["p"], 4),
-                     _fmt(r["p_bonferroni"], 4), _fmt(r["cohen_d"]), _stars(r)]
+                     _fmt(r["p_bonferroni"], 4), _fmt(r.get("q_fdr"), 4),
+                     _fmt(r["cohen_d"]), ci, _fmt(r.get("cluster_p"), 4), _stars(r)]
             for j, c in enumerate(cells):
                 table.setItem(i, j, QtWidgets.QTableWidgetItem(str(c)))
         table.resizeColumnsToContents()
@@ -87,7 +92,7 @@ def _is_nan(v):
 
 
 def _stars(r):
-    pb, p = r.get("p_bonferroni"), r.get("p")
-    if not _is_nan(pb) and pb < 0.05:
+    q, p = r.get("q_fdr"), r.get("p")
+    if not _is_nan(q) and q < 0.05:
         return "★★★"
     return "★" if (not _is_nan(p) and p < 0.05) else ""

@@ -256,7 +256,8 @@ class StatsTablesMixin:
             QtWidgets.QMessageBox.information(
                 self, "Ranked report", "Compute the comparison first.")
             return
-        rows = compare.ranked_group_comparisons(per_rec, metric)
+        pc = self._filtered() if hasattr(self, "_filtered") else None
+        rows = compare.ranked_group_comparisons(per_rec, metric, per_cell=pc)
         if not rows:
             QtWidgets.QMessageBox.information(
                 self, "Ranked report", "Need at least two groups with data.")
