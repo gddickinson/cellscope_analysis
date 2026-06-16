@@ -17,6 +17,7 @@ _TABLES = [
     ("per_frame", "Per-frame region properties  (one row per cell × frame)", True),
     ("per_cell", "Per-cell summary  (track + shape + motion metrics)", True),
     ("tracks", "Centroid trajectories  (long format, px + µm)", True),
+    ("contact_pairs", "Cell-pair contacts  (which cells touch, when, degree)", False),
 ]
 
 

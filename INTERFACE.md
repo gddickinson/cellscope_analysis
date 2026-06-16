@@ -341,9 +341,11 @@ Read this before opening source files. Update it when modules change.
   coords + class codes — for the **contacts overlay**), `contact_episodes`
   (in-contact runs → formation/breakage events), `contacts_over_time`,
   `contact_summary` (per-cell time-in-class + means + **episode dynamics**:
-  `n_contact_events`, `mean_contact_duration`, `contact_event_rate`). Surfaced as
-  per-frame plot metrics, colour-by, a canvas overlay, CSV columns, and comparison
-  readouts.
+  `n_contact_events`, `mean_contact_duration`, `contact_event_rate`), and
+  **`contact_pairs`** (one record per cell **pair** that touches — *which* cells,
+  *when* (first/last frame, frames-in-contact, episodes) and the *degree*
+  (mean/max contact fraction)). Surfaced as per-frame plot metrics, colour-by, a
+  canvas overlay, CSV columns + a **contact-pairs CSV**, and comparison readouts.
 - **edge_dynamics.py** — membrane protrusion/retraction (no cv2):
   `edge_velocity_kymograph` (radial edge velocity, 72 sectors about the
   mid-centroid; +protrusion/−retraction), `radius_kymograph`, `edge_summary`
@@ -417,13 +419,14 @@ Read this before opening source files. Update it when modules change.
   segments (≥5 frames). Mirrors the original `core/motility_state.py` +
   `core/state_analysis.py` (validated to match `compare/per_recording.csv` to 3 dp).
 - **exporters.py** — tidy CSV tables for Origin/Prism: `per_frame_table`
-  (region props incl. perimeter/circularity/state + nearest-neighbour),
-  `per_cell_table` (track + shape + motion + nearest-neighbour aggregates +
-  Fürth D/persistence-time + density-stratified speed + area-stability +
-  track-quality + **min/mean distance from the image border**, optional
-  `with_edge` protrusion/retraction columns, `progress_cb`),
+  (region props incl. perimeter/circularity/state + nearest-neighbour + **contact**;
+  `with_contacts` toggle), `per_cell_table` (track + shape + motion + nearest-neighbour
+  + **contact** aggregates + Fürth D/persistence-time + density-stratified speed +
+  area-stability + track-quality + **min/mean distance from the image border**,
+  optional `with_edge` protrusion/retraction columns, `progress_cb`),
+  `contact_pairs_table` (**which cells touch, when, degree** — one row per cell pair),
   `track_table` (trajectories), `export_all` (single shared per-frame pass +
-  `progress_cb`).
+  `progress_cb`; `which` includes `contact_pairs`).
   Needs pandas.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the
   CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,

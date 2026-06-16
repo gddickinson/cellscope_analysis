@@ -235,3 +235,42 @@ def contact_summary(labels, scale=1.0, max_gap_px=DEFAULT_GAP_PX,
             "contact_event_rate": float(n_ev / (n * dt)) if n else np.nan,
         }
     return summary
+
+
+def contact_pairs(labels, scale=1.0, dt_min=None, max_gap_px=DEFAULT_GAP_PX,
+                  extensive_frac=EXTENSIVE_FRAC, min_px=MIN_CONTACT_PX,
+                  per_frame=None) -> list:
+    """**Which cells touch, when, and how much** — one record per unordered cell pair
+    that is in contact in ≥1 frame.
+
+    Each record: ``cell_a`` / ``cell_b``, ``first_frame`` / ``last_frame``,
+    ``n_frames_in_contact``, ``n_episodes`` (contiguous contact runs),
+    ``mean_episode`` (frames, or min if ``dt_min``), and the contact **degree** over
+    the in-contact frames (``mean_contact_fraction`` / ``max_contact_fraction``). The
+    per-frame pair degree is the larger of the two cells' boundary fractions engaged
+    with the other. Pass a precomputed ``per_frame`` (``contacts_over_time``) to reuse."""
+    labels = np.asarray(labels)
+    pf = per_frame if per_frame is not None else contacts_over_time(
+        labels, scale, max_gap_px, extensive_frac, min_px)
+    dt = float(dt_min) if dt_min else 1.0
+    pair_deg: dict = defaultdict(dict)                  # (a, b) -> {frame: degree}
+    for t, fc in enumerate(pf):
+        for cid, rec in fc.items():
+            for p, frac in rec.get("partners", {}).items():
+                key = (min(int(cid), int(p)), max(int(cid), int(p)))
+                pair_deg[key][t] = max(pair_deg[key].get(t, 0.0), float(frac))
+    out = []
+    for (a, b), fd in sorted(pair_deg.items()):
+        frames = sorted(fd)
+        degs = np.array([fd[t] for t in frames], float)
+        n_ev, durs = contact_episodes(frames, [True] * len(frames))
+        out.append({
+            "cell_a": a, "cell_b": b,
+            "first_frame": frames[0], "last_frame": frames[-1],
+            "n_frames_in_contact": len(frames), "n_episodes": int(n_ev),
+            ("mean_episode_min" if dt_min else "mean_episode_frames"):
+                (float(np.mean(durs)) * dt) if durs else 0.0,
+            "mean_contact_fraction": float(degs.mean()),
+            "max_contact_fraction": float(degs.max()),
+        })
+    return out
