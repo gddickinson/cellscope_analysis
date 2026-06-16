@@ -5,6 +5,26 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR8: cell-level QC flags (exclude individual cells)
+
+Final of the 8-part program. The project had recording-level include/exclude;
+now individual cells can be QC-flagged out of the comparison. `Project.excluded_cells`
+({label: set(cell_id)}) + `exclude_cell` / `is_cell_excluded`; `Project.regroup`
+drops flagged cells alongside excluded recordings (a **display-time remap — no
+recompute**, like the existing exclusions), and they persist in the project file.
+Viewer **Analysis ▸ Toggle selected-cell exclusion** (`Ctrl+Shift+X`,
+`toggle_cell_excluded`) flags the selected cell in/out with a status confirmation —
+for removing obvious tracking errors / debris. Tests +2 (regroup drops the flagged
+cell + toggle-off restores; save/load round-trip). `pytest` **117 passed**; smoke
+green; all files < 500.
+
+This completes the improvement program: PR1 edge polarity + lagged actin, PR2
+run-and-tumble + track QC, PR3 stats power (FDR/CI/cluster-robust), PR4 contact-
+inhibition (CIL), PR5 rose/density/forest plots, PR6 disk cache, PR7 headless
+runner, PR8 cell-level QC.
+
+---
+
 ## 2026-06-15 — PR7: headless analyze-project runner (figures + stats CSVs)
 
 `scripts/analyze_project.py`: load a project (`--data-root`/`--name` or a `.cmp`

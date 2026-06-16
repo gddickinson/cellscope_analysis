@@ -56,6 +56,7 @@ class Project:
     design: Design
     path: str | None = None
     excluded: set = field(default_factory=set)    # recording labels dropped from compare
+    excluded_cells: dict = field(default_factory=dict)  # label -> set(cell_id) dropped
     overrides: dict = field(default_factory=dict)  # recording label -> group (condition)
     corrections: dict = field(default_factory=dict)  # label -> {shifts, fov} (pre-analysis)
     px_size: float | None = None         # manual µm/px override (all recordings)
@@ -68,6 +69,17 @@ class Project:
     def correction_for(self, label):
         """Pre-analysis correction (channel shifts + FOV) for a recording, or {}."""
         return self.corrections.get(label, {})
+
+    def exclude_cell(self, label, cid, on=True):
+        """Flag/unflag one cell as a QC exclusion — dropped from the comparison via a
+        display-time remap (no recompute, like a recording exclusion)."""
+        s = self.excluded_cells.setdefault(label, set())
+        s.add(int(cid)) if on else s.discard(int(cid))
+        if not s:
+            self.excluded_cells.pop(label, None)
+
+    def is_cell_excluded(self, label, cid):
+        return int(cid) in self.excluded_cells.get(label, set())
 
     def scaled(self, rec):
         """Apply the project-wide manual pixel-size / time-interval overrides to a
@@ -122,6 +134,12 @@ class Project:
         if df is None or getattr(df, "empty", True):
             return df
         out = df[~df["recording"].isin(self.excluded)].copy()
+        if self.excluded_cells and "cell_id" in out.columns:    # drop QC-flagged cells
+            pairs = {(lbl, c) for lbl, cs in self.excluded_cells.items() for c in cs}
+            if pairs:
+                keep = [(lbl, int(cid)) not in pairs
+                        for lbl, cid in zip(out["recording"], out["cell_id"])]
+                out = out[keep]
         if self.overrides:
             out["condition"] = out["recording"].map(self.overrides).fillna(out["condition"])
         return out
@@ -232,6 +250,8 @@ def load_project(path):
     name = blob.get("name") or os.path.splitext(os.path.basename(path))[0]
     return Project(name, roots, entries, design, path=path,
                    excluded=set(blob.get("excluded", [])),
+                   excluded_cells={k: set(v) for k, v
+                                   in blob.get("excluded_cells", {}).items()},
                    overrides=dict(blob.get("overrides", {})),
                    corrections=dict(blob.get("corrections", {})),
                    px_size=blob.get("px_size"),
@@ -243,6 +263,7 @@ def save_project(project, path):
             "arms": project.design.arms, "vehicle": project.design.vehicle,
             "colors": project.design.colors,
             "excluded": sorted(project.excluded), "overrides": project.overrides,
+            "excluded_cells": {k: sorted(v) for k, v in project.excluded_cells.items()},
             "corrections": project.corrections, "px_size": project.px_size,
             "frame_interval": project.frame_interval}
     with open(path, "w") as f:

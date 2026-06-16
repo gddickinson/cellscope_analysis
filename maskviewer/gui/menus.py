@@ -69,6 +69,10 @@ def build_menubar(win):
     an.addAction(_act(win, "Channel &Alignment && FOV…", win.open_prep_dialog,
                      tip="Align a fluorescence channel to a reference + define the "
                          "field of view (non-destructive pre-analysis)"))
+    an.addAction(_act(win, "Toggle selected-cell e&xclusion", win.toggle_cell_excluded,
+                     "Ctrl+Shift+X",
+                     tip="QC-flag the selected cell in/out of the comparison "
+                         "(persisted with the project; remove tracking errors / debris)"))
     an.addAction(_act(win, "&Export CSV…", win.export_csv, "Ctrl+E"))
 
     cfg = mb.addMenu("&Config")

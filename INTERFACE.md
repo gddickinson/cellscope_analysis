@@ -78,10 +78,12 @@ Read this before opening source files. Update it when modules change.
   appends the bundled `sample_data/` as a fallback). `PROJECT_ROOT`,
   `SAMPLE_DIR`, `CONFIG_PATH` constants.
 - **project.py** — `Project` (name, data_roots, entries, design, **`excluded`**
-  recording labels + **`overrides`** label→group; `.conditions` (effective,
-  override-aware), `.all_groups`, `.n_recordings`, `group_of`, `included_entries`,
-  **`regroup(df)`** = drop-excluded + apply-overrides remap of a per-cell/MSD
-  frame so grouping changes need no recompute) + `Design` (`arms`
+  recording labels + **`excluded_cells`** {label: set(cell_id)} QC flags +
+  **`overrides`** label→group; `.conditions` (effective, override-aware),
+  `.all_groups`, `.n_recordings`, `group_of`, `included_entries`,
+  `exclude_cell` / `is_cell_excluded`, **`regroup(df)`** = drop-excluded-recordings +
+  drop-excluded-cells + apply-overrides remap of a per-cell/MSD frame so
+  grouping/QC changes need no recompute) + `Design` (`arms`
   {arm:{control,conditions}}, `vehicle`, `colors`; `condition_order`, `color`).
   `auto_design(conditions)` derives the experiment structure (recognises the
   IC295 genetic/drug arms + WT–DMSO vehicle; otherwise one arm with a heuristic
