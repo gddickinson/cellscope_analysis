@@ -5,6 +5,22 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR7: headless analyze-project runner (figures + stats CSVs)
+
+`scripts/analyze_project.py`: load a project (`--data-root`/`--name` or a `.cmp`
+`--project`), run the full cross-recording Comparison, and write a paper-ready
+folder — `per_cell.csv`, `per_recording.csv`, `multivariate.csv` (PERMANOVA + LORO-
+AUC per arm), per arm-contrast `forest_<test>_vs_<control>.csv`, **box-plot PNGs**
+for the most-differentiating metrics, an **effect-size forest PNG** per contrast,
+and an ensemble direction-autocorrelation PNG — all GUI-free (offscreen Qt only for
+rendering; figures via `widget.grab()` so axis labels render). Reproducible:
+recording = unit throughout, same masks → same tables. `--limit` caps recordings
+for a quick run. Verified on the synthetic sample (CSVs) + synthetic multi-condition
+data (publication-quality forest/box PNGs). Test +1 (subprocess integration on the
+sample). `pytest` **115 passed**; all files < 500.
+
+---
+
 ## 2026-06-15 — PR6: performance — per-recording disk cache for heavy passes
 
 New `analysis/cache.py`: a per-recording disk cache keyed by a fast **content
