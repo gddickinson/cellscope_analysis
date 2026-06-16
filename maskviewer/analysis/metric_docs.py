@@ -148,6 +148,12 @@ EXTRA = {
         "Steps whose length exceeds 5× the cell's median step — abnormal displacement "
         "that suggests a tracking error / ID swap. n_track_jumps, frac_track_jumps and "
         "the max single step."),
+    "cil": ("Contact-inhibition of locomotion — does touching change how a cell moves?",
+        "speed_free / speed_contact (mean step speed free vs in-contact), "
+        "speed_ratio_contact (contact ÷ free; <1 = the cell slows on contact, the CIL "
+        "signature), delta_speed_onset (mean speed change as a contact forms), "
+        "velocity_alignment (cosine between the cell's direction and its contacting "
+        "neighbours' — high = coordinated / collective migration)."),
     "edge velocity": ("Membrane protrusion (+) / retraction (−) speed.",
                       "Per-angular-sector change in boundary radius about the "
                       "mid-centroid ÷ interval (µm/min)."),
@@ -290,6 +296,8 @@ _KEY_ALIASES = {
     "frac_tumble": "run_and_tumble", "tumble_angle_deg": "run_and_tumble",
     "n_track_jumps": "track_jumps", "max_step": "track_jumps",
     "frac_track_jumps": "track_jumps",
+    "speed_free": "cil", "speed_contact": "cil", "speed_ratio_contact": "cil",
+    "delta_speed_onset": "cil", "velocity_alignment": "cil", "n_contact_onsets": "cil",
 }
 
 

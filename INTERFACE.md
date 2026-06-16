@@ -328,6 +328,11 @@ Read this before opening source files. Update it when modules change.
   **membrane-score**). `metrics=`
   selects which series to compute. `available_frame_metrics` / `metric_label` /
   `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
+- **cil.py** — **contact-inhibition of locomotion**: `contact_locomotion`
+  (per-cell speed free-vs-in-contact + `speed_ratio_contact`, speed change at contact
+  **onset**, and **velocity alignment** with contacting neighbours — collective
+  migration), `contact_locomotion_table`. Flows to the comparison behind the CIL
+  analysis toggle.
 - **stats_extra.py** — extra comparison statistics (dependency-free, np+scipy):
   `benjamini_hochberg` (FDR q-values), `bootstrap_ci` (percentile CI of any
   statistic, e.g. Cohen's d), `cluster_robust_p` (cell-level group effect with
