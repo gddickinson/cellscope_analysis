@@ -239,18 +239,46 @@ class StatsTablesMixin:
         return self._filter_note(groups=False)
 
     def _add_stats_buttons(self, lay):
-        """Stats-tab action row: Save plot… + Ranked report… (built here to keep
-        compare_window lean)."""
+        """Stats-tab action row: Save plot · Ranked report · Forest · Phenotype map
+        (built here to keep compare_window lean)."""
         row = QtWidgets.QHBoxLayout()
         self._save_btn = QtWidgets.QPushButton("Save plot…")
         self._save_btn.clicked.connect(self._save_current_plot)
-        rank = QtWidgets.QPushButton("Ranked report…")
-        rank.setToolTip("All group-pair comparisons for the current metric, ranked "
-                        "by likelihood of a significant difference (recording = unit)")
-        rank.clicked.connect(self._show_ranked_report)
         row.addWidget(self._save_btn)
-        row.addWidget(rank)
+        for label, tip, slot in (
+                ("Ranked report…", "All group-pair comparisons for the current metric,"
+                 " ranked by significance", self._show_ranked_report),
+                ("Forest…", "Effect size (Cohen's d ± CI) of every metric for a "
+                 "contrast", self._show_forest),
+                ("Phenotype map…", "Per-cell 2-D phenotype cloud with per-group "
+                 "covariance ellipses", self._show_phenotype_map)):
+            b = QtWidgets.QPushButton(label); b.setToolTip(tip)
+            b.clicked.connect(slot); row.addWidget(b)
         lay.addLayout(row)
+
+    def _show_forest(self):
+        from .forest_plot import ForestPlotDialog
+        per_rec = getattr(self, "_stats_per_rec", None)
+        if per_rec is None or per_rec.empty:
+            QtWidgets.QMessageBox.information(self, "Forest plot",
+                                             "Compute the comparison first.")
+            return
+        d = self.project.design
+        conds = compare.order_conditions(per_rec["condition"].unique(),
+                                         order=d.condition_order())
+        ctrl = next(iter(d.arms.values()))["control"] if d.arms else conds[0]
+        ctrl = ctrl if ctrl in conds else conds[0]
+        test = next((c for c in conds if c != ctrl), conds[-1])
+        ForestPlotDialog(per_rec, conds, ctrl, test, self).exec_()
+
+    def _show_phenotype_map(self):
+        from .phenotype_map import PhenotypeMapDialog
+        pc = self._filtered() if hasattr(self, "_filtered") else None
+        if pc is None or pc.empty:
+            QtWidgets.QMessageBox.information(self, "Phenotype map",
+                                             "Compute the comparison first.")
+            return
+        PhenotypeMapDialog(pc, self.project.design, self).exec_()
 
     def _show_ranked_report(self):
         from .ranked_report import RankedReportDialog

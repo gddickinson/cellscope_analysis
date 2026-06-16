@@ -71,6 +71,9 @@ def main():
     op("current-plot resolves on every tab (incl. Dir. autocorr)",
        lambda: [cw.tabs.setCurrentIndex(t) or cw._current_plot()
                 for t in range(cw.tabs.count())])
+    QtWidgets.QDialog.exec_ = lambda self: 1            # forest / phenotype dialogs
+    op("ranked report + forest + phenotype map dialogs",
+       lambda: (cw._show_ranked_report(), cw._show_forest(), cw._show_phenotype_map()))
     print("  comparison edge cases OK", flush=True)
 
     # --- Viewer edge cases (synthetic sample) ---
@@ -94,6 +97,12 @@ def main():
        lambda: (win.select_cell(1), app.processEvents(),
                 _assert(win.edge.fluor.currentText() != "(none)",
                         f"fluor not auto-selected: {win.edge.fluor.currentText()!r}")))
+    op("population rose (net direction)",
+       lambda: (win.population.set_recording(win.masks.labels, win.recording.um_per_px,
+                                             win.recording.time_interval_min)
+                if hasattr(win.population, "set_recording") else None,
+                win.population.kind.setCurrentText("Rose (net direction)"),
+                app.processEvents()))
     print("  viewer edge cases OK", flush=True)
 
     assert not _ERRORS, f"{len(_ERRORS)} edge-case failure(s): {_ERRORS}"

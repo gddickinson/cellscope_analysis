@@ -5,6 +5,25 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR5: plotting — rose + 2D phenotype density + effect-size forest
+
+Three new visualizations that turn the data into figures.
+- **Effect-size forest** (`gui/forest_plot.py` + `compare.forest_data`): Cohen's d ±
+  95% bootstrap CI of *every* metric for a chosen contrast, sorted by |d|, red where
+  MWU p<0.05 — the multivariate phenotype as one figure. CSV export. Stats-tab
+  **Forest…** button.
+- **2D phenotype map** (`gui/phenotype_map.py`): the per-**cell** cloud of two metrics
+  (default roundness vs persistence) with a 1σ+2σ covariance ellipse per condition —
+  the KO "rounder + less persistent" separation made visible. Stats-tab **Phenotype
+  map…** button.
+- **Rose plot** (`PopulationPanel` "Rose (net direction)"): polar histogram of per-cell
+  net-migration directions + the mean-resultant-length R (directional bias).
+All wired via the mixin so `compare_window` is untouched. Tests +1 (`forest_data`
+ranks by |d|); smoke extended (forest/phenotype/ranked dialogs + population rose).
+`pytest` **112 passed**; all files < 500.
+
+---
+
 ## 2026-06-15 — PR4: contact-inhibition of locomotion (CIL)
 
 New `analysis/cil.py` — the payoff of the contact tracking. `contact_locomotion`

@@ -368,6 +368,32 @@ def ranked_group_comparisons(per_recording, metric, groups=None, per_cell=None,
     return rows
 
 
+def forest_data(per_recording, group_a, group_b, metrics=None) -> list:
+    """For an **effect-size forest plot**: Cohen's d (``group_b`` vs ``group_a``) with a
+    95% bootstrap CI + Mann-Whitney p for **every metric**, sorted by |d| descending —
+    a one-figure view of where two groups differ most (the multivariate phenotype).
+    Recording = unit."""
+    from scipy import stats as _ss
+    from . import stats_extra as _se
+    cols = metrics if metrics is not None else metric_columns(per_recording)
+    am = per_recording["condition"] == group_a
+    bm = per_recording["condition"] == group_b
+    rows = []
+    for m in cols:
+        va = per_recording.loc[am, m].to_numpy(float); va = va[np.isfinite(va)]
+        vb = per_recording.loc[bm, m].to_numpy(float); vb = vb[np.isfinite(vb)]
+        if va.size < 2 or vb.size < 2:
+            continue
+        lo, hi = _se.bootstrap_ci(va, vb, cohens_d)
+        try:
+            p = float(_ss.mannwhitneyu(va, vb, alternative="two-sided").pvalue)
+        except ValueError:
+            p = np.nan
+        rows.append({"metric": m, "d": cohens_d(va, vb), "lo": lo, "hi": hi, "p": p})
+    rows.sort(key=lambda r: -abs(r["d"]) if np.isfinite(r["d"]) else 0.0)
+    return rows
+
+
 def effect_sizes(by_cond, arms=None):
     """[{arm, contrast, n_ctrl, n_test, cohen_d}] per within-arm test vs control."""
     from . import feature_tables

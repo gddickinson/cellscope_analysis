@@ -232,3 +232,17 @@ def test_cluster_robust_detects_group_effect():
     p = se.cluster_robust_p(df, "m")
     assert np.isfinite(p) and p < 0.05                   # large group effect detected
     assert np.isnan(se.cluster_robust_p(df[df["condition"] == "WT"], "m"))   # 1 group → NaN
+
+
+def test_forest_data_ranks_by_effect_size():
+    from maskviewer.analysis import compare
+    rows = []
+    for v in (1.0, 1.1, 0.9, 1.05):
+        rows.append({"recording": f"w{v}", "condition": "WT", "big": v, "same": v})
+    for v in (8.0, 8.2, 7.8, 8.1):                       # KO: 'big' very different, 'same' equal
+        rows.append({"recording": f"k{v}", "condition": "KO", "big": v, "same": v - 7.0})
+    per = pd.DataFrame(rows)
+    fd = compare.forest_data(per, "WT", "KO")
+    assert fd[0]["metric"] == "big"                      # largest |d| first
+    assert abs(fd[0]["d"]) > abs(fd[-1]["d"])
+    assert all("lo" in r and "hi" in r and "p" in r for r in fd)

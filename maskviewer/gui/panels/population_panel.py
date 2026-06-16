@@ -18,7 +18,8 @@ from ..plot_export import save_plot
 from ..task_runner import AsyncComputeMixin
 
 _KINDS = ["Time series (all cells)", "Mean ± error", "Histogram", "Flower plot",
-          "Scatter (X vs Y)", "Lineage tree", "Division timeline"]
+          "Scatter (X vs Y)", "Rose (net direction)", "Lineage tree",
+          "Division timeline"]
 _NEEDS_DF = {"Time series (all cells)", "Mean ± error", "Histogram",
              "Scatter (X vs Y)"}
 
@@ -158,9 +159,12 @@ class PopulationPanel(AsyncComputeMixin, QtWidgets.QWidget):
         if kind in _NEEDS_DF and self._df is None:
             return
         self.plot.clear()
-        self.plot.getViewBox().setAspectLocked(kind == "Flower plot")
+        self.plot.getViewBox().setAspectLocked(kind in ("Flower plot",
+                                                        "Rose (net direction)"))
         if kind == "Flower plot":
             return self._plot_flower()
+        if kind == "Rose (net direction)":
+            return self._plot_rose()
         if kind == "Lineage tree":
             return self._plot_lineage()
         if kind == "Division timeline":
@@ -179,6 +183,40 @@ class PopulationPanel(AsyncComputeMixin, QtWidgets.QWidget):
             self._plot_mean(df, metric)
         else:
             self._plot_timeseries(df, metric)
+
+    def _plot_rose(self, n_bins=24):
+        """Polar histogram of per-cell net-migration directions (image frame) — shows
+        directional bias; the title's R is the mean resultant length (0 = uniform,
+        1 = all one way)."""
+        from PyQt5 import QtGui
+        from ...analysis import cell_metrics
+        angles = []
+        for cen in cell_metrics.centroid_history(self._labels).values():
+            fin = cen[np.isfinite(cen).all(axis=1)]
+            if fin.shape[0] >= 2:
+                dy, dx = fin[-1] - fin[0]
+                if np.hypot(dy, dx) > 0:
+                    angles.append(np.arctan2(-dy, dx))    # flip row so up = up
+        if not angles:
+            return
+        a = np.asarray(angles)
+        counts, edges = np.histogram(a, bins=n_bins, range=(-np.pi, np.pi))
+        r = counts / counts.max() if counts.max() else counts.astype(float)
+        for k in range(n_bins):
+            poly = QtGui.QPolygonF([QtCore.QPointF(0, 0)])
+            for ang in np.linspace(edges[k], edges[k + 1], 6):
+                poly.append(QtCore.QPointF(r[k] * np.cos(ang), r[k] * np.sin(ang)))
+            poly.append(QtCore.QPointF(0, 0))
+            it = QtWidgets.QGraphicsPolygonItem(poly)
+            it.setBrush(pg.mkBrush(70, 130, 230, 170)); it.setPen(pg.mkPen("k"))
+            self.plot.addItem(it)
+        for rad in (0.5, 1.0):                            # grid rings
+            t = np.linspace(0, 2 * np.pi, 80)
+            self.plot.plot(rad * np.cos(t), rad * np.sin(t),
+                           pen=pg.mkPen((150, 150, 150), width=1))
+        R = float(np.hypot(np.cos(a).mean(), np.sin(a).mean()))
+        self.plot.setTitle(f"net-direction rose · n={a.size} cells · R={R:.2f}")
+        self.plot.setLabel("bottom", "→ x"); self.plot.setLabel("left", "↑ y")
 
     def _plot_timeseries(self, df, metric):
         x = self._xcol(df)
