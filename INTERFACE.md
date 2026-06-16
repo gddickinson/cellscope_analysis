@@ -336,6 +336,10 @@ Read this before opening source files. Update it when modules change.
   **membrane-score**). `metrics=`
   selects which series to compute. `available_frame_metrics` / `metric_label` /
   `BASE_FRAME_METRICS` drive the Config ▸ Cell-plot-metrics menu.
+- **intensity_metrics.py** — `per_cell_fluor` / `per_cell_fluor_table`: per-cell
+  track-mean **intensity + membrane** (score / boundary-gradient / contrast) for every
+  channel — makes the Cell-Info per-channel fluorescence readouts comparable across
+  conditions (the Fluorescence comparison family).
 - **cache.py** — per-recording **disk cache** for expensive passes: `content_key`
   (fast content fingerprint of a label stack + params), `load_or_compute` (pickle in
   `analysis_out/cache/`, graceful on failure). Used for the VAMPIRE shape-mode model

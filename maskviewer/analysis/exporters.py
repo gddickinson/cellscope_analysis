@@ -93,7 +93,7 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
     scale = float(um_per_px) if um_per_px else 1.0
     u = "um" if um_per_px else "px"
     speed_u = f"{u}_per_min" if dt_min else f"{u}_per_frame"
-    agg_cols = ["area_px", "area_um2", f"perimeter_{u}", "circularity",
+    agg_cols = ["area_px", "area_um2", f"perimeter_{u}", "circularity", "convexity",
                 "eccentricity", "aspect_ratio", "major_axis_px", "minor_axis_px",
                 "extent", "solidity", f"nn_dist_{u}", "n_neighbors",
                 "contact_fraction", "n_contacts", "max_contact_fraction",

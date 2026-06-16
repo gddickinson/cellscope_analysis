@@ -110,6 +110,32 @@ def cell_heterogeneity(model, cell_id):
     return float(-(f * np.log2(f)).sum())
 
 
+def per_cell_shape_summary(model) -> dict:
+    """``{cell_id: summary}`` of each cell's shape-mode usage over its track — for the
+    comparison: ``dominant_shape_mode`` (most-used mode), ``n_shape_modes`` (distinct
+    modes visited), ``shape_mode_entropy`` (bits — how varied) and
+    ``shape_mode_switch_rate`` (fraction of consecutive frames that change mode — shape
+    instability)."""
+    from collections import defaultdict, Counter
+    seq: dict = defaultdict(list)
+    for (cid, t), m in model.get("by_cell_frame", {}).items():
+        seq[cid].append((t, m))
+    out = {}
+    for cid, items in seq.items():
+        modes = [m for _, m in sorted(items)]
+        n = len(modes)
+        cnt = Counter(modes)
+        fr = np.array(list(cnt.values()), float) / n
+        switches = sum(1 for a, b in zip(modes[:-1], modes[1:]) if a != b)
+        out[int(cid)] = {
+            "dominant_shape_mode": int(cnt.most_common(1)[0][0]),
+            "n_shape_modes": len(cnt),
+            "shape_mode_entropy": float(-(fr * np.log2(fr)).sum()) if n else np.nan,
+            "shape_mode_switch_rate": float(switches / (n - 1)) if n > 1 else np.nan,
+        }
+    return out
+
+
 def mode_contour(signature):
     """Closed (x, y) contour reconstructed from a radial signature, for display."""
     th = np.linspace(0, 2 * np.pi, signature.size, endpoint=False)

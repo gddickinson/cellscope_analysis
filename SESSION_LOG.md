@@ -5,6 +5,26 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Comparison completeness: everything in the main GUI is now comparable
+
+Audit found three main-GUI metric families that never reached the comparison. Closed:
+- **Fluorescence intensity + membrane** (new `analysis/intensity_metrics.py`,
+  `per_cell_fluor`): per-cell track-mean **intensity** + **membrane_score** /
+  **boundary_grad** / **membrane_contrast** for *every channel* → compare SiR-actin /
+  tagged-PIEZO1 levels + cortical enrichment across conditions. New
+  **Fluorescence intensity + membrane** analysis toggle.
+- **Shape-mode usage** (`shape_modes.per_cell_shape_summary`): per-cell
+  `dominant_shape_mode` / `n_shape_modes` / `shape_mode_entropy` /
+  `shape_mode_switch_rate` from the (disk-cached) VAMPIRE model. New **Shape-mode
+  usage** toggle.
+- **convexity** added to the per-cell aggregates (it was computed per-frame but never
+  aggregated).
+Both new families default OFF (gated like the others); `metric_docs` covers them
+(intensity/membrane via the existing per-channel PREFIX docs). Tests +2. `pytest`
+**119 passed**; all files < 500 (compare 489).
+
+---
+
 ## 2026-06-16 — Minimal/fast defaults: heavy analysis is now opt-in
 
 Set the GUI's analysis defaults to a fast **basic** state so a fresh session stays

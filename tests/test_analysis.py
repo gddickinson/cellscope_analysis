@@ -385,3 +385,32 @@ def test_jump_steps_flags_outlier():
     # a clean track has no jumps
     clean = np.column_stack([np.zeros(8), np.arange(8.0)])
     assert motion.jump_steps(clean)[0] == 0
+
+
+def test_per_cell_fluor_track_means():
+    from maskviewer.io.recording import Recording
+    from maskviewer.analysis import intensity_metrics
+    L = np.zeros((2, 24, 24), np.int32)
+    L[:, 4:10, 4:10] = 1
+    L[:, 14:20, 14:20] = 2
+    data = np.zeros((2, 1, 24, 24), np.uint16)
+    data[:, 0, 4:10, 4:10] = 100                        # cell 1 bright
+    data[:, 0, 14:20, 14:20] = 30                       # cell 2 dim
+    rec = Recording("x.tif", data, ["Cy5"])
+    fl = intensity_metrics.per_cell_fluor(L, rec)
+    assert abs(fl[1]["mean_intensity_Cy5"] - 100) < 1
+    assert abs(fl[2]["mean_intensity_Cy5"] - 30) < 1
+    for k in ("mean_membrane_score_Cy5", "mean_boundary_grad_Cy5",
+              "mean_membrane_contrast_Cy5"):
+        assert k in fl[1]
+
+
+def test_per_cell_shape_summary():
+    from maskviewer.analysis import shape_modes
+    model = {"by_cell_frame": {(1, 0): 0, (1, 1): 0, (1, 2): 1,
+                               (2, 0): 3, (2, 1): 3, (2, 2): 3}}
+    s = shape_modes.per_cell_shape_summary(model)
+    assert s[1]["dominant_shape_mode"] == 0 and s[1]["n_shape_modes"] == 2
+    assert s[1]["shape_mode_switch_rate"] == 0.5        # one switch over two joints
+    assert s[2]["n_shape_modes"] == 1 and s[2]["shape_mode_switch_rate"] == 0.0
+    assert s[2]["shape_mode_entropy"] == 0.0
