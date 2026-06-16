@@ -100,6 +100,8 @@ python main_viewer.py --data-root /path/to/by_condition
 python main_viewer.py --recording R.ome.tif --masks M.npz
 python scripts/make_sample_data.py        # (re)create the synthetic sample
 MASKVIEWER_REMOTE=8765 python main_viewer.py   # + localhost HTTP self-drive (see remote.py)
+python scripts/analyze_project.py --data-root data/by_condition --name IC295 --out OUT
+                                          # headless: run the comparison → CSVs + figures
 ```
 
 The CellScope `cellpose4` env also has these deps (`conda run -n cellpose4 …`)

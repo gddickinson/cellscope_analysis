@@ -70,9 +70,10 @@ class ForestPlotDialog(QtWidgets.QDialog):
                    for s in sig]
         self.plot.addItem(pg.ScatterPlotItem(d, ys, size=11, brush=brushes,
                                              pen=pg.mkPen("k")))
-        self.plot.getAxis("left").setTicks(
-            [[(int(y), metric_docs.column_label(r["metric"]))
-              for y, r in zip(ys, rows)]])
+        ax = self.plot.getAxis("left")
+        ax.setWidth(150)                               # room for the metric names
+        ax.setTicks([[(int(y), metric_docs.column_label(r["metric"]))
+                      for y, r in zip(ys, rows)]])
         self.plot.setLabel("bottom", f"Cohen's d  ({b} − {a})")
         self.plot.setTitle(f"{b} vs {a} — effect size ± 95% CI "
                            f"(red = Mann-Whitney p < 0.05)")
