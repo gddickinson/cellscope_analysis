@@ -145,7 +145,10 @@ def movement_intensity_pairs(present, velmat, intmat, temporal="past"):
         return np.array([]), np.array([])
     disp, inten = [], []
     for k in range(velmat.shape[0]):
-        it = intmat[k + 1] if temporal == "past" else intmat[k]
+        j = k + 1 if temporal == "past" else k
+        if not (0 <= j < intmat.shape[0]):            # guard a velmat/intmat length mismatch
+            continue
+        it = intmat[j]
         ok = np.isfinite(velmat[k]) & np.isfinite(it)
         disp.append(velmat[k][ok]); inten.append(it[ok])
     d = np.concatenate(disp) if disp else np.array([])
@@ -198,24 +201,37 @@ def correlation_summary(disp, inten, move_threshold=None):
     return out
 
 
-def lagged_intensity_correlation(velmat, intmat, max_lag=3):
+def lagged_intensity_correlation(velmat, intmat, max_lag=3, frames=None):
     """Pearson r between per-sector edge velocity and rectangle intensity at each
     frame **lag** L ∈ [−max_lag, +max_lag].
 
     L<0 = intensity *leads* the movement (e.g. actin enriches *before* protrusion);
     L>0 = intensity *follows*. Returns ``(lags, r_per_lag, peak_lag, peak_r)`` where
     the peak is the lag of strongest |r| — a simple test of whether the fluorescence
-    precedes or trails the edge motion."""
+    precedes or trails the edge motion. ``frames`` (the present-frame index of each
+    ``intmat`` row) makes the lag count **real frames** rather than matrix rows, so a
+    tracking gap doesn't quietly compress the lag; without it, rows are assumed
+    contiguous."""
     lags = list(range(-int(max_lag), int(max_lag) + 1))
     n = velmat.shape[0] if velmat.size else 0
+    row_of = ({int(f): m for m, f in enumerate(frames)}
+              if frames is not None else None)
     rs = []
     for L in lags:
         dd, ii = [], []
         for k in range(n):
-            j = (k + 1) + L                          # velmat[k] ↔ movement into frame k+1
-            if 0 <= j < intmat.shape[0]:
-                ok = np.isfinite(velmat[k]) & np.isfinite(intmat[j])
-                dd.append(velmat[k][ok]); ii.append(intmat[j][ok])
+            if row_of is not None:                   # velmat[k] = movement into row k+1
+                if k + 1 >= len(frames):
+                    continue
+                j = row_of.get(int(frames[k + 1]) + L)    # the row L *frames* away
+                if j is None:
+                    continue
+            else:
+                j = (k + 1) + L
+                if not (0 <= j < intmat.shape[0]):
+                    continue
+            ok = np.isfinite(velmat[k]) & np.isfinite(intmat[j])
+            dd.append(velmat[k][ok]); ii.append(intmat[j][ok])
         d = np.concatenate(dd) if dd else np.array([])
         i = np.concatenate(ii) if ii else np.array([])
         rs.append(_pearson(d, i) if (d.size >= 3 and d.std() and i.std()) else np.nan)
@@ -253,7 +269,7 @@ def analyze_cell(labels, image, cell_id, um_per_px=None, dt_min=None,
     ifr, intmat = intensity_kymograph(labels, image, cell_id, depth, width)
     disp, inten = movement_intensity_pairs(ifr, velmat, intmat, temporal)
     summary = correlation_summary(disp, inten, move_threshold)
-    _, _, peak_lag, peak_r = lagged_intensity_correlation(velmat, intmat)
+    _, _, peak_lag, peak_r = lagged_intensity_correlation(velmat, intmat, frames=ifr)
     summary["edge_intensity_peak_lag"] = peak_lag    # <0 = fluor leads edge motion
     summary["edge_intensity_peak_r"] = peak_r
     return vfr, velmat, ifr, intmat, disp, inten, summary

@@ -27,6 +27,9 @@ def _cell_summ(recs):
     for r in recs:
         nb = np.asarray(r["n_neighbors"], float)
         pres = np.isfinite(np.asarray(r["cents"])[:, 0])
+        if nb.shape[0] != pres.shape[0]:             # guard ragged legacy-cache arrays
+            mlen = min(nb.shape[0], pres.shape[0])
+            nb, pres = nb[:mlen], pres[:mlen]
         dens = np.nanmedian(nb[pres]) if pres.any() else np.nan
         rows.append((r["cond"], r["label"], r["speed"], dens))
     return rows

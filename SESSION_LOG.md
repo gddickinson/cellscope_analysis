@@ -5,6 +5,52 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Fix the remaining audit items (no longer just documented)
+
+Turned every low-severity audit finding into an actual fix:
+
+- **`motion.instantaneous_speed` + `cell_metrics` per-frame speed series** — per-step
+  speed now divides by the **actual elapsed frames** (`Δframe·dt`) when a time scale is
+  given, so a step bridging a tracking gap is no longer over-stated. Without `dt` the
+  raw bridged length is still returned (what `jump_steps` keys on). Gapless tracks
+  unchanged.
+- **`contacts.contact_episodes`** — a tracking gap no longer **splits** one sustained
+  contact into multiple "events" (it broke a run on any frame gap); only a present-but-
+  free frame breaks a run. Stops inflating `n_contact_events`/`contact_event_rate`.
+- **`contacts._boundary_mask`** — image-border pixels of a cell now count as boundary
+  (previously a cell flush against the frame edge under-counted `boundary_px`, inflating
+  its `contact_fraction`).
+- **`cil.contact_locomotion`** — a contact `onset` now requires the cell to have been
+  **present-but-free** the previous frame, so re-appearing after a tracking gap no
+  longer counts as a new formation (`n_contact_onsets` was inflated).
+- **`edge_dynamics`** — `mean_protrusion_velocity` / `mean_retraction_velocity` return
+  **NaN** (not 0.0) when a cell has no protrusion/retraction events, so a never-
+  protruding cell is excluded from (not dragging down) cross-recording means.
+  `edge_velocity_kymograph(smooth=True)` no longer **fabricates** velocity in sectors
+  that had no edge pixel in a frame (they're masked back to NaN), and the temporal
+  smoothing is now a NaN-aware normalized convolution (`_nan_gaussian1d`) so a missing
+  sector doesn't blank its whole time column.
+- **`edge_intensity`** — `lagged_intensity_correlation` takes the present-frame indices
+  so the lag counts **real frames**, not matrix rows (correct across gaps; falls back to
+  rows when not given). `movement_intensity_pairs` fences a velmat/intmat length
+  mismatch.
+- **`multivariate`** — PERMANOVA returns `(nan, nan)` for degenerate group counts
+  (< 2 groups, no within-df, or zero within-group dispersion) instead of dividing by
+  zero; `loadings` now uses the **n-weighted pooled SD** (matches `compare.cohens_d`).
+- **`stats_extra.bootstrap_ci`** — returns NaN bounds when > 50 % of resamples are
+  degenerate (e.g. zero-variance groups), instead of taking percentiles of a tiny
+  surviving subset.
+- **`cell_metrics._region_shape`** — degenerate regions (< 3 px) return 0 axes /
+  eccentricity (skimage's convention) rather than the +1/12-inflated values.
+- **`interactions._cell_summ`** — guards a ragged legacy-cache length mismatch.
+
+Tests +7 in `tests/test_audit_fixes.py` (speed-across-gap, border-boundary, edge_summary
+NaN, PERMANOVA degenerate, loadings = cohens_d, bootstrap_ci degenerate, lagged frame-
+path) + updated `test_contacts` for the corrected gap-handling. `pytest` **135 passed**;
+GUI + analysis smoke green; all files < 500 (cell_metrics 499).
+
+---
+
 ## 2026-06-16 — Deep-dive correctness audit: 6 calculation bugs fixed
 
 Test-drove the whole GUI headless (all 17 colour-by modes, every cell-info plot
