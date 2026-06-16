@@ -163,7 +163,11 @@ Read this before opening source files. Update it when modules change.
     speed, displacement, turning, IoU, area-change, nearest-neighbour, intensity,
     membrane contrast) over time + MSD (log-log **or linear**) with α/D fit. Owns
     the enabled-metric set (QSettings-persisted); `set_metric_enabled` recomputes
-    immediately.
+    immediately. Per-cell results are **memoised** (revisits are instant); a
+    **Precompute all cells** button (`precompute_all`, off-thread via `run_async`)
+    fills the cache so switching cells to compare them never lags. The cache is keyed
+    by recording + enabled metrics (`_cache_key`) and self-invalidates on change;
+    `set_context` primes it from the loaded recording before any cell is clicked.
   - **edge_panel.py** `EdgePanel` — velocity / radius / **curvature** **kymograph**
     (angle×time, blue=retraction/red=protrusion; curvature red=convex/blue=concave),
     a per-frame **edge-this-frame** map (the cell boundary coloured by any per-sector

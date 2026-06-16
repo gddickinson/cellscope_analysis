@@ -5,6 +5,30 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Cell Info: precompute all cells (instant switching)
+
+**Why.** Switching cells in the Cell Info dock recomputed that cell's whole
+per-frame table from the full label stack each time (`cell_frame_table` scans
+`labels[t]==cid` over every frame), so comparing cells by clicking between them
+lagged.
+
+**Change (`gui/panels/cell_info.py`).** `CellInfoPanel` now memoises each cell's
+result (`_cache`, keyed by recording + enabled-metric set via `_cache_key`) — so
+revisiting a cell is an instant lookup — and adds a **Precompute all cells**
+button (`precompute_all`) that computes every cell up front **off the GUI thread**
+(`AsyncComputeMixin` / the window's `run_task`, with the status-bar progress +
+ETA) and shows a "✓ N cells cached" status. The cache self-invalidates when the
+recording or the enabled metrics change; `clear_cell` (deselect) keeps it so a
+misclick doesn't discard a precompute. New `set_context(labels, …)` primes the
+panel from the loaded recording so precompute works before any cell is clicked
+(wired in `viewer_window._load_entry`; `cell_info` added to the `run_async`
+panels). Compacted two `viewer_window` lines to stay < 500.
+
+**Tests.** `tests/test_cell_info_precompute.py` (offscreen) — precompute caches
+all cells, a subsequent switch is a same-object cache hit, and the cache drops on
+metric / recording change; plain `set_cell` memoises without precompute. Full
+suite 154 passed; headless ViewerWindow smoke confirms the button end-to-end.
+
 ## 2026-06-16 — Load raw multi-position Micro-Manager OME-TIFFs directly
 
 **Why.** Deploying the IC295 project to another machine: the masks are tiny

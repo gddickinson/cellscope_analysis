@@ -173,7 +173,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.cell_info.shape_mode_provider = self._shape_modes_model
         self.shape.set_provider(self._shape_modes_model)
         self.population.table_provider = self._population_table
-        for p in (self.population, self.shape, self.cell_table):
+        for p in (self.population, self.shape, self.cell_table, self.cell_info):
             p.run_async = self.run_task          # heavy compute → status-bar bar
         self.cell_table.cellSelected.connect(self.select_cell)
         self.population.cellSelected.connect(self.select_cell)
@@ -205,8 +205,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
             self.masks.labels = _fov.apply_fov(self.masks.labels, self.recording.fov)
         self._display = {}
         self.selected = 0
-        self._cent_hist = self._track_len = self._mean_speed = None
-        self._cell_source = self._shape_model = self._pop_df = None
+        self._cent_hist = self._track_len = self._mean_speed = self._cell_source = self._shape_model = self._pop_df = None
         self._contact_cache, self._iface_cache = {}, {}     # per-recording contact memo
         labels = self.masks.labels if self.masks is not None else None
         # Lineage is derived from the loaded masks themselves (track topology), not
@@ -225,8 +224,9 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
                                       divisions=self.divisions)
         self.canvas.overlays.set_scale(self.recording.um_per_px)
         self.display.set_channels(self.recording.channel_names)
-        self.cell_info.set_available(self.recording.channel_names,
-                                     self.recording.um_per_px)
+        self.cell_info.set_available(self.recording.channel_names, self.recording.um_per_px)
+        self.cell_info.set_context(labels, self.recording.um_per_px,
+                                   self.recording.time_interval_min, self.recording)
         self._rebuild_metrics_menu()
         self.timeline.set_time_interval(self.recording.time_interval_min)
         self.timeline.set_range(self.recording.n_frames)
