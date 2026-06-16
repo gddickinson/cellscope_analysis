@@ -5,6 +5,29 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Docs + in-app help sync
+
+Audited every doc / help surface against the recent features (state/shape params,
+audit fixes, edge curvature, rectangle positioning, track-length metric, mask source).
+CLAUDE.md + INTERFACE.md were already current (those PRs updated them). Gaps found +
+fixed:
+
+- **Help ▸ Metrics Reference + tooltips** (`metric_docs`): added `curvature` (edge
+  summaries) and `track_length` doc entries — previously the `track_length_min` /
+  curvature comparison/edge tooltips fell back to a bare label with no what/how. Now
+  they render in the Metrics Reference dialog and as comparison-column tooltips.
+- **README.md**: mask-source added to the colour-by list; curvature/radius kymographs
+  + the rectangle-positioning option added to the membrane-dynamics section.
+- **docs/DATA.md**: noted that `masks_precleanup.npz` / `masks_original.npz` carry the
+  per-pixel `fusion_source_stack` (1=DIC, 2=Cy5, 3=both) now surfaced as the mask-source
+  colour-by.
+
+(FINDINGS_followup.md has no shape-mode/curvature content, so the shape-mode rotation
+fix needs no caveat there.) `pytest` **145 passed**; Help/tooltip render smoke green;
+all files < 500.
+
+---
+
 ## 2026-06-16 — Colour masks by detection source (DIC / Cy5 / both)
 
 Added a **Mask source** colour-by. The detection pipeline records a per-pixel

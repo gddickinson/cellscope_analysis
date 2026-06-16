@@ -74,8 +74,8 @@ The viewer's `config.json` points its `data_root` at `data/by_condition`.
 | `*_metadata.txt` | original Micro-Manager acquisition metadata |
 | `pipeline_results/masks.npz` | **current** masks — key `labels` `(T,H,W)` int32, 0=bg, IDs track-consistent across frames |
 | `pipeline_results/masks_reviewed.npz` | masks after manual review, before cleaning |
-| `pipeline_results/masks_precleanup.npz` | backup taken just before the cleaning pass |
-| `pipeline_results/masks_original.npz` | raw detector output, before any human edits |
+| `pipeline_results/masks_precleanup.npz` | backup just before the cleaning pass — also carries `fusion_source_stack` (per-pixel detection source: 1=DIC, 2=Cy5, 3=both) |
+| `pipeline_results/masks_original.npz` | raw detector output, before any human edits (also carries `fusion_source_stack`) |
 | `pipeline_results/divisions.json` | detected cell-division events (parent → daughters, frame) |
 | `pipeline_results/RUN_METADATA.json` | provenance: pipeline name, n_frames, n_tracks, runtime, etc. |
 | `per_cell.csv` | one row per tracked cell — state-stratified metrics (see below) |
