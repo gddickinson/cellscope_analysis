@@ -223,6 +223,12 @@ Read this before opening source files. Update it when modules change.
   **`_export`**, and `_show_multivariate`; `multivariate_dialog`/`show_multivariate`
   (PERMANOVA + LORO-AUC table) + `show_metrics_help(parent)`. Split out to keep
   `compare_window` small.
+- **forest_plot.py** — `ForestPlotDialog`: the Stats-tab **Forest…** — Cohen's d ±
+  95% bootstrap CI of *every* metric for a chosen contrast (sorted by |d|; red =
+  MWU p<0.05), via `compare.forest_data`. CSV export.
+- **phenotype_map.py** — `PhenotypeMapDialog`: the Stats-tab **Phenotype map…** —
+  the per-**cell** 2-D cloud of two metrics with a 1σ+2σ covariance ellipse per
+  condition (the multivariate phenotype as a figure).
 - **ranked_report.py** — `RankedReportDialog`: the Stats-tab **Ranked report** — a
   sortable table of every group-pair comparison for the current metric, ordered by
   likelihood of a significant difference (p-asc), with Bonferroni / Cohen d / stars
