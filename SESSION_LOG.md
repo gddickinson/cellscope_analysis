@@ -5,6 +5,68 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Deep-dive correctness audit: 6 calculation bugs fixed
+
+Test-drove the whole GUI headless (all 17 colour-by modes, every cell-info plot
+metric, MSD/autocorr, population, shape, edge+fluorescence, config, CSV, comparison
+build — all green) and ran a 5-front correctness audit of the analysis math. The GUI
+surface had **no runtime bugs**; the audit found and we fixed **6 calculation bugs**
+(+ doc/consistency fixes):
+
+1. **`motion.turning_angles` (HIGH)** — a paused cell (zero-length step) got
+   `arctan2(0,0)=0` (phantom "due-east"), so a straight-but-paused track produced two
+   fake ~90° turns and `run_and_tumble` reported it as **fully tumbling**. Now joints
+   adjacent to a zero-length step return NaN (mirrors the guard
+   `direction_autocorrelation` already had); `run_and_tumble` is NaN-aware.
+2. **`shape_modes.contour_signature` (HIGH)** — the orientation-roll didn't actually
+   remove rotation (inertia-orientation is mod-π and in a different angular frame than
+   the binning), so VAMPIRE "shape modes" largely encoded **cell orientation, not
+   shape** (a fixed shape rotating scattered across all modes). Replaced with a
+   2nd-Fourier-harmonic alignment computed *in the binning frame* + a 180°-flip
+   canonicalization. Rotation RMS of the signature: **0.43 → 0.017**; rotated copies of
+   one shape now collapse together and round-vs-elongated separate regardless of angle.
+3. **`compare.ranked_group_comparisons` (MED)** — guard `not (ptp(a)==0 and ptp(b)==0)`
+   discarded a *valid, maximally-significant* comparison when both groups were
+   internally constant but different (e.g. WT=[5,5,5] vs KO=[9,9,9] → p=0.047 in the
+   main Stats table but NaN in the Ranked report). Now skips only the all-tied case
+   (`ptp(pooled)==0`).
+4. **`cell_metrics`→`state.classify_state` (MED)** — `circularity` was computed but
+   never passed, so the no-scale fallback was dead code and scale-less recordings
+   classified **every** cell `unknown`. Passed at both call sites (verified: a disk with
+   no µm/px now classifies `rounded`).
+5. **`contacts._aggregate` (LOW-MED)** — `contact_fraction`/`contact_length` counted
+   boundary pixels of sub-`min_px` partners that `n_contacts`/class dropped. Now counts
+   only pixels touching a surviving partner (a no-op when all partners survive).
+6. **`motion.displacement_metrics` (MED)** — `mean_speed` divided total path by step
+   *count*, inflating speed across tracking gaps. Now total path ÷ elapsed *time*
+   (identical for gapless tracks; flows to colour-by + the comparison's mean_speed).
+
+Plus: `mode_contour` display angle now matches the binning frame (cosmetic); the
+perimeter is correctly labelled **skimage `regionprops` perimeter (Benkrid–Crookes,
+nb=4), not Crofton** (comments + module docstring + INTERFACE.md + CLAUDE.md);
+`_convexity`'s curvature-dependent bias is documented (relative ruffling index); and the
+`ComputeWorker` option fallbacks now match the documented "all OFF" defaults.
+
+Audit **verified correct** (no change): MSD / α-D fit (incl. the 4D factor) / Fürth /
+direction autocorrelation; edge-dynamics velocity sign + units + polarity +
+rear-retraction; **all** comparison statistics (recording = unit everywhere, BH-FDR
+matches scipy + monotone + ≤Bonferroni, Cohen's d pooled SD, MWU/KW guards, PERMANOVA
+pseudo-F with +1 permutation p, leave-one-recording-out AUC, CR1 cluster-robust SE,
+state-segmented speed-cap/edge/segment gating); nearest-neighbour; CIL sign/windowing;
+moment-based eccentricity/axes/orientation/extent; membrane metrics.
+
+Low-severity items left as documented limitations (real call sites unaffected):
+per-step `instantaneous_speed` gap bridging (needed by `jump_steps` QC), contact-episode
+/ CIL-onset counting across tracking gaps, edge-cell boundary undercount, degenerate
+sub-`MIN_AREA` region axes, `multivariate.loadings` unweighted pooled SD, `bootstrap_ci`
+degenerate-resample drop, PERMANOVA div-by-zero on degenerate group counts.
+
+Tests +6 (`tests/test_audit_fixes.py`): pause→no-phantom-turn, rotation-invariant shape
+signature + shape-not-orientation clustering, ranked-report constant-but-different
+groups, no-scale state fallback. `pytest` **128 passed**; all files < 500.
+
+---
+
 ## 2026-06-16 — Expose ALL remaining code-level constants in the Analysis-parameters tab
 
 Followed up by surfacing the constants previously left in code. The tab now groups

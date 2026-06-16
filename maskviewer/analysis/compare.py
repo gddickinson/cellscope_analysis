@@ -353,7 +353,7 @@ def ranked_group_comparisons(per_recording, metric, groups=None, per_cell=None,
             va, vb = vals.get(a, np.array([])), vals.get(b, np.array([]))
             p = np.nan
             if (va.size and vb.size and va.size + vb.size >= 3
-                    and not (np.ptp(va) == 0 and np.ptp(vb) == 0)):
+                    and np.ptp(np.concatenate([va, vb])) > 0):    # skip only all-tied
                 try:
                     p = float(_ss.mannwhitneyu(va, vb, alternative="two-sided").pvalue)
                 except ValueError:

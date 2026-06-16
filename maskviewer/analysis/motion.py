@@ -41,17 +41,27 @@ def instantaneous_speed(cen: np.ndarray, dt_min: float | None = None) -> np.ndar
 
 
 def displacement_metrics(cen: np.ndarray, dt_min: float | None = None) -> dict:
-    """Net displacement, total path, straightness and mean speed for a track."""
-    pts = _finite_points(cen)
+    """Net displacement, total path, straightness and mean speed for a track.
+
+    ``mean_speed`` is total path ÷ **elapsed time over the track** (the span between
+    the first and last present frame), so a track with internal gaps (the cell
+    briefly untracked) is not over-stated by dividing by step count alone. Identical
+    to the per-step mean for gapless tracks.
+    """
+    cen = np.asarray(cen, float)
+    ok = np.isfinite(cen).all(axis=1)
+    pts = cen[ok]
     if pts.shape[0] < 2:
         return {"net_disp": np.nan, "total_path": np.nan, "straightness": np.nan,
                 "mean_speed": np.nan, "n_steps": 0}
     seg = np.sqrt((np.diff(pts, axis=0) ** 2).sum(axis=1))
     total = float(seg.sum())
     net = float(np.sqrt(((pts[-1] - pts[0]) ** 2).sum()))
+    idx = np.where(ok)[0]
+    elapsed = float(idx[-1] - idx[0])                 # frames actually spanned (≥ n_steps)
     return {"net_disp": net, "total_path": total,
             "straightness": net / total if total > 0 else np.nan,
-            "mean_speed": (float(seg.mean()) / float(dt_min)) if dt_min else float(seg.mean()),
+            "mean_speed": (total / (elapsed * float(dt_min))) if dt_min else total / elapsed,
             "n_steps": int(seg.size)}
 
 
@@ -100,13 +110,22 @@ def msd(cen: np.ndarray, dt_min: float | None = None,
 
 
 def turning_angles(cen: np.ndarray) -> np.ndarray:
-    """Signed turn (rad, [-π, π]) between consecutive step directions."""
+    """Signed turn (rad, [-π, π]) between consecutive step directions.
+
+    A joint adjacent to a **zero-length step** (the cell paused — identical
+    consecutive centroids) has no defined direction, so it returns NaN rather than
+    a phantom turn. (``arctan2(0, 0)`` is 0/"due-east", which would otherwise make a
+    straight-but-paused track register two large fake turns — and `run_and_tumble`
+    then mis-report it as fully tumbling.)"""
     pts = _finite_points(cen)
     if pts.shape[0] < 3:
         return np.array([])
     steps = np.diff(pts, axis=0)
+    norms = np.sqrt((steps ** 2).sum(axis=1))
     ang = np.arctan2(steps[:, 0], steps[:, 1])
-    return (np.diff(ang) + np.pi) % (2 * np.pi) - np.pi
+    turns = (np.diff(ang) + np.pi) % (2 * np.pi) - np.pi
+    turns[(norms[:-1] == 0) | (norms[1:] == 0)] = np.nan   # pause → undefined, not 90°
+    return turns
 
 
 def fit_msd(tau: np.ndarray, msd_vals: np.ndarray) -> dict:
@@ -171,7 +190,8 @@ def run_and_tumble(cen: np.ndarray, dt_min: float | None = None,
     if turns.size == 0:
         return {k: np.nan for k in keys}
     dt = float(dt_min) if dt_min else 1.0
-    is_tumble = np.abs(turns) > np.deg2rad(turn_threshold_deg)
+    defined = np.isfinite(turns)                       # pause-joints (NaN) are excluded
+    is_tumble = defined & (np.abs(turns) > np.deg2rad(turn_threshold_deg))
     run_steps, cur = [], 1                             # first step opens a run
     for t in is_tumble:
         if t:
@@ -187,7 +207,7 @@ def run_and_tumble(cen: np.ndarray, dt_min: float | None = None,
         "mean_run_steps": float(run_steps.mean()),
         "mean_run_duration": float(run_steps.mean()) * dt,
         "tumble_rate": float(is_tumble.sum() / (n_steps * dt)) if n_steps else np.nan,
-        "frac_tumble": float(is_tumble.mean()),
+        "frac_tumble": float(is_tumble.sum() / defined.sum()) if defined.any() else np.nan,
         "mean_tumble_angle_deg": (float(np.rad2deg(tumble_ang.mean()))
                                   if tumble_ang.size else np.nan),
     }

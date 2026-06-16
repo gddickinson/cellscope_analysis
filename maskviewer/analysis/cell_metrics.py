@@ -4,9 +4,10 @@ Moment-based morphometry computed directly with NumPy/SciPy so the package
 keeps its light, CPU-only dependency set. The eccentricity and axis-length
 definitions match scikit-image's ``regionprops`` (central second moments with
 the +1/12 pixel-area correction), so values are comparable to the wider
-literature. Perimeter / circularity (which need a robust boundary trace, i.e.
-scikit-image) are intentionally omitted — they are also noise-sensitive at this
-pixel size; ``solidity`` is provided via a SciPy convex hull when requested.
+literature. Perimeter / circularity / convexity are **opt-in** (``with_perimeter``)
+since a raster perimeter is noise-sensitive at this pixel size; the estimator is
+scikit-image's ``regionprops`` perimeter (Benkrid–Crookes, neighborhood=4), not the
+Crofton variant. ``solidity`` is a SciPy convex hull, also opt-in.
 
 These are the building blocks for the CSV exporters (``exporters.py``) and the
 GUI cell-info panel. Pure functions over ``(T, H, W)`` / ``(H, W)`` int arrays.
@@ -22,8 +23,9 @@ from . import neighbors as _nbr
 from . import membrane as _membrane
 from . import contacts as _contacts
 
-# Crofton perimeter weights (identical to scikit-image's regionprops perimeter,
-# neighborhood=4) so circularity is comparable to the wider literature.
+# Perimeter weights = skimage ``measure.perimeter(neighborhood=4)`` (Benkrid–Crookes,
+# as ``regionprops.perimeter`` uses) — NOT skimage's separate ``perimeter_crofton``.
+# Runs ~2-4% high on curves, so the derived circularity is conservative.
 _PERIM_W = np.zeros(50)
 _PERIM_W[[5, 7, 15, 17, 25, 27]] = 1.0
 _PERIM_W[[21, 33]] = np.sqrt(2)
@@ -32,7 +34,7 @@ _PERIM_KERNEL = np.array([[10, 2, 10], [2, 1, 2], [10, 2, 10]])
 
 
 def _perimeter(mask: np.ndarray) -> float:
-    """Boundary perimeter (px) of a 2-D boolean mask (Crofton estimate)."""
+    """Boundary perimeter (px) of a 2-D mask (skimage regionprops perimeter, nb=4)."""
     img = mask.astype(np.uint8)
     border = img - ndimage.binary_erosion(img, border_value=0).astype(np.uint8)
     conv = ndimage.convolve(border, _PERIM_KERNEL, mode="constant", cval=0)
@@ -44,6 +46,10 @@ def _convexity(rows: np.ndarray, cols: np.ndarray, perimeter_px: float) -> float
 
     Perimeter-based (unlike solidity, which is area-based) so it is far more
     sensitive to fine membrane ruffling / blebbing — an actin-protrusion readout.
+
+    NOTE: numerator = exact Euclidean hull-polygon perimeter, denominator = raster
+    ``_perimeter`` (a few % high on curves), so a smoothly convex curved cell reads
+    ~0.95 not 1.0 (a mild curvature-dependent offset) — a *relative* ruffling index.
     """
     if perimeter_px <= 0:
         return float("nan")
@@ -165,6 +171,7 @@ def regionprops_frame(labels2d: np.ndarray, um_per_px: float | None = None,
                 rec["perimeter_um"] = per_px * scale
         rec["state"] = _state.classify_state(
             area, rec.get("area_um2"), rec["eccentricity"],
+            circularity=rec.get("circularity"),
             solidity=rec.get("solidity"), edge=rec["edge"])
         out[lab] = rec
     return out
@@ -397,8 +404,8 @@ def cell_frame_table(labels: np.ndarray, cell_id: int, um_per_px=None,
             rec["convexity"] = _convexity(rows, cols, per_px)
         edge = bool(x0 == 0 or y0 == 0 or x1 >= W - 1 or y1 >= H - 1)
         rec["state_code"] = _state.STATE_CODE[_state.classify_state(
-            area, area_um2, sh["eccentricity"], solidity=rec.get("solidity"),
-            edge=edge)]
+            area, area_um2, sh["eccentricity"], circularity=rec.get("circularity"),
+            solidity=rec.get("solidity"), edge=edge)]
         if want_iou:
             if prev_m is not None:
                 union = float(np.logical_or(m, prev_m).sum())
