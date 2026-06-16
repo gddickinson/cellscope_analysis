@@ -236,14 +236,19 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
     fast; enabling a family adds its columns (and its compute cost). Enabling these
     makes **every main-GUI metric comparable** (incl. per-channel intensity / membrane,
     shape modes, contacts, edge polarity).
-  - **Analysis parameters** (grouped by section): tune the **neighbour radius** (µm),
-    **contact gap tolerance** (px), **extensive-contact threshold**, the
-    **state-classification thresholds** (rounded max area µm² + max eccentricity — drive
-    state / frac_rounded / all state-segmented metrics) and the **number of shape
-    modes** (`compare_tables.ANALYSIS_PARAMS` → `apply_analysis_params` sets the analysis
-    module globals, which the functions read at call time so a change applies to
-    **both** the comparison (recompute — folded into the cache key) **and** the
-    interactive overlays / colour-by / cell-info; the shape model re-fits).
+  - **Analysis parameters** (grouped by section, scrollable): every tunable analysis
+    constant lives here — **Neighbours & contact** (neighbour radius µm, contact gap
+    tolerance px, extensive-contact threshold, min contact size px) · **State
+    classification** (rounded max area µm² + max eccentricity + min cell area px — drive
+    state / frac_rounded / all state-segmented metrics) · **Shape modes** (number of
+    modes) · **Motion** (run/tumble turn angle °, jump-step factor) · **Edge dynamics**
+    (front/rear half-cone °, kymograph time σ + angular window) · **Edge↔fluorescence
+    sampling** (rectangle depth/width px, min in-cell coverage) · **Contact inhibition**
+    (CIL speed window). All via `compare_tables.ANALYSIS_PARAMS` → `apply_analysis_params`,
+    which sets the analysis-module globals that the (sentinel-`None`-defaulted) functions
+    read at call time, so a change applies to **both** the comparison (recompute — folded
+    into the cache key via `analysis_params_tag`) **and** the interactive overlays /
+    colour-by / cell-info / edge + shape panels (the shape model re-fits).
   - **Pixel size & time scale**: manually set **µm/px** and/or **min/frame** for when
     a file's metadata is lost or incorrect. Stored on the `Project` (`px_size` /
     `frame_interval`), applied to **every** recording (`Project.scaled`) — scale bar,

@@ -90,18 +90,20 @@ class ConfigWindow(QtWidgets.QDialog):
     def _params_tab(self):
         w = QtWidgets.QWidget()
         v = QtWidgets.QVBoxLayout(w)
-        v.addWidget(_wrap("Parameters that define the neighbour / contact analyses. "
-                          "Apply to <b>both</b> the comparison (recompute) and the "
-                          "interactive overlays / colour-by."))
+        v.addWidget(_wrap("Parameters that define the analyses (grouped by kind). Apply "
+                          "to <b>both</b> the comparison (on its next Recompute) and the "
+                          "interactive overlays / colour-by / panels."))
+        host = QtWidgets.QWidget()
+        hv = QtWidgets.QVBoxLayout(host)
         self._param_spins = {}
         section = None
         form = None
         for key, label, default, lo, hi, dec, sect, tip in ANALYSIS_PARAMS:
             if sect != section:                            # new section → header + form
                 section = sect
-                v.addWidget(QtWidgets.QLabel(f"<b>{sect}</b>"))
+                hv.addWidget(QtWidgets.QLabel(f"<b>{sect}</b>"))
                 form = QtWidgets.QFormLayout()
-                v.addLayout(form)
+                hv.addLayout(form)
             sp = QtWidgets.QDoubleSpinBox()
             sp.setRange(lo, hi)
             sp.setDecimals(dec)
@@ -110,16 +112,23 @@ class ConfigWindow(QtWidgets.QDialog):
             sp.valueChanged.connect(lambda val, k=key: self._set_param(k, val))
             self._param_spins[key] = sp
             form.addRow(label, sp)
+        hv.addStretch(1)
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(host)
+        v.addWidget(scroll)
         reset = QtWidgets.QPushButton("Reset to defaults")
         reset.clicked.connect(self._reset_params)
         v.addWidget(reset)
-        v.addStretch(1)
         return w
+
+    # params whose change invalidates the cached VAMPIRE shape model (it re-fits)
+    _SHAPE_PARAMS = ("shape_n_modes", "state_min_area_px")
 
     def _set_param(self, key, val):
         self._settings.setValue(f"analysis/{key}", float(val))
         apply_analysis_params(self._settings)
-        if key == "shape_n_modes":                        # shape model must re-fit
+        if key in self._SHAPE_PARAMS:                     # shape model must re-fit
             self.win._shape_model = None
         for attr in ("_contact_cache", "_iface_cache"):   # force overlays to recompute
             getattr(self.win, attr, {}).clear()

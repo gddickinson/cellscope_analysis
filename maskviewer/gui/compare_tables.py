@@ -66,6 +66,10 @@ ANALYSIS_PARAMS = [
      "Neighbours & contact",
      "A neighbour interface ≥ this fraction of the cell's boundary is 'extensive' "
      "(else 'point')."),
+    ("contact_min_px", "Min contact size (px)", 2.0, 1.0, 50.0, 0,
+     "Neighbours & contact",
+     "Boundary-pixel contacts smaller than this are ignored (noise floor for cell–cell "
+     "touching)."),
     ("rounded_area_um2", "Rounded: max area (µm²)", 960.0, 50.0, 10000.0, 0,
      "State classification (rounded vs spread)",
      "A cell is 'rounded' only if its footprint is ≤ this AND not elongated; drives "
@@ -73,8 +77,42 @@ ANALYSIS_PARAMS = [
     ("rounded_ecc", "Rounded: max eccentricity", 0.85, 0.1, 1.0, 2,
      "State classification (rounded vs spread)",
      "A cell is 'rounded' only if its eccentricity is ≤ this (and small)."),
+    ("state_min_area_px", "Min cell area (px)", 200.0, 0.0, 5000.0, 0,
+     "State classification (rounded vs spread)",
+     "Cells smaller than this footprint are 'unknown' (too small to classify, and "
+     "excluded from shape-mode fitting)."),
     ("shape_n_modes", "Number of shape modes", 5, 2, 12, 0, "Shape modes (VAMPIRE)",
      "How many clusters the VAMPIRE shape-mode model uses (re-fits + re-caches)."),
+    ("run_tumble_turn_deg", "Run/tumble turn angle (°)", 60.0, 5.0, 175.0, 0, "Motion",
+     "Turning angle above which a step counts as a reorientation 'tumble' (run-and-"
+     "tumble decomposition / tumble rate)."),
+    ("jump_factor", "Jump-step factor (× median)", 5.0, 1.5, 50.0, 1, "Motion",
+     "A step longer than this × the median step length is flagged as a tracking jump "
+     "(track-quality QC)."),
+    ("edge_front_deg", "Front/rear half-cone (°)", 60.0, 10.0, 90.0, 0, "Edge dynamics",
+     "Half-angle from the migration direction defining 'front' vs 'rear' edge sectors "
+     "(polarity index / rear-retraction fraction)."),
+    ("edge_temporal_sigma", "Kymograph time smoothing (σ frames)", 1.0, 0.0, 5.0, 1,
+     "Edge dynamics",
+     "Gaussian σ (frames) applied along time to the edge-velocity kymograph (0 = none)."),
+    ("edge_angular_window", "Kymograph angular window (sectors)", 5.0, 3.0, 15.0, 0,
+     "Edge dynamics",
+     "Savitzky-Golay window (odd, in sectors) smoothing each frame's boundary radius "
+     "around the cell."),
+    ("edge_rect_depth_px", "Sampling rectangle depth (px)", 12.0, 2.0, 60.0, 0,
+     "Edge ↔ fluorescence sampling",
+     "How far each edge-intensity sampling rectangle reaches inward from the boundary."),
+    ("edge_rect_width_px", "Sampling rectangle width (px)", 7.0, 2.0, 60.0, 0,
+     "Edge ↔ fluorescence sampling",
+     "Width of each edge-intensity sampling rectangle along the boundary."),
+    ("edge_min_coverage", "Sampling min in-cell coverage", 0.3, 0.0, 1.0, 2,
+     "Edge ↔ fluorescence sampling",
+     "A sampling rectangle is dropped if less than this fraction of it lies inside the "
+     "cell mask."),
+    ("cil_window", "CIL speed window (frames)", 3.0, 1.0, 20.0, 0,
+     "Contact inhibition (CIL)",
+     "± frames around a contact event over which the speed change is measured "
+     "(negative = slowing as contact forms)."),
 ]
 
 
@@ -87,14 +125,26 @@ def analysis_params(settings=None) -> dict:
 def apply_analysis_params(settings=None):
     """Push the configured analysis parameters onto the analysis module globals so
     every computation (comparison + interactive) reads them at call time."""
-    from ..analysis import neighbors, contacts, state, shape_modes
+    from ..analysis import (neighbors, contacts, state, shape_modes, motion,
+                            edge_dynamics, edge_intensity, cil)
     p = analysis_params(settings)
     neighbors.DEFAULT_RADIUS_UM = p["nn_radius"]
     contacts.DEFAULT_GAP_PX = p["contact_gap"]
     contacts.EXTENSIVE_FRAC = p["extensive_frac"]
+    contacts.MIN_CONTACT_PX = int(p["contact_min_px"])
     state.ROUNDED_AREA_UM2 = p["rounded_area_um2"]
     state.ROUNDED_ECC = p["rounded_ecc"]
+    state.MIN_AREA_PX = int(p["state_min_area_px"])
     shape_modes.N_MODES = int(p["shape_n_modes"])
+    motion.RUN_TUMBLE_TURN_DEG = p["run_tumble_turn_deg"]
+    motion.JUMP_FACTOR = p["jump_factor"]
+    edge_dynamics.POLARITY_FRONT_DEG = p["edge_front_deg"]
+    edge_dynamics.TEMPORAL_SIGMA = p["edge_temporal_sigma"]
+    edge_dynamics.ANGULAR_SG_WINDOW = int(p["edge_angular_window"])
+    edge_intensity.DEPTH_PX = int(p["edge_rect_depth_px"])
+    edge_intensity.WIDTH_PX = int(p["edge_rect_width_px"])
+    edge_intensity.MIN_COVERAGE = p["edge_min_coverage"]
+    cil.DEFAULT_WINDOW = int(p["cil_window"])
 
 
 def analysis_params_tag(settings=None) -> str:

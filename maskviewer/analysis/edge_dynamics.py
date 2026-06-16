@@ -18,8 +18,9 @@ import numpy as np
 from scipy import ndimage
 
 N_SECTORS = 72
-ANGULAR_SG_WINDOW = 5
-TEMPORAL_SIGMA = 1.0
+ANGULAR_SG_WINDOW = 5             # Savitzky-Golay window for per-frame angular smoothing
+TEMPORAL_SIGMA = 1.0             # Gaussian sigma (frames) for temporal kymograph smoothing
+POLARITY_FRONT_DEG = 60.0        # half-cone (deg) defining front/rear sectors
 _SUMMARY_KEYS = ("mean_protrusion_velocity", "mean_retraction_velocity",
                  "protrusion_fraction", "net_velocity", "max_protrusion",
                  "max_retraction", "ruffling")
@@ -193,7 +194,7 @@ _POLARITY_KEYS = ("front_velocity", "rear_velocity", "side_velocity",
                   "polarity_index", "rear_retraction_fraction")
 
 
-def edge_polarity(labels, cell_id, um_per_px=None, dt_min=None, front_deg=60.0,
+def edge_polarity(labels, cell_id, um_per_px=None, dt_min=None, front_deg=None,
                   pairs=None, vel=None) -> dict:
     """Edge velocity resolved in the **migration-direction frame**.
 
@@ -206,6 +207,8 @@ def edge_polarity(labels, cell_id, um_per_px=None, dt_min=None, front_deg=60.0,
     and the rear retracts) and ``rear_retraction_fraction`` (share of all retraction
     happening at the rear — the PIEZO1 rear-retraction signature). Pass a precomputed
     ``pairs`` / ``vel`` (from ``edge_velocity_kymograph``) to avoid recomputing."""
+    if front_deg is None:
+        front_deg = POLARITY_FRONT_DEG
     labels = np.asarray(labels)
     if pairs is None or vel is None:
         pairs, vel = edge_velocity_kymograph(labels, cell_id, um_per_px, dt_min)
