@@ -144,6 +144,23 @@ EXTRA = {
                       "mid-centroid ÷ interval (µm/min)."),
     "ruffling": ("Edge activity.",
                  "Mean over sectors of the temporal std of edge velocity."),
+    "edge_front_velocity": ("Edge velocity at the cell front (migration direction).",
+        "Mean edge velocity in the forward cone after rotating each frame-pair's "
+        "sectors to the cell's migration direction (+protrusion; µm/min). Includes "
+        "migration-driven leading-edge advance."),
+    "edge_rear_velocity": ("Edge velocity at the cell rear.",
+        "Mean edge velocity in the backward cone (−retraction; µm/min)."),
+    "edge_polarity_index": ("Front−rear morphodynamic polarity.",
+        "front_velocity − rear_velocity: large when the front protrudes and the rear "
+        "retracts. Correlated with migration speed — read with the speed-adjusted OLS."),
+    "edge_rear_retraction_fraction": ("How concentrated retraction is at the rear.",
+        "Σ rear-sector retraction ÷ Σ all retraction (0–1) — a spatial concentration "
+        "(more speed-independent than the magnitude); the PIEZO1 rear-retraction "
+        "signature (GOF / YODA1 ↑ rear retraction)."),
+    "edge_piezo_lag": ("Does the fluorescence lead or follow edge motion?",
+        "Frame lag of the strongest edge-velocity ↔ rectangle-intensity correlation: "
+        "peak_lag < 0 = the signal enriches BEFORE the movement (leads it, e.g. actin "
+        "before protrusion), > 0 = follows; peak_r is that correlation."),
     "edge_piezo_corr": ("Edge-movement ↔ fluorescence-intensity coupling (e.g. "
                         "tagged PIEZO1). +ve = the channel is brighter where the "
                         "edge protrudes; −ve = brighter where it retracts.",
@@ -258,6 +275,7 @@ _KEY_ALIASES = {
     "nn_dist": "nn_dist", "mean_nn_dist": "nn_dist", "median_nn_dist": "nn_dist",
     "edge_piezo_slope": "edge_piezo_corr",
     "piezo_protr_minus_retr": "edge_piezo_corr",
+    "edge_piezo_peak_lag": "edge_piezo_lag", "edge_piezo_peak_r": "edge_piezo_lag",
 }
 
 

@@ -35,7 +35,7 @@ def _resolve_channel(rec, channel):
 
 def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
                      piezo_channel=None, corrections=None, scale_override=None,
-                     with_contacts=True, with_state_segmented=True):
+                     with_contacts=True, with_state_segmented=True, with_edge=False):
     """(per_cell_df, msd_long_df, autocorr_long_df) across all entries with masks.
 
     per_cell_df: per-cell rows + recording + condition. msd_long_df / autocorr_long_df:
@@ -78,7 +78,7 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
                                        with_contacts=with_contacts)
         df = exporters.per_cell_table(labels, rec.um_per_px,
                                       rec.time_interval_min, with_solidity,
-                                      per_frame_df=pf, centroids=cents)
+                                      per_frame_df=pf, centroids=cents, with_edge=with_edge)
         if df.empty:
             continue
         df = df.copy()
@@ -99,7 +99,9 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
                 prows.append({"cell_id": int(cid),
                               "edge_piezo_corr": summ["edge_move_intensity_r"],
                               "edge_piezo_slope": summ["edge_move_intensity_slope"],
-                              "piezo_protr_minus_retr": summ["piezo_protr_minus_retr"]})
+                              "piezo_protr_minus_retr": summ["piezo_protr_minus_retr"],
+                              "edge_piezo_peak_lag": summ.get("edge_intensity_peak_lag"),
+                              "edge_piezo_peak_r": summ.get("edge_intensity_peak_r")})
             df = df.merge(pd.DataFrame(prows), on="cell_id", how="left")
         df["recording"] = e.label
         df["condition"] = e.condition or "?"

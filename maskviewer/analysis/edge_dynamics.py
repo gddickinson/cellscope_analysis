@@ -189,9 +189,66 @@ def edge_events(velmat, dt_min=None, thresh=None, min_len=2) -> dict:
     }
 
 
+_POLARITY_KEYS = ("front_velocity", "rear_velocity", "side_velocity",
+                  "polarity_index", "rear_retraction_fraction")
+
+
+def edge_polarity(labels, cell_id, um_per_px=None, dt_min=None, front_deg=60.0,
+                  pairs=None, vel=None) -> dict:
+    """Edge velocity resolved in the **migration-direction frame**.
+
+    Each frame-pair's angular sectors are rotated by the cell's instantaneous
+    migration direction (centroid displacement), so 'front' sectors point the way
+    the cell is going and 'rear' sectors point opposite. ``front_deg`` is the
+    half-cone (deg): front = within it of forward, rear = within it of backward,
+    else side. Reports mean front / rear / side edge velocity (+protrusion /
+    −retraction), a ``polarity_index`` (front − rear; large when the front protrudes
+    and the rear retracts) and ``rear_retraction_fraction`` (share of all retraction
+    happening at the rear — the PIEZO1 rear-retraction signature). Pass a precomputed
+    ``pairs`` / ``vel`` (from ``edge_velocity_kymograph``) to avoid recomputing."""
+    labels = np.asarray(labels)
+    if pairs is None or vel is None:
+        pairs, vel = edge_velocity_kymograph(labels, cell_id, um_per_px, dt_min)
+    if vel.size == 0:
+        return {k: np.nan for k in _POLARITY_KEYS}
+    present = _present_frames(labels, cell_id)
+    cents = {}
+    for t in present:
+        rr, cc = np.nonzero(labels[t] == cell_id)
+        cents[t] = (rr.mean(), cc.mean())
+    centers = (np.arange(N_SECTORS) + 0.5) / N_SECTORS * 2 * np.pi - np.pi
+    fh = np.deg2rad(front_deg)
+    fv, rv, sv = [], [], []
+    for i, b in enumerate(pairs):
+        a = present[i]                                # pairs[i] == present[i+1]
+        dy, dx = cents[b][0] - cents[a][0], cents[b][1] - cents[a][1]
+        if dy == 0 and dx == 0:
+            continue                                  # no migration → no front/rear
+        rel = np.abs(((centers - np.arctan2(dy, dx) + np.pi) % (2 * np.pi)) - np.pi)
+        row = vel[i]
+        for bucket, sel in ((fv, rel <= fh), (rv, rel >= np.pi - fh),
+                            (sv, (rel > fh) & (rel < np.pi - fh))):
+            bucket.extend(row[sel][np.isfinite(row[sel])].tolist())
+    fv, rv, sv = np.array(fv), np.array(rv), np.array(sv)
+    allv = np.concatenate([fv, rv, sv]) if fv.size + rv.size + sv.size else np.array([])
+    retr = allv[allv < 0]
+    rear_retr = rv[rv < 0]
+    return {
+        "front_velocity": float(fv.mean()) if fv.size else np.nan,
+        "rear_velocity": float(rv.mean()) if rv.size else np.nan,
+        "side_velocity": float(sv.mean()) if sv.size else np.nan,
+        "polarity_index": (float(fv.mean() - rv.mean())
+                           if fv.size and rv.size else np.nan),
+        "rear_retraction_fraction": (float(rear_retr.sum() / retr.sum())
+                                     if retr.sum() != 0 else np.nan),
+    }
+
+
 def edge_summary_for_cell(labels, cell_id, um_per_px=None, dt_min=None) -> dict:
-    """Convenience: velocity kymograph → summary + event metrics for one cell."""
-    _, mat = edge_velocity_kymograph(labels, cell_id, um_per_px, dt_min)
+    """Convenience: velocity kymograph → summary + event + polarity metrics."""
+    labels = np.asarray(labels)
+    pairs, mat = edge_velocity_kymograph(labels, cell_id, um_per_px, dt_min)
     out = edge_summary(mat)
     out.update(edge_events(mat, dt_min))
+    out.update(edge_polarity(labels, cell_id, pairs=pairs, vel=mat))
     return out

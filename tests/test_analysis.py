@@ -159,6 +159,28 @@ def test_growing_disk_is_protrusion():
     assert np.nanmedian(rmat[-1]) > np.nanmedian(rmat[0])     # radius grew
 
 
+def test_edge_polarity_translation_front_rear():
+    """A disc translating right: relative to the mid-centroid the leading edge
+    protrudes and the trailing edge retracts → front>0, rear<0, rear-concentrated
+    retraction, with the polarity axis aligned to the migration direction."""
+    labels = np.zeros((6, 80, 80), int)
+    for t in range(6):
+        labels[t][_disk(80, 80, 40, 20 + 4 * t, 10)] = 1     # moves +x each frame
+    p = edge_dynamics.edge_polarity(labels, 1, um_per_px=1.0, dt_min=1.0)
+    assert p["front_velocity"] > 0 and p["rear_velocity"] < 0
+    assert p["polarity_index"] > 0
+    assert 0.0 <= p["rear_retraction_fraction"] <= 1.0 and p["rear_retraction_fraction"] > 0.6
+    # a stationary cell (no migration) → polarity undefined (NaN), no crash
+    stay = np.zeros((4, 60, 60), int)
+    for t in range(4):
+        stay[t][_disk(60, 60, 30, 30, 10)] = 1
+    ps = edge_dynamics.edge_polarity(stay, 1, um_per_px=1.0, dt_min=1.0)
+    assert np.isnan(ps["polarity_index"])
+    # included in the per-cell edge summary
+    s = edge_dynamics.edge_summary_for_cell(labels, 1, 1.0, 1.0)
+    assert "rear_retraction_fraction" in s and "polarity_index" in s
+
+
 def test_cell_frame_table_series():
     from maskviewer.io import load_masks, load_recording
     m = load_masks(os.path.join(SAMPLE, "pipeline_results", "masks.npz"))

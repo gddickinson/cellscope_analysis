@@ -5,6 +5,23 @@ change. Most recent first.
 
 ---
 
+## 2026-06-15 — PR1: front–rear edge polarity + lagged actin↔edge + edge in the comparison
+
+First of an 8-part improvement program. **Edge polarity** (`edge_dynamics.edge_polarity`):
+rotate each frame-pair's angular sectors into the cell's **migration-direction frame**
+→ front / rear / side edge velocity, a `polarity_index` (front−rear), and
+`rear_retraction_fraction` (spatial concentration of retraction at the rear — the
+PIEZO1 GOF/YODA1 signature; more speed-independent than the magnitude). Folded into
+`edge_summary_for_cell`. **Lagged correlation** (`edge_intensity.lagged_intensity_correlation`):
+edge-velocity ↔ rectangle-intensity Pearson r vs frame lag → does the fluorescence
+**lead or follow** the edge motion (peak lag/r exposed in `analyze_cell`'s summary).
+**Surfaced in the comparison**: new **Edge dynamics** analysis toggle
+(`build_comparison(with_edge=…)`) adds the per-cell edge summary + events + polarity
+columns; the edge↔fluor block adds `edge_piezo_peak_lag`/`_r`. metric_docs + tooltips
+for all. Tests +4. `pytest` **103 passed**; all files < 500.
+
+---
+
 ## 2026-06-15 — GUI bug-hunt: fix headerless empty contact-pairs CSV
 
 A headless test-drive (every colour-by mode incl. contacts, the contacts overlay,

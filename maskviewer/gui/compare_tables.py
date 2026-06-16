@@ -29,6 +29,9 @@ COMPARE_OPTIONS = [
      "Speed / persistence / area split by cell state — the CellScope reproduction."),
     ("solidity", "Solidity (convex hull)", False,
      "area ÷ convex-hull area per frame — slower (a SciPy hull per cell-frame)."),
+    ("edge_dynamics", "Edge dynamics (protrusion / retraction / polarity)", False,
+     "Per-cell membrane protrusion/retraction summary + events + front–rear "
+     "polarity — slowest (a radial edge-velocity kymograph per cell)."),
 ]
 
 
@@ -87,6 +90,7 @@ class ComputeWorker(QtCore.QObject):
                 with_solidity=o.get("solidity", False),
                 with_contacts=o.get("contacts", True),
                 with_state_segmented=o.get("state_segmented", True),
+                with_edge=o.get("edge_dynamics", False),
                 progress_cb=lambda i, n: (self.progress.emit(i, n)
                                           or not self.cancel))
         except Exception as exc:                          # surface, don't crash

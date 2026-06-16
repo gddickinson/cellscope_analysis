@@ -193,6 +193,34 @@ def correlation_summary(disp, inten, move_threshold=None):
     return out
 
 
+def lagged_intensity_correlation(velmat, intmat, max_lag=3):
+    """Pearson r between per-sector edge velocity and rectangle intensity at each
+    frame **lag** L ∈ [−max_lag, +max_lag].
+
+    L<0 = intensity *leads* the movement (e.g. actin enriches *before* protrusion);
+    L>0 = intensity *follows*. Returns ``(lags, r_per_lag, peak_lag, peak_r)`` where
+    the peak is the lag of strongest |r| — a simple test of whether the fluorescence
+    precedes or trails the edge motion."""
+    lags = list(range(-int(max_lag), int(max_lag) + 1))
+    n = velmat.shape[0] if velmat.size else 0
+    rs = []
+    for L in lags:
+        dd, ii = [], []
+        for k in range(n):
+            j = (k + 1) + L                          # velmat[k] ↔ movement into frame k+1
+            if 0 <= j < intmat.shape[0]:
+                ok = np.isfinite(velmat[k]) & np.isfinite(intmat[j])
+                dd.append(velmat[k][ok]); ii.append(intmat[j][ok])
+        d = np.concatenate(dd) if dd else np.array([])
+        i = np.concatenate(ii) if ii else np.array([])
+        rs.append(_pearson(d, i) if (d.size >= 3 and d.std() and i.std()) else np.nan)
+    rs = np.array(rs, float)
+    if np.isfinite(rs).any():
+        kbest = int(np.nanargmax(np.abs(np.where(np.isfinite(rs), rs, 0.0))))
+        return np.array(lags), rs, lags[kbest], float(rs[kbest])
+    return np.array(lags), rs, 0, np.nan
+
+
 def rectangles_for_frame(labels, image, cell_id, t, depth=DEPTH_PX, width=WIDTH_PX):
     """(corners (m, 4, 2) row/col, intensities (m,)) for accepted rectangles in
     frame ``t`` — for the per-frame sampling-rectangle overlay."""
@@ -220,4 +248,7 @@ def analyze_cell(labels, image, cell_id, um_per_px=None, dt_min=None,
     ifr, intmat = intensity_kymograph(labels, image, cell_id, depth, width)
     disp, inten = movement_intensity_pairs(ifr, velmat, intmat, temporal)
     summary = correlation_summary(disp, inten, move_threshold)
+    _, _, peak_lag, peak_r = lagged_intensity_correlation(velmat, intmat)
+    summary["edge_intensity_peak_lag"] = peak_lag    # <0 = fluor leads edge motion
+    summary["edge_intensity_peak_r"] = peak_r
     return vfr, velmat, ifr, intmat, disp, inten, summary
