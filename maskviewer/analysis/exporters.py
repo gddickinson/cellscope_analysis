@@ -108,8 +108,10 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
             "cell_id": int(cid),
             "first_frame": int(frames[0]) if frames.size else -1,
             "last_frame": int(frames[-1]) if frames.size else -1,
-            "frames_tracked": int(present.sum()),
+            "frames_tracked": int(present.sum()),          # track length (frames)
         }
+        if dt_min:
+            row["track_length_min"] = float(present.sum()) * float(dt_min)
         # distance from the centroid to the nearest image border (crowding /
         # edge-proximity QC) — min over present frames + the mean
         if labels.ndim == 3 and cen.ndim == 2 and frames.size:

@@ -44,6 +44,12 @@ N_SECTORS = edge_dynamics.N_SECTORS
 DEPTH_PX = 12                    # rectangle reach into the cell (px)
 WIDTH_PX = 7                     # rectangle width along the edge (px)
 MIN_COVERAGE = 0.3               # min fraction of the rectangle inside the cell
+# How a sampling rectangle is positioned when the straight inward one falls short of
+# MIN_COVERAGE (concave edges / image borders) — see the original cell_edge_analysis
+# step6: "none" = inward normal only; "flip" = also try the 180° opposite; "search" =
+# rotate through RECT_SEARCH_ANGLES orientations and keep the best in-cell coverage.
+RECT_ROTATION = "none"
+RECT_SEARCH_ANGLES = 18
 _SUMMARY_KEYS = (
     "edge_move_intensity_r", "edge_move_intensity_r2", "edge_move_intensity_p",
     "edge_move_intensity_slope", "piezo_at_protrusion", "piezo_at_retraction",
@@ -78,21 +84,58 @@ def _sector_geometry(center, radii):
     return point, inward, tangent
 
 
+def _rotate(vec, deg):
+    """Rotate a 2-D (row, col) vector by ``deg`` degrees."""
+    a = np.deg2rad(deg)
+    c, s = np.cos(a), np.sin(a)
+    return np.array([c * vec[0] - s * vec[1], s * vec[0] + c * vec[1]])
+
+
+def _rotation_angles(rotation, n):
+    """Candidate angles (deg) to try after the base inward orientation fails coverage."""
+    if rotation == "flip":
+        return (180.0,)
+    if rotation == "search":                            # 0 is the base (already tried)
+        return tuple(np.linspace(0.0, 360.0, int(max(2, n)), endpoint=False))[1:]
+    return ()
+
+
+def _sample_rect(img, mask_frame, p, inw, tan, ds, ws, depth, width, h, w):
+    """(coverage, mean-intensity, corners) for one ``depth``×``width`` rectangle at ``p``."""
+    grid = (p + inw * ds[:, None, None] + tan * ws[None, :, None]).reshape(-1, 2)
+    ri = np.rint(grid[:, 0]).astype(int)
+    ci = np.rint(grid[:, 1]).astype(int)
+    inb = (ri >= 0) & (ri < h) & (ci >= 0) & (ci < w)
+    incell = np.zeros(grid.shape[0], bool)
+    incell[inb] = mask_frame[ri[inb], ci[inb]]
+    cov = float(incell.mean())
+    val = float(img[ri[incell], ci[incell]].mean()) if incell.any() else np.nan
+    hw = tan * (width / 2.0)
+    corn = np.array([p + hw, p + hw + inw * depth, p - hw + inw * depth, p - hw])
+    return cov, val, corn
+
+
 def rectangle_intensity(image_frame, mask_frame, center, radii,
                         depth=None, width=None, min_coverage=None,
-                        return_corners=False):
+                        rotation=None, search_angles=None, return_corners=False):
     """Mean fluorescence per sector in an inward ``depth``×``width`` px rectangle.
 
     For each sector with a finite boundary radius, a rectangle reaches ``depth``
     px inward from the boundary point (``width`` px along the edge). Pixels inside
     the cell mask are averaged; a sector is NaN if too little of its rectangle
-    lies in the cell (< ``min_coverage``). Returns ``(N_SECTORS,)`` intensities
-    (and, if asked, ``(N_SECTORS, 4, 2)`` rectangle corners in (row, col)).
-    ``depth`` / ``width`` / ``min_coverage`` of ``None`` read the (configurable)
-    module-level ``DEPTH_PX`` / ``WIDTH_PX`` / ``MIN_COVERAGE``."""
+    lies in the cell (< ``min_coverage``). When the inward rectangle falls below
+    ``min_coverage`` (concave edge / image border) the ``rotation`` strategy
+    (``none`` / ``flip`` / ``search``, ``search`` over ``search_angles`` orientations)
+    rotates the rectangle to recover the best in-cell coverage. Returns
+    ``(N_SECTORS,)`` intensities (and, if asked, ``(N_SECTORS, 4, 2)`` corners,
+    row/col). ``None`` args read the configurable module-level defaults
+    (``DEPTH_PX`` / ``WIDTH_PX`` / ``MIN_COVERAGE`` / ``RECT_ROTATION`` /
+    ``RECT_SEARCH_ANGLES``)."""
     depth = DEPTH_PX if depth is None else depth
     width = WIDTH_PX if width is None else width
     min_coverage = MIN_COVERAGE if min_coverage is None else min_coverage
+    rotation = RECT_ROTATION if rotation is None else rotation
+    search_angles = RECT_SEARCH_ANGLES if search_angles is None else search_angles
     img = np.asarray(image_frame, float)
     h, w = mask_frame.shape
     point, inward, tangent = _sector_geometry(center, radii)
@@ -104,20 +147,20 @@ def rectangle_intensity(image_frame, mask_frame, center, radii,
     for s in range(N_SECTORS):
         if not np.isfinite(radii[s]):
             continue
-        grid = (point[s] + inward[s] * ds[:, None, None]
-                + tangent[s] * ws[None, :, None]).reshape(-1, 2)
-        ri = np.rint(grid[:, 0]).astype(int)
-        ci = np.rint(grid[:, 1]).astype(int)
-        inb = (ri >= 0) & (ri < h) & (ci >= 0) & (ci < w)
-        incell = np.zeros(grid.shape[0], bool)
-        incell[inb] = mask_frame[ri[inb], ci[inb]]
-        if incell.mean() < min_coverage:
+        cov, val, corn = _sample_rect(img, mask_frame, point[s], inward[s],
+                                      tangent[s], ds, ws, depth, width, h, w)
+        if cov < min_coverage and rotation != "none":    # recover a poorly-placed rect
+            for ang in _rotation_angles(rotation, search_angles):
+                c2, v2, k2 = _sample_rect(img, mask_frame, point[s],
+                                          _rotate(inward[s], ang), _rotate(tangent[s], ang),
+                                          ds, ws, depth, width, h, w)
+                if c2 > cov:
+                    cov, val, corn = c2, v2, k2
+        if cov < min_coverage:
             continue
-        out[s] = float(img[ri[incell], ci[incell]].mean())
+        out[s] = val
         if return_corners:
-            hw = tangent[s] * (width / 2.0)
-            corners[s] = np.array([point[s] + hw, point[s] + hw + inward[s] * depth,
-                                   point[s] - hw + inward[s] * depth, point[s] - hw])
+            corners[s] = corn
     return (out, corners) if return_corners else out
 
 
