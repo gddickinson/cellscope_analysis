@@ -327,8 +327,8 @@ Read this before opening source files. Update it when modules change.
 ### maskviewer/analysis/  — pure-function stats (grow analysis HERE)
 - **label_stats.py** — `n_cells_per_frame`, `cell_ids`, `cell_areas_px`,
   `track_lengths`, `centroids`, `summary(labels, um_per_px)`. No GUI/IO deps.
-- **cell_metrics.py** — morphometry (no skimage; perimeter via a Crofton
-  estimate matching skimage): `regionprops_frame` (area, centroid, bbox, axes,
+- **cell_metrics.py** — morphometry (no skimage; perimeter = skimage
+  `regionprops.perimeter`, Benkrid–Crookes nb=4, not Crofton): `regionprops_frame` (area, centroid, bbox, axes,
   eccentricity, aspect ratio, orientation, extent, edge flag, state, optional
   solidity / perimeter+circularity), `per_frame_records` (+ nearest-neighbour +
   **cell–cell contact** columns, `progress_cb`), `centroid_history`, `cell_series`,

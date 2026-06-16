@@ -19,7 +19,6 @@ import numpy as np
 from scipy import ndimage
 
 from . import edge_dynamics as _edge
-from . import cell_metrics as _cm
 from . import state as _state
 
 N_POINTS = _edge.N_SECTORS          # 72-point radial signature
@@ -27,11 +26,39 @@ N_MODES = 5
 N_PCS = 8
 
 
+def _align_to_axis(rad):
+    """Rotate a radial signature ``r(θ)`` to a canonical phase so clustering keys on
+    *shape*, not orientation.
+
+    The elongation axis is the phase of the **2nd Fourier harmonic** of ``r(θ)``,
+    computed in the SAME angular convention the radii were binned in
+    (``θ = arctan2(dy, dx)``, bin-centres ``-π + (s+½)·2π/N``). The 2nd harmonic is
+    π-periodic, exactly matching an *undirected* axis, so a pure rotation of the cell
+    becomes a circular shift that this cancels. The axis is rolled to bin 0; the
+    residual 180° ambiguity is resolved by putting the heavier lobe in the front half
+    (so a 180°-rotated cell maps to the same signature). A near-circular cell (tiny
+    harmonic) is already rotation-invariant and is left unrolled.
+    """
+    n = rad.size
+    theta = -np.pi + (np.arange(n) + 0.5) * (2 * np.pi / n)
+    c2 = complex(np.sum(rad * np.exp(-2j * theta)))
+    if abs(c2) < 1e-6 * max(float(rad.sum()), 1e-9):     # ~circular → rotation-invariant
+        return rad
+    axis = np.angle(c2) / 2.0                            # major-axis angle (binning frame)
+    # roll by +shift: the 2nd-harmonic phase moves opposite to a circular shift, so
+    # this cancels a cell rotation (a −shift would double it). Where the axis lands is
+    # irrelevant — only that it lands in the same bin for every rotation of the shape.
+    shift = int(round((axis + np.pi) / (2 * np.pi) * n)) % n
+    rolled = np.roll(rad, shift)
+    alt = np.roll(rolled, n // 2)                        # the opposite (180°) axis end
+    return alt if alt[:n // 2].sum() > rolled[:n // 2].sum() else rolled
+
+
 def contour_signature(mask):
     """Aligned, scale-normalised radial signature of one boolean mask, or None.
 
-    Aligned by the cell's major-axis orientation (rotation-invariant) and divided
-    by the equivalent radius (scale-invariant), so only *shape* drives clustering.
+    Rotation-aligned to the elongation axis (``_align_to_axis``) and divided by the
+    equivalent radius (scale-invariant), so only *shape* drives the clustering.
     """
     rr, cc = np.nonzero(mask)
     if rr.size < _state.MIN_AREA_PX:
@@ -39,10 +66,9 @@ def contour_signature(mask):
     rad = _edge._interp_circular(_edge._radii(mask, (rr.mean(), cc.mean())))
     if not np.isfinite(rad).all():
         return None
-    orient = _cm._region_shape(rr.astype(float), cc.astype(float))["orientation"]
-    rad = np.roll(rad, -int(round((orient % (2 * np.pi)) / (2 * np.pi) * rad.size)))
     eqr = np.sqrt(rr.size / np.pi)
-    return rad / eqr if eqr > 0 else rad
+    rad = rad / eqr if eqr > 0 else rad
+    return _align_to_axis(rad)
 
 
 def fit_shape_modes(labels, n_modes=None, n_pcs=N_PCS, progress_cb=None):
@@ -139,7 +165,13 @@ def per_cell_shape_summary(model) -> dict:
 
 
 def mode_contour(signature):
-    """Closed (x, y) contour reconstructed from a radial signature, for display."""
-    th = np.linspace(0, 2 * np.pi, signature.size, endpoint=False)
+    """Closed (x, y) contour reconstructed from a radial signature, for display.
+
+    Uses the same bin-centre angles the signature was sampled at
+    (``θ = -π + (s+½)·2π/N`` with ``x = r·cosθ``, ``y = r·sinθ``) so the drawn mode
+    shape matches the radii's angular frame rather than an arbitrary 0→2π sweep.
+    """
+    n = signature.size
+    th = -np.pi + (np.arange(n) + 0.5) * (2 * np.pi / n)
     x, y = signature * np.cos(th), signature * np.sin(th)
     return np.append(x, x[0]), np.append(y, y[0])

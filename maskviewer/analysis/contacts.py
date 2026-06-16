@@ -110,11 +110,11 @@ def _aggregate(ids, blab, pix_partners, bcount, scale, extensive_frac, min_px):
     out = {c: _free_record(bcount[c], scale) for c in ids}
     if not pix_partners:
         return out
-    contact_px = defaultdict(int)                  # cell -> distinct boundary px in contact
+    cell_pix = defaultdict(list)                   # cell -> partner-set per in-contact px
     pair_px = defaultdict(lambda: defaultdict(int))  # cell -> {partner: px}
     for i, parts in pix_partners.items():
         c = int(blab[i])
-        contact_px[c] += 1
+        cell_pix[c].append(parts)
         for p in parts:
             pair_px[c][p] += 1
     for c in ids:
@@ -122,7 +122,10 @@ def _aggregate(ids, blab, pix_partners, bcount, scale, extensive_frac, min_px):
         partners = {p: px for p, px in pair_px.get(c, {}).items() if px >= min_px}
         if not partners:
             continue                               # stays the default free record
-        cpx = int(contact_px.get(c, 0))
+        # count contact pixels only against surviving (≥min_px) partners, so
+        # contact_fraction / contact_length stay consistent with n_contacts / class
+        surv = set(partners)
+        cpx = sum(1 for parts in cell_pix.get(c, []) if surv.intersection(parts))
         partner_fracs = {p: px / bc for p, px in partners.items()}
         max_frac = max(partner_fracs.values())
         cls = classify_contact(max_frac, cpx, extensive_frac, min_px)
