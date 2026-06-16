@@ -183,8 +183,11 @@ Read this before opening source files. Update it when modules change.
     The heavy per-cell compute is **lazy** — deferred (`set_cell` → `_pending`) until
     the dock is the front tab (visibility tracked via show/hide events), so clicking
     cells while viewing another tab (e.g. Cell Info) stays instant; `showEvent` runs
-    the pending cell. Rendering lives in **edge_render.py** `EdgeRenderMixin` (split
-    out to keep each file < 500 lines).
+    the pending cell. Results are **cached** per (cell, fluor channel) (`_compute_snapshot`
+    → `_cache`) so revisits are instant; `precompute_all` (off-thread via `run_async`)
+    warms every cell — folded into the Cell-Info "Precompute all cells" pass (the viewer
+    chains it via `cell_info.after_precompute` → `_precompute_edge`). Rendering lives in
+    **edge_render.py** `EdgeRenderMixin` (split out to keep each file < 500 lines).
   - **edge_render.py** `EdgeRenderMixin` — the Edge panel's view layer (mixed into
     `EdgePanel`): `_replot` + all `_draw_*` (kymographs, per-frame edge map,
     movement↔intensity scatter, sampling rectangles) + CSV `_export`, drawing from

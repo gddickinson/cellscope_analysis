@@ -173,7 +173,8 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.cell_info.shape_mode_provider = self._shape_modes_model
         self.shape.set_provider(self._shape_modes_model)
         self.population.table_provider = self._population_table
-        for p in (self.population, self.shape, self.cell_table, self.cell_info):
+        self.cell_info.after_precompute = self._precompute_edge      # fold edge into the pass
+        for p in (self.population, self.shape, self.cell_table, self.cell_info, self.edge):
             p.run_async = self.run_task          # heavy compute → status-bar bar
         self.cell_table.cellSelected.connect(self.select_cell)
         self.population.cellSelected.connect(self.select_cell)
@@ -225,8 +226,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         self.canvas.overlays.set_scale(self.recording.um_per_px)
         self.display.set_channels(self.recording.channel_names)
         self.cell_info.set_available(self.recording.channel_names, self.recording.um_per_px)
-        self.cell_info.set_context(labels, self.recording.um_per_px,
-                                   self.recording.time_interval_min, self.recording)
+        self.cell_info.set_context(labels, self.recording.um_per_px, self.recording.time_interval_min, self.recording)
         self._rebuild_metrics_menu()
         self.timeline.set_time_interval(self.recording.time_interval_min)
         self.timeline.set_range(self.recording.n_frames)

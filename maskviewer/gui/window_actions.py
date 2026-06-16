@@ -160,6 +160,15 @@ class WindowActionsMixin:
                     QtWidgets.QApplication.restoreOverrideCursor()
         return self._shape_model
 
+    def _precompute_edge(self):
+        """Warm the Edge-dynamics per-cell cache for the loaded recording — chained
+        after the Cell-Info 'Precompute all cells' pass so both are precomputed."""
+        if self.masks is None or self.recording is None:
+            return
+        self.edge.set_context(self.masks.labels, self.recording.um_per_px,
+                              self.recording.time_interval_min, self.recording)
+        self.edge.precompute_all()
+
     # -- threaded compute (status-bar progress + ETA) -------------------
     def run_task(self, label, work, apply):
         """Run ``work(progress_cb)`` off-thread with a status-bar bar/ETA, then

@@ -46,6 +46,7 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
         self.available = []                    # selectable metric keys
         self.neighbor_provider = None          # callable -> {cid:(T,2)} | None
         self.shape_mode_provider = None        # callable -> shape-mode model | None
+        self.after_precompute = None           # callable run after precompute (e.g. edge)
         self.divisions = []                    # division events for lineage info
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
         saved = self._settings.value("cell_metrics_enabled")
@@ -93,8 +94,9 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
         self.precompute_btn = QtWidgets.QPushButton("Precompute all cells")
         self.precompute_btn.setToolTip(
             "Compute every cell's metrics now (with the current Cell-plot-metrics "
-            "selection) so switching between cells to compare them is instant. "
-            "Re-run after enabling more metrics.")
+            "selection) so switching between cells to compare them is instant — and "
+            "also warms the Edge-dynamics cache for every cell. Re-run after "
+            "enabling more metrics.")
         self.precompute_btn.clicked.connect(self.precompute_all)
         self.cache_label = QtWidgets.QLabel("")
         self.cache_label.setStyleSheet("color: gray;")
@@ -236,6 +238,8 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
                 self._cft = cache[self.cell_id]
                 self._update_info()
                 self._rebuild_combo()
+            if self.after_precompute:          # chain the edge-dynamics precompute
+                self.after_precompute()
 
         self.cache_label.setText(f"Precomputing {len(ids)} cells…")
         self._dispatch("Cell info (all cells)", work, apply)

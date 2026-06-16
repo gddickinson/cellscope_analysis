@@ -5,6 +5,29 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Edge dynamics: per-cell cache + folded into "Precompute all cells"
+
+Follow-up so the Edge tab is fast too (when it's the front tab, switching cells
+previously still recomputed). `EdgePanel` now **caches** each cell's computed
+state keyed by (cell_id, fluor channel) — `_compute_snapshot` builds a pure dict
+(no self-mutation, no Qt → safe off-thread), `_ensure_computed` restores from the
+cache or computes+caches, `_apply_snapshot` pushes it to the widgets. Revisiting a
+cell (same fluor) is instant; the cache drops on recording change (`set_context`)
+and survives deselect (`clear_cell` keeps it). A fluor change recomputes only the
+fluorescence part (kymographs are fluor-independent) and re-caches.
+
+**Folded into precompute.** `EdgePanel.precompute_all` (now an `AsyncComputeMixin`)
+computes+caches every cell off-thread; the Cell-Info "Precompute all cells" pass
+**chains** it via `cell_info.after_precompute` → `ViewerWindow._precompute_edge`
+(sets the edge context + precomputes). So one button warms both caches; switching
+cells on the Edge tab is then instant. Viewer wires `edge` into the `run_async`
+panels. (`window_actions._precompute_edge` keeps `viewer_window` < 500.)
+
+Tests: `tests/test_edge_panel_lazy.py` (+revisit cache hit, precompute caches every
+cell, new recording clears cache), `tests/test_cell_info_precompute.py` (+after_precompute
+chain hook). Full suite 166 passed; a headless ViewerWindow smoke confirms the
+button warms both caches and the Edge switch is a cache hit.
+
 ## 2026-06-16 — Fix slow cell switching: edge dynamics now computes lazily
 
 **Report.** After precomputing Cell Info, switching cells was *still* slow.
