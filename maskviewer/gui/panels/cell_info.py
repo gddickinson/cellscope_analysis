@@ -55,6 +55,8 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
             if isinstance(saved, str):                 # QSettings may unwrap a 1-list
                 saved = [saved]
             self._enabled = set(saved)
+        self._auto_precompute = self._settings.value(
+            "cell_info/auto_precompute", False, type=bool)
 
         self.title = QtWidgets.QLabel("No cell selected")
         self.title.setStyleSheet("font-weight: bold;")
@@ -126,12 +128,24 @@ class CellInfoPanel(AsyncComputeMixin, QtWidgets.QWidget):
     def set_context(self, labels, um_per_px=None, dt_min=None, recording=None):
         """Give the panel the recording's data without selecting a cell, so
         **Precompute all cells** works before anything is clicked. Invalidates the
-        per-cell cache when the recording changes."""
+        per-cell cache when the recording changes; auto-precomputes then if the
+        Config toggle is on."""
         ctx = (labels, um_per_px, dt_min, recording)
-        if self._cache_key(ctx, self.enabled()) != self._cache_sig:
+        changed = self._cache_key(ctx, self.enabled()) != self._cache_sig
+        if changed:
             self._invalidate_cache()
         self._dt = dt_min
         self._ctx = ctx
+        if changed and self._auto_precompute and labels is not None:
+            self.precompute_all()
+
+    def set_auto_precompute(self, on):
+        """Config toggle (persisted): precompute all cells automatically when a
+        recording loads. Turning it on precomputes the current recording now."""
+        self._auto_precompute = bool(on)
+        self._settings.setValue("cell_info/auto_precompute", self._auto_precompute)
+        if on and self._ctx and self._ctx[0] is not None and not self._precomputed:
+            self.precompute_all()
 
     def set_cell(self, cell_id, labels, um_per_px=None, dt_min=None, recording=None):
         if not cell_id:

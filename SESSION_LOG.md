@@ -5,6 +5,19 @@ change. Most recent first.
 
 ---
 
+## 2026-06-16 — Cell Info: auto-precompute-on-load toggle (Config)
+
+Follow-up to the precompute feature: a **Config ▸ Cell plot metrics** checkbox
+"Auto-precompute all cells when a recording loads" (QSettings
+`cell_info/auto_precompute`, **default off**). The panel owns the flag
+(`set_auto_precompute`, read in `__init__`); `set_context` auto-runs
+`precompute_all` when the recording genuinely changes and the toggle is on (so it
+fires once per load, not per cell click). Enabling the toggle precomputes the
+current recording immediately. Tests extended (`test_cell_info_precompute.py`):
+auto-runs when enabled, doesn't when off (default), and the setter precomputes the
+loaded recording. Full suite 157 passed; headless ConfigWindow smoke confirms the
+checkbox (default off → toggling on precomputes).
+
 ## 2026-06-16 — Cell Info: precompute all cells (instant switching)
 
 **Why.** Switching cells in the Cell Info dock recomputed that cell's whole
