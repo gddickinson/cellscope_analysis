@@ -218,7 +218,12 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   the IC295 genetic/drug arms + WT–DMSO vehicle; else one arm with a heuristic
   control). **Save/Open Project File** (small JSON, incl. per-recording
   include/exclude + group overrides) + **Recent Projects**; switch datasets
-  without restarting (`ViewerWindow.set_project`). The comparison stats are
+  without restarting (`ViewerWindow.set_project`). **Portable**: a saved project
+  stores its `data_roots` *relative to the project file* (a project written into
+  the data folder gets `"data_roots": ["."]`), so the file + data can move together
+  / mount the same share at a different path on another machine and still resolve
+  (legacy absolute roots still load; resolved to absolute in memory — see
+  `project.save_project`/`load_project`). The comparison stats are
   design-driven and the design is editable at runtime (see the Groups &
   Comparisons editor below), so arbitrary treatments / recording counts /
   groupings compare correctly.

@@ -102,7 +102,11 @@ Read this before opening source files. Update it when modules change.
   `load_project`/`save_project` (small JSON, incl. excluded/overrides + per-recording
   **`corrections`** = channel shifts + FOV; `correction_for(label)`; + project-wide
   **`px_size`** / **`frame_interval`** manual scale overrides — `scaled(rec)` applies
-  them to every recording, `scale_override` = `(px_size, frame_interval)`). Decouples
+  them to every recording, `scale_override` = `(px_size, frame_interval)`). **Portable
+  paths**: `save_project` stores `data_roots` *relative to the project file*
+  (`_relpath_to`); `load_project` resolves them against the file's dir (`_resolve_root`;
+  absolute/legacy roots used as-is) → the project file + data can move together across
+  machines/mounts. Decouples
   the app from the hard-coded IC295 design so any dataset (any treatments / counts /
   groupings / **image sizes / lengths**) loads + compares correctly. GUI-free.
 

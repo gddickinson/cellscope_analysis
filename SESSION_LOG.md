@@ -5,6 +5,32 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Portable project files (data_roots relative to the project file)
+
+**Request / why.** Reviewed whether a cellscope_analysis project save affects the
+original cellscope project (it doesn't — we write one JSON, read everything else;
+cellscope uses `*.cellscope` per-recording files, never scans for generic `*.json`,
+and `ic293_analysis/*` is gitignored there so our file is invisible to its git). The
+one portability gap: saved `data_roots` were **absolute**, so a project broke when
+the data moved / a share mounted at a different path on another machine.
+
+**Fix (`project.py`).**
+- `save_project` stores each data root **relative to the project file's directory**
+  (`_relpath_to`) — a project written into the data folder gets `"data_roots": ["."]`.
+  Falls back to absolute when no relative path exists (different Windows drive).
+- `load_project` resolves stored roots against the file's dir (`_resolve_root`);
+  **absolute/legacy roots load as-is**, and in-memory roots are always absolute. So a
+  re-save converts legacy absolute → relative automatically.
+- Converted the live `…/ic293_analysis/ic293.json` to the portable form
+  (`data_roots: ["."]`, exclusion preserved) by load+save; verified it reloads,
+  resolves to the absolute path, includes 77, excludes `Pos36_div-GOF`.
+
+**Tests.** `tests/test_portable_project.py` (4): saved-relative-to-file, **move the
+whole tree → still discovers the recording**, legacy-absolute backward compat,
+re-save relativises a legacy absolute file. Full suite **191 passed**.
+
+---
+
 ## 2026-06-18 — Wire include/exclude to the Comparison Groups editor + Save Project
 
 **Request.** Wire the new Include/Exclude dialog together with the Comparison
