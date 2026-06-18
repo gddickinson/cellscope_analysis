@@ -50,7 +50,7 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
             self.resize(1100, 760)
         if hasattr(entries, "design"):          # a Project was passed
             self.project = entries
-            self.entries = list(entries.entries)
+            self.entries = list(entries.included_entries())   # session = included only
         else:                                   # a bare entry list (back-compat)
             self.entries = list(entries)
             self.project = projmod.from_entries(self.entries)

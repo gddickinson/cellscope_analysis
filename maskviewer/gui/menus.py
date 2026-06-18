@@ -9,6 +9,7 @@ from __future__ import annotations
 from PyQt5 import QtWidgets
 
 from .luts import PRESETS
+from . import inclusion
 
 
 def _act(parent, text, slot, shortcut=None, tip=None):
@@ -34,6 +35,10 @@ def build_menubar(win):
     win.recent_menu = f.addMenu("&Recent Projects")
     win.recent_menu.setToolTipsVisible(True)
     win._rebuild_recent_menu()
+    f.addAction(_act(win, "&Include / Exclude Recordings…",
+                     lambda: inclusion.manage_inclusion(win),
+                     tip="Choose which recordings are loaded in the session and "
+                         "used in the analysis (two lists; non-destructive)"))
     f.addSeparator()
     f.addAction(_act(win, "&Export CSV…", win.export_csv, "Ctrl+E",
                      "Export tracks / masks / cell properties as CSV"))
