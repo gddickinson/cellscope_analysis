@@ -102,9 +102,14 @@ Read this before opening source files. Update it when modules change.
   `load_project`/`save_project` (small JSON, incl. excluded/overrides + per-recording
   **`corrections`** = channel shifts + FOV; `correction_for(label)`; + project-wide
   **`px_size`** / **`frame_interval`** manual scale overrides — `scaled(rec)` applies
-  them to every recording, `scale_override` = `(px_size, frame_interval)`). **Portable
-  paths**: `save_project` stores `data_roots` *relative to the project file*
-  (`_relpath_to`); `load_project` resolves them against the file's dir (`_resolve_root`;
+  them to every recording, `scale_override` = `(px_size, frame_interval)`). **Build
+  across trees**: `add_folder(root)` merges another folder's recordings (new auto-
+  discovered `data_root`); `add_recording(entry)` adds a one-off (tracked in **`extra`**,
+  saved as the JSON `recordings` list); `load_project` = `discover(data_roots)` ∪
+  `recordings` (deduped by path). **Portable
+  paths**: `save_project` stores `data_roots` + `recordings` paths *relative to the
+  project file* (`_relpath_to` / `_entry_to_dict`); `load_project` resolves them against
+  the file's dir (`_resolve_root` / `_entry_from_dict`;
   absolute/legacy roots used as-is) → the project file + data can move together across
   machines/mounts. Decouples
   the app from the hard-coded IC295 design so any dataset (any treatments / counts /
@@ -269,6 +274,9 @@ Read this before opening source files. Update it when modules change.
   (emitted from `_on_design_changed`) → `apply_inclusion(win, exc, notify_compare=False)`;
   the reverse (`notify_compare=True`) refreshes the editor table + replots. Persist via
   File ▸ **Save Project** (Ctrl+S) → `window_actions.save_project_as(path=project.path)`.
+- **project_build.py** — `add_folder_to_project(win)`: File ▸ Add Folder to Project…
+  → `Project.add_folder` (merge another result tree's recordings) + `win.set_project`
+  to refresh the session/comparison. Free function (keeps `window_actions` < 500).
 - **config_window.py** — `ConfigWindow(QDialog)`: the unified **Config ▸ Settings…**
   (Ctrl+,) tabbed window — **Startup** (`startup/load_demo` + `startup/load_config_roots`
   checkboxes → QSettings, read at launch by `main_viewer`; both off → blank slate),

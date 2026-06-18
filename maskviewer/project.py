@@ -70,6 +70,29 @@ class Project:
     corrections: dict = field(default_factory=dict)  # label -> {shifts, fov} (pre-analysis)
     px_size: float | None = None         # manual µm/px override (all recordings)
     frame_interval: float | None = None  # manual min/frame override (all recordings)
+    extra: list = field(default_factory=list)  # recordings added individually (not under
+                                               # a data_root) — persisted in `recordings`
+
+    def add_recording(self, entry):
+        """Add one individually-loaded recording (from anywhere) to the project and
+        remember it for saving. No-op (returns False) if its path is already present."""
+        if any(e.recording_path == entry.recording_path for e in self.entries):
+            return False
+        self.entries.append(entry)
+        self.extra.append(entry)
+        return True
+
+    def add_folder(self, root):
+        """Merge another folder's recordings into the project (a new `data_root`,
+        auto-discovered). Returns the number of newly-added recordings."""
+        root = os.path.abspath(root)
+        if root not in self.data_roots:
+            self.data_roots.append(root)
+        have = {e.recording_path for e in self.entries}
+        added = [e for e in discover([root]) if e.recording_path not in have]
+        self.entries.extend(added)
+        ensure_colors(self.design, self.all_groups)
+        return len(added)
 
     def group_of(self, entry):
         """The comparison group of a recording (override wins over its folder)."""
@@ -240,6 +263,23 @@ def _resolve_root(root, base):
     return root if os.path.isabs(root) else os.path.normpath(os.path.join(base, root))
 
 
+def _entry_to_dict(e, base):
+    """Serialise an individually-added recording with portable (relative-to-file) paths."""
+    from .io.dataset import Entry  # noqa: F401  (Entry is the runtime type of `e`)
+    return {"label": e.label, "condition": e.condition,
+            "recording_path": _relpath_to(e.recording_path, base),
+            "mask_path": _relpath_to(e.mask_path, base) if e.mask_path else None}
+
+
+def _entry_from_dict(d, base):
+    from .io.dataset import Entry
+    rp = _resolve_root(d["recording_path"], base)
+    mp = d.get("mask_path")
+    return Entry(d.get("label") or os.path.splitext(os.path.basename(rp))[0],
+                 d.get("condition", "") or "", rp,
+                 _resolve_root(mp, base) if mp else None)
+
+
 # ------------------------------------------------------------- constructors
 def _conditions_of(entries):
     conds = []
@@ -264,14 +304,23 @@ def from_data_roots(roots, name=None):
 
 
 def load_project(path):
-    """Load a project JSON ({name, data_roots, arms?, vehicle?, colors?}). Data roots
-    stored relative to the project file (the portable form) are resolved against its
-    directory; absolute roots are used as-is."""
+    """Load a project JSON ({name, data_roots, recordings?, arms?, vehicle?, colors?}).
+    Entries are `discover(data_roots)` ∪ the explicit `recordings` list (recordings
+    added individually from outside the roots) — both with paths resolved relative to
+    the project file (the portable form); absolute roots/paths are used as-is."""
     with open(path) as f:
         blob = json.load(f)
     base = os.path.dirname(os.path.abspath(path))
     roots = [_resolve_root(r, base) for r in blob.get("data_roots", [])]
     entries = discover(roots)
+    have = {e.recording_path for e in entries}
+    extra = []
+    for d in blob.get("recordings", []):
+        e = _entry_from_dict(d, base)
+        if e.recording_path not in have:
+            extra.append(e)
+            have.add(e.recording_path)
+    entries = entries + extra
     arms = blob.get("arms")
     if arms:
         design = Design(arms, blob.get("vehicle"),
@@ -287,13 +336,15 @@ def load_project(path):
                    overrides=dict(blob.get("overrides", {})),
                    corrections=dict(blob.get("corrections", {})),
                    px_size=blob.get("px_size"),
-                   frame_interval=blob.get("frame_interval"))
+                   frame_interval=blob.get("frame_interval"),
+                   extra=extra)
 
 
 def save_project(project, path):
     base = os.path.dirname(os.path.abspath(path))
     blob = {"name": project.name,
             "data_roots": [_relpath_to(r, base) for r in project.data_roots],
+            "recordings": [_entry_to_dict(e, base) for e in project.extra],
             "arms": project.design.arms, "vehicle": project.design.vehicle,
             "colors": project.design.colors,
             "excluded": sorted(project.excluded), "overrides": project.overrides,

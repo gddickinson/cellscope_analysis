@@ -5,6 +5,38 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Manually-assembled projects across cellscope trees (persisted)
+
+**Request.** Build a project by loading recordings from *different* cellscope projects
+and save it. Review showed: a multi-folder project persisted (data_roots is a list),
+but **individually-added recordings were lost on reload** (save stored only
+`data_roots`; load re-discovered from them), and there was no "add a folder to the
+current project" (opening a folder *replaced* it).
+
+**Changes.**
+- `project.py`: `Project.extra` (recordings added individually) + `add_recording(entry)`
+  (append to entries + extra, dedupe by path) and `add_folder(root)` (append a new
+  `data_root`, discover, merge new entries, ensure colours). `save_project` now also
+  writes a **`recordings`** list (`_entry_to_dict`, portable relative paths);
+  `load_project` builds entries = `discover(data_roots)` ∪ `recordings`
+  (`_entry_from_dict`, deduped by path). Backward compatible (no `recordings` key → none).
+- `gui/project_build.py` (new): `add_folder_to_project(win)` — File-dialog → `add_folder`
+  → `win.set_project` refresh. Free function (window_actions stayed 498).
+- `window_actions._add_recording_entry` routes through `Project.add_recording` (so
+  Open Recording + dropped `.ome.tif` files now persist).
+- Menu: File ▸ **Add Folder to Project…** (`menus.py`).
+
+**Result.** Drop several folders together, or Add Folder to Project incrementally, or
+Open Recording one-offs — all from different cellscope trees — and the assembled mix
+**round-trips** through save/reload, with portable relative paths.
+
+**Tested.** `tests/test_project_build.py` (5): add-recording persists, dedup,
+add-folder merges+persists (via data_roots), no-dup-with-extra, and **move-the-tree →
+added recording still resolves**. Headless GUI smoke: `_add_recording_entry` → `extra`
+grows; add_folder + set_project refresh; save/reload round-trips. Full suite **196 passed**.
+
+---
+
 ## 2026-06-18 — Portable project files (data_roots relative to the project file)
 
 **Request / why.** Reviewed whether a cellscope_analysis project save affects the

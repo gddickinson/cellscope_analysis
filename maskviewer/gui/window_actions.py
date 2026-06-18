@@ -46,11 +46,10 @@ class WindowActionsMixin:
         return npzs[0] if npzs else None
 
     def _add_recording_entry(self, fn, mask):
-        """Append a single recording to the project (canonical list) and select it.
-        Goes into `project.entries` so it shows in the Include/Exclude dialog; the
-        session list (`self.entries`) is the included subset."""
-        self.project.entries.append(Entry(os.path.splitext(os.path.basename(fn))[0],
-                                          "", fn, mask))
+        """Add a single recording to the project (persisted in its `recordings` list)
+        and select it; shows in the Include/Exclude dialog, session = included subset."""
+        self.project.add_recording(Entry(os.path.splitext(os.path.basename(fn))[0],
+                                         "", fn, mask))
         self.entries = list(self.project.included_entries())
         self.display.set_recordings(self.entries)
         self.display.recording.setCurrentIndex(len(self.entries) - 1)
