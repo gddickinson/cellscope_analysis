@@ -10,6 +10,13 @@ A CellScope results tree looks like:
 The flat sample layout `<root>/<label>/...` works too. Real data lives
 outside this repo and is pointed at via `config.json` (see config loader);
 the bundled `sample_data/` is a tiny synthetic stand-in.
+
+Internal / hidden folders are skipped: a CellScope results tree keeps its
+machinery in **underscore-prefixed** siblings of `by_condition/` — `_cache/`
+(a flat dump of every converted recording, *no* per-recording masks), `_runs/`,
+`_source_metadata/` — so pointing discovery at the whole results root (not just
+`by_condition/`) must not turn `_cache/` into a bogus "_cache" recording. We
+therefore prune any directory whose name starts with `_` or `.` from the walk.
 """
 from __future__ import annotations
 
@@ -57,7 +64,12 @@ def discover(roots) -> list:
     for root in roots:
         if not root or not os.path.isdir(root):
             continue
-        for dirpath, _dirs, _files in os.walk(root):
+        for dirpath, dirs, _files in os.walk(root):
+            # Prune internal/hidden subfolders (e.g. `_cache`, `_runs`,
+            # `_source_metadata`) so they're never walked into or mistaken for a
+            # recording folder. (The root itself is always scanned — pointing
+            # discovery straight at such a folder still works.)
+            dirs[:] = [d for d in dirs if not d.startswith((".", "_"))]
             if os.path.basename(dirpath) == "pipeline_results":
                 continue
             tif = _first_tif(dirpath)
