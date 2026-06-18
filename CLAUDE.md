@@ -336,7 +336,17 @@ its bottom bar.
 Origin/Prism: per-frame region properties ("masks as CSV"), per-cell summary
 (track + shape + motion + **contact**), centroid trajectories, and a **cell-pair
 contacts** table (which cells touch, when, and the degree) — via
-`analysis/exporters.py` (pure, reusable from scripts/notebooks too).
+`analysis/exporters.py` (pure, reusable from scripts/notebooks too). The dialog
+(`gui/export_dialog.py`) adds: a **scope** (current recording vs **all recordings in
+the project**), a **grouping** for "all" (one file per recording / one **combined**
+file / one file **per condition** — `export_project(group=…)`, with `recording` +
+`condition` columns + project scale/corrections, excluded skipped), **per-frame column
+selection** (grouped checkboxes; the export subsets the per-frame table), and a
+**DiPer-ready trajectory export** (`export_diper` / `diper_table` — coordinates in the
+`diper_clone` column layout: cols 4/5/6 = frame, x, y; `frame` resets per cell; one CSV
+per condition = one DiPer group). Heavy passes are threaded (jobs run in sequence with a
+combined progress bar). Our `motion.direction_autocorrelation` + `motion.msd` are
+**bit-identical to `diper_clone`** (pinned by `tests/test_diper_equivalence.py`).
 
 ## Testing without a display
 

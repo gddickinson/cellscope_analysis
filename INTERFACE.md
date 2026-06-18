@@ -370,8 +370,11 @@ Read this before opening source files. Update it when modules change.
   checkable submenu, rebuilt per recording; **Comparison plot options…** →
   `open_compare_plot_options`) / Window /
   Help (incl. **Metrics Reference…** → `metric_docs.as_html`). Tooltips throughout.
-- **export_dialog.py** — `CSVExportDialog`: pick tables + folder/prefix; runs on
-  a worker `QThread` with a progress bar + Cancel; solidity / edge-dynamics opts.
+- **export_dialog.py** — `CSVExportDialog`: pick tables, **per-frame columns**
+  (grouped checkboxes), **scope** (current recording / all recordings in project),
+  **grouping** (per-recording / combined / per-condition), and a **DiPer-ready
+  trajectory** export; folder/prefix; runs the chosen export jobs on a worker
+  `QThread` (combined progress bar + Cancel); solidity / edge-dynamics opts.
 - **plot_export.py** — `save_plot(plot, parent)`: PNG/SVG export for any panel plot.
 - **status_progress.py** — `StatusProgress(QWidget)`: a compact status-bar progress
   widget (label + bar + elapsed/**ETA**, `fmt_secs`); `start` / `update(done,
@@ -566,9 +569,13 @@ Read this before opening source files. Update it when modules change.
   area-stability + track-quality + **min/mean distance from the image border**,
   optional `with_edge` protrusion/retraction columns, `progress_cb`),
   `contact_pairs_table` (**which cells touch, when, degree** — one row per cell pair),
-  `track_table` (trajectories), `export_all` (single shared per-frame pass +
-  `progress_cb`; `which` includes `contact_pairs`).
-  Needs pandas.
+  `track_table` (trajectories), `build_tables` (DataFrames for one stack; `columns`
+  subsets the per-frame output), `export_all` (one recording; `columns`/`with_contacts`),
+  **`export_project`** (every recording; `group` = recording / combined / condition,
+  applies scale + corrections, skips excluded), and the **DiPer** export
+  (`diper_table` = coords in `diper_clone` column layout — cols 4/5/6 = frame, x, y,
+  `frame` reset per cell; `export_diper` per condition/recording/combined,
+  `export_diper_one` for one recording). Needs pandas.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the
   CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,
   `tracks()`) + the experimental design (`ARMS`, `VEHICLE`) +

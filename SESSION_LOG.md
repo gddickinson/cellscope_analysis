@@ -5,6 +5,39 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Export CSV: scope/grouping + column selection + DiPer-ready trajectories
+
+**Request.** Export per-frame coordinates + properties for **all** recordings (separate
+files, combined, or per condition), let the user choose **which per-frame columns**, and
+export coordinates in the **`diper_clone`** format. Plus: verify our built-in DiPer
+matches `diper_clone` exactly.
+
+**Changes.**
+- `analysis/exporters.py`: `build_tables` (DataFrames for one stack; `columns` subsets
+  the per_frame output, per_cell still aggregates the full table) + `_select_columns`.
+  `export_all` gains `columns` / `with_contacts`. New **`export_project`** (every
+  recording; `group` ∈ recording / combined / condition; adds `recording`+`condition`
+  cols; applies scale override + channel/FOV corrections; skips excluded). New DiPer
+  export: **`diper_table`** (coords in `diper_clone` column layout — cols 4/5/6 = frame,
+  x, y; `frame` renumbered 1..N **per cell** so DiPer's split-on-frame-reset works; x/y
+  in µm when scaled), **`export_diper`** (per condition/recording/combined — each
+  condition CSV = one DiPer group), **`export_diper_one`**.
+- `gui/export_dialog.py`: rewrote with a **Scope & grouping** box (current / all + a
+  grouping combo), **Per-frame columns** scroll-area (grouped checkboxes, All/None;
+  contacts/solidity compute auto-gated by selection), a **DiPer** checkbox, and a
+  **jobs-list worker** (standard export + DiPer run in sequence, combined progress).
+- `gui/window_actions.py`: pass `project` + current label/condition to the dialog.
+
+**DiPer equivalence — verified, no divergence.** Cross-checked our
+`motion.direction_autocorrelation` + `motion.msd` against the real `diper_clone` package
+on IC293 trajectories: **per-cell** max |diff| 1.9e-15 (autocorr) / 0 (MSD); **ensemble**
+5.2e-16 / 4.5e-13 — i.e. bit-identical. No code change needed; the DiPer export was also
+round-tripped through `diper_clone`'s own `load_data` + `split_trajectories` (correct
+trajectory count + coords). Pinned by `tests/test_diper_equivalence.py` (self-contained
+inline DiPer reference). Full suite **199 passed**; GUI export test-driven headless.
+
+---
+
 ## 2026-06-18 — IC293 vs IC295 single-cell treatment comparison (scripts + report)
 
 **Task.** Analyse two PIEZO1 single-cell datasets — `ic293_analysis` (manual crops,
