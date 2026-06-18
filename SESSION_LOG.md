@@ -5,6 +5,42 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Wire include/exclude to the Comparison Groups editor + Save Project
+
+**Request.** Wire the new Include/Exclude dialog together with the Comparison
+window's Groups editor (they edit the same `Project.excluded`); make the
+include/exclude choices saveable to the loaded project file (e.g. `ic293.json`).
+
+**Two-way sync.**
+- `CompareWindow` gains `inclusionChanged = pyqtSignal(object)`, emitted from
+  `_on_design_changed` (which already fires on every Groups-editor include/group
+  edit). The main viewer connects it (in `open_compare_window`) to
+  `inclusion.apply_inclusion(self, exc, notify_compare=False)` — so excluding in the
+  Groups editor **removes the recording from the main session dropdown** too.
+- The reverse: `apply_inclusion(..., notify_compare=True)` (the default, used by the
+  File-menu dialog) refreshes the open Groups editor's table (`set_data`) + replots
+  (`_on_design_changed`). The `notify_compare` flag prevents an echo loop (the
+  Groups-editor-originated path passes False).
+
+**Save.**
+- `window_actions.save_project_as(path=None)` now takes an optional path: with one it
+  saves straight there (no prompt), else it prompts. New **File ▸ Save Project**
+  (Ctrl+S) calls it with `project.path` → writes the loaded file (e.g. `ic293.json`);
+  **Save Project As…** still prompts. `Project.excluded` was already serialized by
+  `save_project`, so exclusions persist.
+
+**Sizes.** Kept under 500: trimmed the `_on_design_changed` refactor (compare_window
+499); the reverse-sync lives in `inclusion.py`; Save Project is wired via a menu
+lambda (window_actions 499).
+
+**Tested.** `tests/test_inclusion.py` +3 (Groups-editor→session, main→Groups-editor,
+save-to-path round-trips `excluded`). GUI test-driven on the real `ic293.json`:
+exclude in Groups editor → session 77→76; re-include from the main side → Groups
+checkbox re-ticks; Save Project → temp file reload shows `excluded=[Pos36_div-GOF]`;
+**user's `ic293.json` left untouched**. Full suite **187 passed**.
+
+---
+
 ## 2026-06-18 — Include / Exclude Recordings dialog (session-aware)
 
 **Request.** A menu item acting on the loaded project: two lists (included /

@@ -261,6 +261,10 @@ Read this before opening source files. Update it when modules change.
   functions (not window methods) to keep `window_actions`/`viewer_window` under
   500 lines. (The session list `ViewerWindow.entries` is the *included* subset;
   the canonical full list is `project.entries`, used by the dialog + comparison.)
+  **Two-way synced** with the Comparison Groups editor: `CompareWindow.inclusionChanged`
+  (emitted from `_on_design_changed`) → `apply_inclusion(win, exc, notify_compare=False)`;
+  the reverse (`notify_compare=True`) refreshes the editor table + replots. Persist via
+  File ▸ **Save Project** (Ctrl+S) → `window_actions.save_project_as(path=project.path)`.
 - **config_window.py** — `ConfigWindow(QDialog)`: the unified **Config ▸ Settings…**
   (Ctrl+,) tabbed window — **Startup** (`startup/load_demo` + `startup/load_config_roots`
   checkboxes → QSettings, read at launch by `main_viewer`; both off → blank slate),
