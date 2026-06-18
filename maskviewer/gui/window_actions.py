@@ -359,12 +359,12 @@ class WindowActionsMixin:
             QtWidgets.QMessageBox.information(
                 self, "No masks", "This recording has no masks to export.")
             return
-        idx = max(self.display.recording.currentIndex(), 0)
-        label = self.entries[idx].label if self.entries else "export"
+        e = self.entries[max(self.display.recording.currentIndex(), 0)] if self.entries else None
+        lbl, cond = (e.label, e.condition) if e else ("export", "")
         CSVExportDialog(self.masks.labels, self.recording.um_per_px,
                         self.recording.time_interval_min,
-                        os.path.join(PROJECT_ROOT, "analysis_out"),
-                        f"{label}_", self).exec_()
+                        os.path.join(PROJECT_ROOT, "analysis_out"), f"{lbl}_", self,
+                        project=self.project, current_label=lbl, current_condition=cond).exec_()
 
     def save_screenshot(self):
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(

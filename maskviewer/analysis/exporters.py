@@ -20,6 +20,18 @@ import numpy as np
 
 from . import label_stats, cell_metrics, motion, edge_dynamics, contacts
 
+# Per-frame columns always kept (identity), regardless of the user's column selection.
+_PF_IDENTITY = ("recording", "condition", "cell_id", "frame", "time_min")
+
+
+def _select_columns(df, columns):
+    """Keep only the identity columns + the requested per-frame `columns` (order of the
+    DataFrame preserved). `columns=None` → keep everything."""
+    if not columns:
+        return df
+    want = set(columns)
+    return df[[c for c in df.columns if c in _PF_IDENTITY or c in want]]
+
 
 def per_frame_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
                     progress_cb=None, with_contacts=True):
@@ -222,35 +234,181 @@ def write_csv(df, path: str) -> str:
     return path
 
 
-def export_all(labels, um_per_px=None, dt_min=None, out_dir=".", prefix="",
-               which=("per_frame", "per_cell", "tracks"), with_solidity=False,
-               with_edge=False, progress_cb=None):
-    """Write the requested tables as ``<out_dir>/<prefix><name>.csv``.
-
-    The per-frame regionprops pass (the slow part) runs once and is shared by
-    the per_frame and per_cell tables. ``progress_cb(done, total)`` drives a GUI
-    bar from that pass. Returns {name: path}.
-    """
-    os.makedirs(out_dir, exist_ok=True)
+def build_tables(labels, um_per_px=None, dt_min=None,
+                 which=("per_frame", "per_cell", "tracks"), columns=None,
+                 with_solidity=False, with_edge=False, with_contacts=True,
+                 progress_cb=None):
+    """Return ``{name: DataFrame}`` for the requested tables of one label stack. The
+    per-frame regionprops pass (the slow part) runs once and is shared by per_frame +
+    per_cell; `columns` (a list) subsets the **per_frame** output only (per_cell still
+    aggregates the full per-frame table)."""
     labels = np.asarray(labels)
-    paths = {}
+    out = {}
     pf = None
     if "per_frame" in which or "per_cell" in which:
         pf = per_frame_table(labels, um_per_px, dt_min, with_solidity,
-                             progress_cb=progress_cb)
+                             progress_cb=progress_cb, with_contacts=with_contacts)
     if "per_frame" in which:
-        paths["per_frame"] = write_csv(pf, os.path.join(out_dir, f"{prefix}per_frame.csv"))
+        out["per_frame"] = _select_columns(pf, columns)
     if "per_cell" in which:
-        pc = per_cell_table(labels, um_per_px, dt_min, with_solidity,
-                            per_frame_df=pf, with_edge=with_edge)
-        paths["per_cell"] = write_csv(pc, os.path.join(out_dir, f"{prefix}per_cell.csv"))
+        out["per_cell"] = per_cell_table(labels, um_per_px, dt_min, with_solidity,
+                                         per_frame_df=pf, with_edge=with_edge)
     if "tracks" in which:
-        tr = track_table(labels, um_per_px, dt_min)
-        paths["tracks"] = write_csv(tr, os.path.join(out_dir, f"{prefix}tracks.csv"))
+        out["tracks"] = track_table(labels, um_per_px, dt_min)
     if "contact_pairs" in which:
-        cp = contact_pairs_table(labels, um_per_px, dt_min)
-        paths["contact_pairs"] = write_csv(
-            cp, os.path.join(out_dir, f"{prefix}contact_pairs.csv"))
+        out["contact_pairs"] = contact_pairs_table(labels, um_per_px, dt_min)
+    return out
+
+
+def export_all(labels, um_per_px=None, dt_min=None, out_dir=".", prefix="",
+               which=("per_frame", "per_cell", "tracks"), with_solidity=False,
+               with_edge=False, columns=None, with_contacts=True, progress_cb=None):
+    """Write the requested tables of one recording as ``<out_dir>/<prefix><name>.csv``.
+    ``columns`` subsets the per_frame table. ``progress_cb(done, total)`` drives a GUI
+    bar. Returns {name: path}."""
+    os.makedirs(out_dir, exist_ok=True)
+    tables = build_tables(labels, um_per_px, dt_min, which, columns, with_solidity,
+                          with_edge, with_contacts, progress_cb=progress_cb)
+    paths = {name: write_csv(df, os.path.join(out_dir, f"{prefix}{name}.csv"))
+             for name, df in tables.items()}
     if progress_cb:
         progress_cb(1, 1)
+    return paths
+
+
+def _apply_scale(rec, scale_override):
+    if scale_override:
+        px, dt = scale_override
+        if px:
+            rec.um_per_px = float(px)
+        if dt:
+            rec.time_interval_min = float(dt)
+
+
+def _load_corrected(e, scale_override, corrections):
+    """Load a recording's (label stack, um/px, dt) with scale override + per-recording
+    channel/FOV corrections applied (so coordinates match the analysis). None if no masks."""
+    from ..io import recording as _rec
+    from . import fov as _fov
+    masks = e.load_masks()
+    if masks is None:
+        return None
+    rec = e.load_recording()
+    _apply_scale(rec, scale_override)
+    _rec.apply_correction(rec, corrections.get(e.label))
+    labels = _fov.apply_fov(masks.labels, rec.fov) if rec.fov else masks.labels
+    return labels, rec.um_per_px, rec.time_interval_min
+
+
+def export_project(entries, out_dir=".", which=("per_frame",), columns=None,
+                   with_solidity=False, with_edge=False, with_contacts=True,
+                   group="recording", scale_override=None, corrections=None,
+                   excluded=None, progress_cb=None):
+    """Export tables for **every recording** in a project. ``group``: ``"recording"`` →
+    one ``<label>_<name>.csv`` per recording; ``"combined"`` → one ``ALL_<name>.csv`` per
+    table; ``"condition"`` → one ``<condition>_<name>.csv`` per condition. The grouped
+    files carry leading ``recording`` + ``condition`` columns. Applies the project scale
+    override + per-recording channel/FOV corrections, skips ``excluded`` labels.
+    ``progress_cb(done, total)`` advances per recording."""
+    import pandas as pd
+    os.makedirs(out_dir, exist_ok=True)
+    corrections, excluded = corrections or {}, set(excluded or ())
+    ents = [e for e in entries if e.label not in excluded]
+    buckets, paths, n = {}, {}, len(ents)            # buckets: key -> {name: [df]}
+    for i, e in enumerate(ents):
+        if progress_cb:
+            progress_cb(i, n)
+        loaded = _load_corrected(e, scale_override, corrections)
+        if loaded is None:
+            continue
+        labels, um, dt = loaded
+        tables = build_tables(labels, um, dt, which, columns, with_solidity,
+                              with_edge, with_contacts)
+        for name, df in tables.items():
+            df = df.copy()
+            df.insert(0, "condition", e.condition or "")
+            df.insert(0, "recording", e.label)
+            if group == "recording":
+                paths[f"{e.label}/{name}"] = write_csv(
+                    df, os.path.join(out_dir, f"{e.label}_{name}.csv"))
+            else:
+                key = "ALL" if group == "combined" else (e.condition or "none")
+                buckets.setdefault(key, {}).setdefault(name, []).append(df)
+    for key, by_name in buckets.items():
+        for name, parts in by_name.items():
+            paths[f"{key}/{name}"] = write_csv(
+                pd.concat(parts, ignore_index=True),
+                os.path.join(out_dir, f"{key}_{name}.csv"))
+    if progress_cb:
+        progress_cb(n, n)
+    return paths
+
+
+def diper_table(labels, um_per_px=None, dt_min=None, recording="", condition=""):
+    """Trajectory coordinates in **DiPer column layout** (for the `diper_clone` package):
+    columns ``[condition, recording, cell_id, frame, x, y, real_frame, time_min]`` — DiPer
+    reads by *position* (cols 4/5/6 = frame, x, y; first three ignored). Cells are stacked
+    and ``frame`` is renumbered 1..N **per cell** so DiPer's split-on-frame-reset detects
+    each trajectory. ``x``/``y`` are µm when a scale is given, else px."""
+    import pandas as pd
+    tr = track_table(np.asarray(labels), um_per_px, dt_min)
+    cols = ["condition", "recording", "cell_id", "frame", "x", "y",
+            "real_frame", "time_min"]
+    if tr.empty:
+        return pd.DataFrame(columns=cols)
+    xc = "centroid_x_um" if "centroid_x_um" in tr.columns else "centroid_x"
+    yc = "centroid_y_um" if "centroid_y_um" in tr.columns else "centroid_y"
+    has_t = "time_min" in tr.columns
+    rows = []
+    for cid, g in tr.groupby("cell_id"):
+        g = g.sort_values("frame")
+        for step, (_, r) in enumerate(g.iterrows(), start=1):
+            rows.append({"condition": condition, "recording": recording,
+                         "cell_id": int(cid), "frame": step,
+                         "x": float(r[xc]), "y": float(r[yc]),
+                         "real_frame": int(r["frame"]),
+                         "time_min": float(r["time_min"]) if has_t else ""})
+    return pd.DataFrame(rows, columns=cols)
+
+
+def export_diper_one(labels, um_per_px=None, dt_min=None, out_dir=".", label="",
+                     condition="", prefix="diper_", progress_cb=None):
+    """DiPer-ready trajectory CSV for one recording → ``<out_dir>/<prefix><label>.csv``."""
+    os.makedirs(out_dir, exist_ok=True)
+    df = diper_table(labels, um_per_px, dt_min, recording=label, condition=condition)
+    path = write_csv(df, os.path.join(out_dir, f"{prefix}{label or 'recording'}.csv"))
+    if progress_cb:
+        progress_cb(1, 1)
+    return {f"diper/{label or 'recording'}": path}
+
+
+def export_diper(entries, out_dir=".", group="condition", scale_override=None,
+                 corrections=None, excluded=None, prefix="diper_", progress_cb=None):
+    """DiPer-ready trajectory CSVs for a project. ``group``: ``"condition"`` → one
+    ``<prefix><cond>.csv`` per condition (the canonical DiPer multi-group input — each
+    file is one group); ``"recording"`` → one per recording; ``"combined"`` → one
+    ``<prefix>all.csv``. Trajectories from every recording are stacked per group (``frame``
+    resets per cell). Applies scale override + corrections, skips ``excluded``."""
+    import pandas as pd
+    os.makedirs(out_dir, exist_ok=True)
+    corrections, excluded = corrections or {}, set(excluded or ())
+    ents = [e for e in entries if e.label not in excluded]
+    buckets, n = {}, len(ents)
+    for i, e in enumerate(ents):
+        if progress_cb:
+            progress_cb(i, n)
+        loaded = _load_corrected(e, scale_override, corrections)
+        if loaded is None:
+            continue
+        labels, um, dt = loaded
+        df = diper_table(labels, um, dt, recording=e.label, condition=e.condition or "")
+        if df.empty:
+            continue
+        key = {"condition": e.condition or "none", "recording": e.label}.get(group, "all")
+        buckets.setdefault(key, []).append(df)
+    paths = {f"diper/{key}": write_csv(pd.concat(parts, ignore_index=True),
+                                       os.path.join(out_dir, f"{prefix}{key}.csv"))
+             for key, parts in buckets.items()}
+    if progress_cb:
+        progress_cb(n, n)
     return paths
