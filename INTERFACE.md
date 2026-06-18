@@ -80,6 +80,15 @@ Read this before opening source files. Update it when modules change.
   axes linked? between-condition yes / within-condition no → distinct,
   non-redundant), `mv_feature_heatmap.png`, `mv_phenotype_2d.png`.
   → `analysis_out/` (gitignored).
+- **scripts/compare_datasets.py** (+ `ds_config`, `ds_compute`, `ds_stats`,
+  `ds_figures`, `ds_report`) — **two-dataset treatment comparison**: IC293 (manual
+  crops) vs IC295 (programmatic single-cell crops), same PIEZO1 arms. `ds_compute`
+  caches `build_comparison` per-cell tables; `ds_stats` does per-contrast effect sizes
+  (Cohen's d + Mann–Whitney, Bonferroni), per-arm multivariate (PERMANOVA + LORO-AUC
+  over `KEY_METRICS`, reduced permutation counts), and **cross-dataset concordance**
+  (correlation of per-metric d between datasets + robust-effect flags); `ds_figures`
+  (matplotlib) + `ds_report` write `analysis_out/ic293_vs_ic295/{REPORT.md, figs/*}`
+  (gitignored). `CELLSCOPE_ROOT` env overrides the data location.
 
 ## maskviewer/ (package)
 - **config.py** — `load_config(path, include_sample=True)` → dict with `data_roots`
