@@ -378,6 +378,10 @@ Read this before opening source files. Update it when modules change.
   **grouping** (per-recording / combined / per-condition), and a **DiPer-ready
   trajectory** export; folder/prefix; runs the chosen export jobs on a worker
   `QThread` (combined progress bar + Cancel); solidity / edge-dynamics opts.
+- **mask_export_dialog.py** — `MaskExportDialog` + free function `open_mask_export(win)`
+  (File ▸ Export Masks…, Ctrl+M): format combo (TIFF stack / TIFF·PNG sequence / NumPy),
+  scope (current / all recordings), relabel-consecutive option, folder/prefix; threaded
+  via `analysis.mask_export`. Free function so it adds nothing to `window_actions`.
 - **plot_export.py** — `save_plot(plot, parent)`: PNG/SVG export for any panel plot.
 - **status_progress.py** — `StatusProgress(QWidget)`: a compact status-bar progress
   widget (label + bar + elapsed/**ETA**, `fmt_secs`); `start` / `update(done,
@@ -583,6 +587,11 @@ Read this before opening source files. Update it when modules change.
   (`diper_table` = coords in `diper_clone` column layout — cols 4/5/6 = frame, x, y,
   `frame` reset per cell; `export_diper` per condition/recording/combined,
   `export_diper_one` for one recording). Needs pandas.
+- **mask_export.py** — export the `(T,H,W)` label stack for other viewers/software:
+  `export_masks(labels, fmt, …)` (ImageJ TIFF stack with µm/min metadata, per-frame TIFF
+  / PNG sequence via Pillow, NumPy `.npz`/`.npy`; auto 8/16/32-bit), `export_masks_project`
+  (every recording, FOV-cropped, excluded skipped), `relabel_consecutive`. `FORMATS` lists
+  the options. Pure; tifffile + PIL.
 - **feature_tables.py** — data layer for the follow-up analyses: loads the
   CellScope IC295 artifacts via `data/` (`recordings()`, `cells()`,
   `tracks()`) + the experimental design (`ARMS`, `VEHICLE`) +

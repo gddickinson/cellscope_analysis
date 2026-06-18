@@ -5,6 +5,31 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Export Masks (TIFF / PNG / NumPy) for other software
+
+**Request.** A mask-export menu with format options, for importing the masks into other
+viewers/software.
+
+**Changes.**
+- `analysis/mask_export.py` (new, pure): `export_masks(labels, fmt, out_dir, …)` writes the
+  `(T,H,W)` label stack as an **ImageJ/Fiji TIFF stack** (multi-page, µm/min metadata),
+  per-frame **TIFF** / **PNG** sequence (Pillow), or **NumPy** `.npz`/`.npy`. Auto
+  bit-depth (`_smallest_uint`: 8/16/32), optional `relabel_consecutive` (IDs → dense 1..N,
+  0 kept). `export_masks_project` does every recording (FOV-cropped via `_load_masks_fov`,
+  scale-aware, excluded skipped; sequences → `<label>/` subfolder, else `<label>_masks.<ext>`).
+  Cell IDs preserved exactly (label images, not renders). `FORMATS` drives the dialog.
+- `gui/mask_export_dialog.py` (new): `MaskExportDialog` (format combo, scope current/all,
+  relabel option, folder/prefix, threaded worker + progress) + free function
+  `open_mask_export(win)` — keeps `window_actions` at its 498-line limit.
+- `menus.py`: File ▸ **Export Masks…** (Ctrl+M).
+
+**Tested.** `tests/test_mask_export.py` (8): TIFF-stack / npz / npy / TIFF+PNG-sequence
+round-trips (labels preserved), relabel, auto bit-depth, bad-format + PNG->16-bit guards.
+GUI test-driven headless (current → single file; all → per-recording subfolders/flat;
+relabel). Full suite **209 passed**; all files <500 lines. Docs: README / CLAUDE / INTERFACE.
+
+---
+
 ## 2026-06-18 — README rewrite for readability + DiPer features
 
 **Request.** The README wasn't easy to read — make it user-friendly; cover the new

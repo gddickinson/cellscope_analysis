@@ -306,7 +306,7 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   throughout the GUI.
 - **Menus**: File (open recording / open project / **Add Folder to Project** (merge) /
   **Save Project** Ctrl+S (→ loaded file) + Save As / **Recent Projects** /
-  **Include / Exclude Recordings…** / **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
+  **Include / Exclude Recordings…** / **Export CSV** Ctrl+E / **Export Masks** Ctrl+M / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
   — frame the canvas on the selected cell, handy in a large sparse FOV), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
@@ -352,6 +352,14 @@ selection** (grouped checkboxes; the export subsets the per-frame table), and a
 per condition = one DiPer group). Heavy passes are threaded (jobs run in sequence with a
 combined progress bar). Our `motion.direction_autocorrelation` + `motion.msd` are
 **bit-identical to `diper_clone`** (pinned by `tests/test_diper_equivalence.py`).
+
+**Mask export** (File ▸ Export Masks…, Ctrl+M, `gui/mask_export_dialog.py` +
+`analysis/mask_export.py`) writes the **label stack** for other software (Fiji/ImageJ,
+napari, QuPath…): **ImageJ TIFF stack** (multi-page, µm/min metadata), per-frame **TIFF**
+/ **PNG** sequences, or **NumPy** `.npz`/`.npy` — auto bit-depth (8/16/32), optional
+**relabel to consecutive 1..N**, scope **current recording or all recordings** (each into
+a `<label>/` subfolder for sequences, else `<label>_masks.<ext>`; FOV crop + scale applied,
+excluded skipped). Threaded; cell IDs preserved exactly (label images, not renders).
 
 ## Testing without a display
 
