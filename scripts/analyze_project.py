@@ -72,7 +72,7 @@ def main():
     design = proj.design
     print(f"Analyzing {len(entries)} recordings → {args.out}")
 
-    per_cell, msd, autocorr = compare.build_comparison(
+    per_cell, msd, autocorr, *_ = compare.build_comparison(
         entries, max_lag=args.lags, corrections=proj.corrections,
         scale_override=proj.scale_override,
         progress_cb=lambda i, n: print(f"  recording {i}/{n}", end="\r") or True)

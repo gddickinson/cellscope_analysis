@@ -333,8 +333,11 @@ Read this before opening source files. Update it when modules change.
   means), `ensemble_msd` (mean±SEM / median+CI bands; band-bound curves added to
   the plot so they inherit its log mode + clamped > 0 — fixes misaligned log-log
   bands/lines; honours τ-binning, linear/log axis, and optional point markers +
-  per-point error bars), `ensemble_autocorr` (**DiPer direction autocorrelation**
-  by condition — the same band/point style, y in [−0.2, 1.05]), `scatter` (X-vs-Y +
+  per-point error bars), the **DiPer decay-curve family** sharing `_ensemble_decay` +
+  optional `_individual_curves` overlay — `ensemble_autocorr` (direction autocorr,
+  y∈[−0.2,1.05]), `ensemble_dirratio` (directionality ratio d/D vs elapsed time,
+  y∈[0,1.05]), `ensemble_velcorr` (normalized velocity autocorrelation vs lag),
+  `scatter` (X-vs-Y +
   Spearman, clickable, optional
   per-group / all-data **fit lines** with ±SE band — `_fit_xy`/`_draw_fit`),
   `histogram` (per-cell distribution by group). `_fit_xy` handles polynomial
@@ -450,7 +453,9 @@ Read this before opening source files. Update it when modules change.
   **recording-clustered** robust SE — a statsmodels-free random-intercept stand-in).
 - **motion.py** — centroid-track motion: `instantaneous_speed`,
   `displacement_metrics` (net/path/straightness/speed), `direction_autocorrelation`
-  + `persistence` (lag-1, speed-unbiased), `msd` + `fit_msd` (D, α exponent),
+  + `persistence` (lag-1, speed-unbiased), **`directionality_ratio`** (DiPer d/D over
+  time) + **`velocity_autocorrelation`** (DiPer normalized, speed-weighted) — both
+  bit-identical to `diper_clone` (`tests/test_diper_equivalence.py`), `msd` + `fit_msd` (D, α exponent),
   `fit_furth` (Fürth/PRW D + persistence-time), `turning_angles`, **`run_and_tumble`**
   (directed runs vs reorientation tumbles → run length/duration + tumble rate/angle),
   **`jump_steps`** (displacement-outlier steps = suspected ID-swap track QC),
@@ -532,8 +537,10 @@ Read this before opening source files. Update it when modules change.
   includes a **Cross-recording comparison** section (recording = unit, whole-track
   vs state-segmented, filters, stats).
 - **compare.py** — cross-recording comparison (recording = unit): `build_comparison`
-  (→ per-cell table over many recordings + condition, AND per-recording ensemble
-  MSD up to `max_lag` lags — `MAX_LAG` default, exposed in the toolbar; optional
+  (→ **5-tuple** `(per_cell, msd, autocorr, dir_ratio, velcorr)`: a per-cell table over
+  many recordings + condition, AND four per-recording ensemble **DiPer** curve tables —
+  MSD, direction autocorrelation, directionality ratio, velocity autocorrelation —
+  mean-over-cells via `_mean_curve_rows`, up to `max_lag` lags — `MAX_LAG` default; optional
   `piezo_channel` adds per-cell edge-movement↔intensity `edge_piezo_corr` /
   `edge_piezo_slope` / `piezo_protr_minus_retr` columns via `edge_intensity`;
   optional `corrections` applies each recording's channel alignment + FOV crop;

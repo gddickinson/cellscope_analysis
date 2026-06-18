@@ -163,9 +163,12 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   dedicated standalone window (not a dock) for cross-recording / treatment
   analysis by condition (**recording = unit**) — left tabbed **Distributions**
   (strip / **box** Bonferroni stars / superplot) · **Ensemble MSD** (mean±SEM /
-  median+bootstrap-CI) · **Scatter X-vs-Y** (+Spearman) · **Direction
-  autocorrelation** (DiPer directional-persistence decay curves per condition,
-  recording = unit), all **axis-labelled with
+  median+bootstrap-CI) · **Scatter X-vs-Y** (+Spearman) · and the **DiPer family**
+  of per-condition decay curves (recording = unit, all **matched bit-for-bit to
+  `diper_clone`**): **Direction autocorrelation** (directional persistence),
+  **Directionality ratio** (d/D = net displacement ÷ path length over elapsed time),
+  and **Velocity autocorrelation** (normalized, speed-weighted) — each with optional
+  individual-recording-curve overlay; all **axis-labelled with
   units**; a **Filters…** dialog (`gui/compare_filters.py`: min frames ·
   track-quality · min cells/recording · cell-state · **nearest-neighbour distance
   min/max · neighbour count min/max · distance-from-image-edge**); and a tabbed

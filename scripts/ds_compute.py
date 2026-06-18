@@ -33,7 +33,7 @@ def compute_dataset(ds, recompute=False):
     proj = projmod.from_data_roots(root, name=key)
     n = len(proj.entries)
     print(f"[{key}] computing {n} recordings (build_comparison)…")
-    per_cell, msd, autocorr = compare.build_comparison(
+    per_cell, msd, autocorr, *_ = compare.build_comparison(
         proj.entries,
         progress_cb=lambda i, t: print(f"  [{key}] {i}/{t}", end="\r") or True)
     print()

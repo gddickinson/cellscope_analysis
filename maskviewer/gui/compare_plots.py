@@ -353,19 +353,18 @@ def ensemble_msd(plot, msd, design, stat, style=None):
           title=f"ensemble MSD by condition ({band}{binned})")
 
 
-def ensemble_autocorr(plot, autocorr, design, stat, style=None):
-    """DiPer **direction autocorrelation** by condition: mean ± SEM (or median +
-    bootstrap CI) of the per-recording autocorrelation curves vs the time interval
-    τ. Decays from ~1 (persistent) toward 0 (random walk) — the speed-unbiased
-    directional-persistence readout (Gorelik & Gautreau 2014)."""
+def _ensemble_decay(plot, long, design, stat, style, value_col, left, bottom, title,
+                    yrange=None):
+    """Shared renderer for the DiPer per-condition decay curves (mean ± SEM / median +
+    CI of the per-recording curves), with optional individual-recording overlay."""
     style = style or PlotStyle()
-    if autocorr is None or autocorr.empty:
-        plot.setTitle("no direction autocorrelation (recompute to build it)")
+    if long is None or getattr(long, "empty", True):
+        plot.setTitle(f"no {value_col} (recompute to build it)")
         return
-    ens = compare.ensemble_by_condition(autocorr, stat=stat, bin_min=style.msd_bin_min,
-                                        max_lag=style.msd_max_lag, value_col="autocorr")
+    ens = compare.ensemble_by_condition(long, stat=stat, bin_min=style.msd_bin_min,
+                                        max_lag=style.msd_max_lag, value_col=value_col)
     if style.show_individual_curves:
-        _individual_curves(plot, autocorr, design, "autocorr", False, style)
+        _individual_curves(plot, long, design, value_col, False, style)
     for cond in compare.order_conditions(ens, order=design.condition_order()):
         tau, centre, lo, hi = ens[cond]
         keep = np.isfinite(tau) & np.isfinite(centre)
@@ -384,10 +383,34 @@ def ensemble_autocorr(plot, autocorr, design, stat, style=None):
                 plot.plot([tau[k], tau[k]], [lo[k], hi[k]],
                           pen=pg.mkPen(col, width=style.line_width))
     band = "median + 95% CI" if stat == "median" else "mean ± SEM"
-    _axes(plot, style, left="direction autocorrelation",
-          bottom="time interval τ (min)",
-          title=f"DiPer direction autocorrelation by condition ({band})")
-    plot.setYRange(-0.2, 1.05)
+    _axes(plot, style, left=left, bottom=bottom, title=f"{title} ({band})")
+    if yrange:
+        plot.setYRange(*yrange)
+
+
+def ensemble_autocorr(plot, autocorr, design, stat, style=None):
+    """DiPer **direction autocorrelation** by condition vs τ — decays from ~1
+    (persistent) toward 0 (random walk); the speed-unbiased directional-persistence
+    readout (Gorelik & Gautreau 2014)."""
+    _ensemble_decay(plot, autocorr, design, stat, style, "autocorr",
+                    "direction autocorrelation", "time interval τ (min)",
+                    "DiPer direction autocorrelation by condition", yrange=(-0.2, 1.05))
+
+
+def ensemble_dirratio(plot, dirratio, design, stat, style=None):
+    """DiPer **directionality ratio** d/D vs elapsed time — net displacement ÷ path
+    length at each time point (1 = straight, →0 = tortuous)."""
+    _ensemble_decay(plot, dirratio, design, stat, style, "dir_ratio",
+                    "directionality ratio (d/D)", "elapsed time (min)",
+                    "DiPer directionality ratio over time", yrange=(0, 1.05))
+
+
+def ensemble_velcorr(plot, velcorr, design, stat, style=None):
+    """DiPer **normalized velocity autocorrelation** vs lag — speed-weighted (vs the
+    unit-vector direction autocorrelation)."""
+    _ensemble_decay(plot, velcorr, design, stat, style, "velcorr",
+                    "velocity autocorrelation", "lag τ (min)",
+                    "DiPer normalized velocity autocorrelation")
 
 
 def scatter(plot, per_rec, mx, my, design, pick_cb=None, style=None):

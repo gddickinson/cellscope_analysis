@@ -45,6 +45,30 @@ def diper_msd(xy, max_step):
     return np.array(out)
 
 
+def diper_dir_ratio(xy):
+    """diper_clone dir_ratio.calculate_directionality_ratio (d/D over time)."""
+    seg = np.hypot(np.diff(xy[:, 0]), np.diff(xy[:, 1]))
+    path = np.concatenate([[np.nan], np.cumsum(seg)])        # path_length[0] = NaN
+    dist = np.hypot(xy[:, 0] - xy[0, 0], xy[:, 1] - xy[0, 1])
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ratio = dist / path
+    ratio[0] = 1.0
+    return ratio
+
+
+def diper_velcorr(xy, max_step):
+    """diper_clone vel_cor.calculate_normalized_velocity_autocorrelation."""
+    dx, dy = np.diff(xy[:, 0]), np.diff(xy[:, 1])
+    ssq = float((dx ** 2 + dy ** 2).sum())                   # dt²·norm
+    out = []
+    for step in range(1, max_step + 1):
+        if len(dx) - step <= 0:
+            break
+        num = dx[:-step] * dx[step:] + dy[:-step] * dy[step:]
+        out.append(num.mean() / ssq)
+    return np.array(out)
+
+
 def _trajectories():
     """A few deterministic trajectories incl. a turn and a pause (zero-length step)."""
     rng = np.random.default_rng(0)
@@ -80,3 +104,18 @@ def test_msd_matches_diper():
 def test_persistence_is_lag1_autocorrelation():
     xy = _trajectories()[2]
     assert motion.persistence(xy) == motion.direction_autocorrelation(xy, max_lag=1)[1]
+
+
+def test_directionality_ratio_matches_diper():
+    for xy in _trajectories():
+        _t, ours = motion.directionality_ratio(xy)
+        ref = diper_dir_ratio(xy)
+        np.testing.assert_allclose(ours, ref, rtol=0, atol=1e-12, equal_nan=True)
+
+
+def test_velocity_autocorrelation_matches_diper():
+    for xy in _trajectories():
+        ours = motion.velocity_autocorrelation(xy, max_lag=15)
+        ref = diper_velcorr(xy, max_step=15)
+        k = min(ours.size, ref.size)
+        np.testing.assert_allclose(ours[:k], ref[:k], rtol=0, atol=1e-12)

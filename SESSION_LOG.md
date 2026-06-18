@@ -5,6 +5,38 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — DiPer family: directionality ratio + velocity autocorrelation + curve CSVs
+
+**Request.** Add the DiPer analyses we were missing — **directionality ratio over time**
+and **velocity autocorrelation** — as Comparison-window ensemble tabs, plus export the
+ensemble curve data.
+
+**New metrics (`motion.py`, bit-identical to `diper_clone`).**
+- `directionality_ratio(cen, dt)` → (t, d/D): straight-line distance from start ÷
+  cumulative path length at each point (1=straight, →0=tortuous); ratio[0]=1.
+- `velocity_autocorrelation(cen, max_lag)` → DiPer normalized speed-weighted vector
+  autocorrelation `mean_i(v_i·v_{i+k})/Σ|v_j|²`.
+- Validated vs the real `diper_clone` on IC293 (max |diff| 0 / 1.2e-16). Pinned by
+  `tests/test_diper_equivalence.py` (+2 inline-reference tests; now 5).
+
+**Pipeline.** `compare.build_comparison` now returns a **5-tuple**
+`(per_cell, msd, autocorr, dir_ratio, velcorr)` — refactored the per-recording
+curve-building into one `_mean_curve_rows` helper (so adding two curves shrank the
+loop). All callers made tolerant (`*_` / `*rest`); `save_results` / the `.cmp` + cache
+blobs / `_apply_loaded_results` carry the two new frames.
+
+**GUI.** Comparison window gains **Direct. ratio** and **Vel. autocorr** tabs
+(`compare_plots._ensemble_decay` + `ensemble_dirratio` / `ensemble_velcorr`, reusing the
+band/point/individual-curve style); `_replot` dispatch covers tabs 1/3/4/5. The
+Comparison **Export CSVs** now writes `comparison_ensemble_{msd,autocorr,dir_ratio,
+velocity_autocorr}.csv` (regroup-aware).
+
+**Sizes.** Kept everything <500 (compare.py 499, compare_window.py 499, compare_plots.py
+492) by extracting helpers + compacting the window's tab/legend setup. Full suite
+**201 passed**; GUI test-driven headless (both tabs render; export writes all four curve CSVs).
+
+---
+
 ## 2026-06-18 — Ensemble plots: overlay individual recording curves
 
 **Request.** Show individual per-recording curves alongside the ensemble (mean ± band)

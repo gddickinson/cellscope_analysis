@@ -33,15 +33,36 @@ def _resolve_channel(rec, channel):
     return ch if 0 <= ch < rec.n_channels else None
 
 
+def _mean_curve_rows(arrays, width, tau_of, label, cond, value_col, skip=0):
+    """Mean-over-cells ensemble curve → long rows {recording, condition, tau, value}.
+    Each array is one cell's curve (indexed from 0); padded to `width`, NaN-averaged over
+    cells; `tau_of(k)` maps the column index to the τ value; `skip` drops leading columns."""
+    import warnings
+    if not arrays or width <= 0:
+        return []
+    mat = np.full((len(arrays), width), np.nan)
+    for j, a in enumerate(arrays):
+        m = min(a.size, width)
+        mat[j, :m] = a[:m]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        ens = np.nanmean(mat, axis=0)
+    return [{"recording": label, "condition": cond, "tau": tau_of(k), value_col: float(ens[k])}
+            for k in range(skip, width) if np.isfinite(ens[k])]
+
+
 def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX_LAG,
                      piezo_channel=None, corrections=None, scale_override=None,
                      with_contacts=True, with_state_segmented=True, with_edge=False,
                      with_cil=False, with_fluor_metrics=False, with_shape_modes=False):
-    """(per_cell_df, msd_long_df, autocorr_long_df) across all entries with masks.
+    """(per_cell_df, msd, autocorr, dir_ratio, velcorr) across all entries with masks.
 
-    per_cell_df: per-cell rows + recording + condition. msd_long_df / autocorr_long_df:
-    per-recording ensemble MSD and **DiPer direction autocorrelation** (mean over
-    cells) in long form (recording, condition, tau, msd|autocorr) up to ``max_lag``
+    per_cell_df: per-cell rows + recording + condition. The other four are
+    per-recording ensemble curves (mean over cells) in long form
+    (recording, condition, tau, value) — the **DiPer** family, all matched to
+    `diper_clone`: ensemble **MSD**, **direction autocorrelation**, **directionality
+    ratio** d/D over elapsed time (`tau`=elapsed min, `dir_ratio`), and **normalized
+    velocity autocorrelation** (`velcorr`). MSD / autocorr go up to ``max_lag``
     lags. ``with_contacts`` / ``with_state_segmented`` / ``with_solidity`` gate the
     optional (heavier) analysis families — the Config ▸ Comparison-analysis toggles.
     ``piezo_channel`` (channel name or index) → also add
@@ -55,7 +76,7 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
     from ..io import recording as _recording
     max_lag = int(max_lag) if max_lag and max_lag > 0 else MAX_LAG
     corrections = corrections or {}
-    parts, msd_rows, ac_rows = [], [], []
+    parts, msd_rows, ac_rows, dr_rows, vc_rows = [], [], [], [], []
     n = len(entries)
     for i, e in enumerate(entries):
         if progress_cb and progress_cb(i, n) is False:
@@ -130,37 +151,25 @@ def build_comparison(entries, progress_cb=None, with_solidity=False, max_lag=MAX
         parts.append(df)
         scale = rec.um_per_px or 1.0
         dt = rec.time_interval_min or 1.0
-        mat = np.full((len(cents), max_lag), np.nan)
-        for j, cen in enumerate(cents.values()):
-            _, vals = motion.msd(cen * scale, rec.time_interval_min, max_lag=max_lag)
-            mat[j, :vals.size] = vals
-        import warnings
-        with warnings.catch_warnings():               # all-NaN lag columns are fine
-            warnings.simplefilter("ignore", RuntimeWarning)
-            ens = np.nanmean(mat, axis=0) if mat.shape[0] else np.full(max_lag, np.nan)
-        for k in range(max_lag):
-            if np.isfinite(ens[k]):
-                msd_rows.append({"recording": e.label, "condition": e.condition or "?",
-                                 "tau": (k + 1) * dt, "msd": float(ens[k])})
-        # ensemble DiPer direction autocorrelation (mean over cells; scale-free)
-        amat = np.full((len(cents), max_lag + 1), np.nan)
-        for j, cen in enumerate(cents.values()):
-            ac = motion.direction_autocorrelation(cen, max_lag=max_lag)
-            amat[j, :ac.size] = ac
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            aens = (np.nanmean(amat, axis=0) if amat.shape[0]
-                    else np.full(max_lag + 1, np.nan))
-        for k in range(1, max_lag + 1):               # skip lag 0 (always 1.0)
-            if k < aens.size and np.isfinite(aens[k]):
-                ac_rows.append({"recording": e.label, "condition": e.condition or "?",
-                                "tau": k * dt, "autocorr": float(aens[k])})
+        cc, cond = list(cents.values()), e.condition or "?"
+        # ensemble curves per recording (mean over cells), all matched to diper_clone
+        msd_rows += _mean_curve_rows(
+            [motion.msd(c * scale, None, max_lag=max_lag)[1] for c in cc],
+            max_lag, lambda k: (k + 1) * dt, e.label, cond, "msd")        # MSD (µm²)
+        ac_rows += _mean_curve_rows(
+            [motion.direction_autocorrelation(c, max_lag=max_lag) for c in cc],
+            max_lag + 1, lambda k: k * dt, e.label, cond, "autocorr", skip=1)
+        vc_rows += _mean_curve_rows(
+            [motion.velocity_autocorrelation(c, max_lag=max_lag) for c in cc],
+            max_lag, lambda k: (k + 1) * dt, e.label, cond, "velcorr")
+        dr = [motion.directionality_ratio(c * scale)[1] for c in cc]      # vs elapsed t
+        dr_rows += _mean_curve_rows(dr, max((a.size for a in dr), default=0),
+                                    lambda k: k * dt, e.label, cond, "dir_ratio")
     if progress_cb:
         progress_cb(n, n)
     per_cell = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
-    msd = pd.DataFrame(msd_rows) if msd_rows else pd.DataFrame()
-    autocorr = pd.DataFrame(ac_rows) if ac_rows else pd.DataFrame()
-    return per_cell, msd, autocorr
+    frame = lambda rows: pd.DataFrame(rows) if rows else pd.DataFrame()
+    return (per_cell, frame(msd_rows), frame(ac_rows), frame(dr_rows), frame(vc_rows))
 
 
 def ensemble_by_condition(msd_long, stat="mean", n_boot=400, bin_min=0, max_lag=0,
@@ -269,14 +278,15 @@ def ols_adjusted(per_recording, outcome, covariates=("frac_spread", "mean_n_neig
     return out
 
 
-def save_results(path, per_cell, msd, meta=None, autocorr=None):
-    """Pickle the computed comparison results (per-cell + ensemble MSD + ensemble
-    direction-autocorrelation frames + a small meta dict: project name, design,
-    exclusions) so they can be reloaded and re-plotted later without the raw masks."""
+def save_results(path, per_cell, msd, meta=None, autocorr=None, dir_ratio=None,
+                 velcorr=None):
+    """Pickle the computed comparison results (per-cell + the ensemble DiPer curve
+    frames: MSD, direction autocorrelation, directionality ratio, velocity
+    autocorrelation + a small meta dict) for reload/replot without the raw masks."""
     import pickle
     with open(path, "wb") as f:
         pickle.dump({"per_cell": per_cell, "msd": msd, "autocorr": autocorr,
-                     "meta": meta or {}}, f)
+                     "dir_ratio": dir_ratio, "velcorr": velcorr, "meta": meta or {}}, f)
     return path
 
 

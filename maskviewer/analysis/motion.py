@@ -117,6 +117,44 @@ def msd(cen: np.ndarray, dt_min: float | None = None,
     return tau, vals
 
 
+def directionality_ratio(cen: np.ndarray, dt_min: float | None = None) -> tuple:
+    """DiPer **directionality ratio** d/D over time: at each point, straight-line distance
+    from the start (d) ÷ cumulative path length (D). Returns ``(t, ratio)`` indexed by
+    elapsed point (t in min if ``dt`` given); ``ratio[0] = 1.0``. 1 = perfectly straight,
+    →0 = tortuous (Gorelik & Gautreau 2014)."""
+    pts = _finite_points(cen)
+    n = pts.shape[0]
+    if n < 2:
+        return np.array([]), np.array([])
+    seg = np.sqrt((np.diff(pts, axis=0) ** 2).sum(axis=1))
+    path = np.concatenate([[0.0], np.cumsum(seg)])           # cumulative path length D
+    dist = np.sqrt(((pts - pts[0]) ** 2).sum(axis=1))        # straight-line dist d
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ratio = np.where(path > 0, dist / path, 1.0)
+    ratio[0] = 1.0
+    t = np.arange(n, dtype=float) * (float(dt_min) if dt_min else 1.0)
+    return t, ratio
+
+
+def velocity_autocorrelation(cen: np.ndarray, max_lag: int | None = None) -> np.ndarray:
+    """DiPer **normalized velocity autocorrelation** vs lag: ``mean_i(v_i·v_{i+k}) / Σ_j|v_j|²``
+    over displacement vectors v (speed-*weighted*, unlike the unit-vector direction
+    autocorrelation). Index 0 = lag 1. Empty if < 3 finite points."""
+    pts = _finite_points(cen)
+    if pts.shape[0] < 3:
+        return np.array([])
+    v = np.diff(pts, axis=0)
+    ssq = float((v ** 2).sum())                              # Σ|v_j|² (DiPer norm)
+    n = v.shape[0]
+    max_lag = min(max_lag or (n - 1), n - 1)
+    out = np.full(max_lag, np.nan)
+    if ssq <= 0:
+        return out
+    for k in range(1, max_lag + 1):
+        out[k - 1] = float((v[:-k] * v[k:]).sum(axis=1).mean()) / ssq
+    return out
+
+
 def turning_angles(cen: np.ndarray) -> np.ndarray:
     """Signed turn (rad, [-π, π]) between consecutive step directions.
 
