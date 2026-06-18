@@ -121,8 +121,9 @@ package does the maths. Built for a **PIEZO1** keratinocyte-migration study
 |---|---|---|
 | ![cell info](docs/screenshots/cell_info.png) | ![population](docs/screenshots/population.png) | ![shape modes](docs/screenshots/shape_modes.png) |
 
-*Edge movement ↔ SiR-actin (Cy5) on a real WT-control cell — actin is enriched at
-retracting edges (negative r, highly significant):*
+*Edge movement ↔ SiR-actin (Cy5) on a real WT-control cell — the edge-movement vs
+per-sector intensity scatter (coloured by movement class) with regression line and
+r/R²/p, the sampling rectangles, and the boundary coloured by per-sector intensity:*
 
 | Edge movement ↔ intensity | Sampling rectangles (coloured by intensity) | Edge this frame: intensity |
 |---|---|---|
