@@ -5,6 +5,20 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Ensemble plots: overlay individual recording curves
+
+**Request.** Show individual per-recording curves alongside the ensemble (mean ± band)
+on the Comparison window's MSD + direction-autocorrelation plots.
+
+**Change.** New `PlotStyle.show_individual_curves` (persisted; checkbox in the plot-style
+editor). When on, `compare_plots.ensemble_msd` / `ensemble_autocorr` faintly overlay each
+recording's own curve (condition-coloured, low alpha, behind the ensemble) via
+`_individual_curves` — the per-recording `msd_long` / `autocorr_long` tables already carry
+one curve per recording, so no recompute. Headless smoke: enabling it adds one curve per
+recording (78 on IC293). Full suite **199 passed**.
+
+---
+
 ## 2026-06-18 — Export CSV: scope/grouping + column selection + DiPer-ready trajectories
 
 **Request.** Export per-frame coordinates + properties for **all** recordings (separate

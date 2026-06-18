@@ -34,6 +34,7 @@ class PlotStyle:
     msd_max_lag: int = 0          # ensemble-MSD: keep only the first N lags; 0 = all
     msd_log: bool = True          # ensemble MSD on log-log axes (else linear)
     msd_points: bool = False      # draw markers + error bars at each MSD lag
+    show_individual_curves: bool = False  # overlay each recording's own MSD/autocorr curve
     background: str = "default"   # plot background: default / black / white / grey
     legend: bool = False          # show a per-group legend on the graphs
     fit_kind: str = "none"        # scatter fit model (none → no fit; see _FITS)
@@ -81,6 +82,8 @@ class PlotStyleDialog(QtWidgets.QDialog):
                ("log_y", "Log Y (distributions / scatter)"),
                ("msd_log", "Ensemble-MSD log-log axes (else linear)"),
                ("msd_points", "Ensemble-MSD points + error bars"),
+               ("show_individual_curves",
+                "Ensemble MSD/autocorr: overlay individual recording curves"),
                ("show_points", "Show individual points (box / bars)"),
                ("trendline", "Trendline (connect group means)"),
                ("fit_ci", "Scatter fit ± std-error band"),

@@ -192,8 +192,10 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   means), **scatter fit lines** (model combo linear / polynomial-2/3 / power / exp /
   log × target all-data / per-group / both, ±SE band),
   and ensemble-MSD **τ-bin size / max display lags / linear axis / point markers +
-  error bars** (plus a **compute-time MSD lag count** in the toolbar — recompute,
-  cache keyed by it), plus
+  error bars** + **overlay individual recording curves** (`show_individual_curves` —
+  faintly draws every recording's own MSD / direction-autocorrelation curve behind the
+  ensemble mean ± band, so the per-recording spread is visible), (plus a **compute-time
+  MSD lag count** in the toolbar — recompute, cache keyed by it), plus
   a **filter annotation** that labels graphs + tables with the active filters; the
   Distributions tab adds a **Bars (mean ± SEM)** view. **Results ▾** runs a
   **multivariate phenotype test** (PERMANOVA + leave-one-recording-out AUC over all

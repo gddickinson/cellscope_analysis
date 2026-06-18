@@ -30,6 +30,23 @@ def _conds(per, design):
                                     order=design.condition_order())
 
 
+def _individual_curves(plot, long_df, design, value_col, log, style):
+    """Faintly overlay each recording's own curve (condition-coloured) behind the
+    ensemble — shows the per-recording spread the mean ± band summarises."""
+    if long_df is None or long_df.empty:
+        return
+    for (_rec, cond), g in long_df.groupby(["recording", "condition"]):
+        g = g.sort_values("tau")
+        tau, v = g["tau"].to_numpy(float), g[value_col].to_numpy(float)
+        keep = np.isfinite(tau) & np.isfinite(v) & ((not log) | (v > 0))
+        if style.msd_max_lag:
+            keep &= np.arange(len(tau)) < style.msd_max_lag
+        if keep.sum() < 2:
+            continue
+        tau, v = tau[keep], (np.maximum(v[keep], 1e-9) if log else v[keep])
+        plot.plot(tau, v, pen=pg.mkPen(color=(*_rgb(design.color(cond)), 55), width=1))
+
+
 _BG = {"black": "k", "white": "w", "grey": (60, 60, 60), "default": None}
 
 _FILTER_NOTE = ""           # appended to plot titles when filters are active
@@ -304,6 +321,8 @@ def ensemble_msd(plot, msd, design, stat, style=None):
                                         max_lag=style.msd_max_lag)
     log = style.msd_log
     eps = 1e-9                       # log axes need strictly-positive values
+    if style.show_individual_curves:
+        _individual_curves(plot, msd, design, "msd", log, style)
     for cond in compare.order_conditions(ens, order=design.condition_order()):
         tau, centre, lo, hi = ens[cond]
         keep = np.isfinite(tau) & np.isfinite(centre) & (not log or centre > 0)
@@ -345,6 +364,8 @@ def ensemble_autocorr(plot, autocorr, design, stat, style=None):
         return
     ens = compare.ensemble_by_condition(autocorr, stat=stat, bin_min=style.msd_bin_min,
                                         max_lag=style.msd_max_lag, value_col="autocorr")
+    if style.show_individual_curves:
+        _individual_curves(plot, autocorr, design, "autocorr", False, style)
     for cond in compare.order_conditions(ens, order=design.condition_order()):
         tau, centre, lo, hi = ens[cond]
         keep = np.isfinite(tau) & np.isfinite(centre)
