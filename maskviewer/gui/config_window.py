@@ -13,6 +13,7 @@ from __future__ import annotations
 from PyQt5 import QtCore, QtWidgets
 
 from ..analysis import cell_metrics, metric_docs
+from ..config import load_config
 from .compare_tables import (COMPARE_OPTIONS, ANALYSIS_PARAMS, ANALYSIS_CHOICES,
                              apply_analysis_params)
 from .scale_dialog import ScalePanel
@@ -42,6 +43,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.resize(540, 480)
         self._settings = QtCore.QSettings("cellscope_analysis", "viewer")
         tabs = QtWidgets.QTabWidget()
+        tabs.addTab(self._startup_tab(), "Startup")
         tabs.addTab(self._metrics_tab(), "Cell plot metrics")
         tabs.addTab(self._compare_tab(), "Comparison analysis")
         tabs.addTab(self._params_tab(), "Analysis parameters")
@@ -52,6 +54,34 @@ class ConfigWindow(QtWidgets.QDialog):
         lay = QtWidgets.QVBoxLayout(self)
         lay.addWidget(tabs)
         lay.addWidget(bb)
+
+    # -- Startup --------------------------------------------------------
+    def _startup_tab(self):
+        """What the viewer loads on launch (read by main_viewer at start-up)."""
+        w = QtWidgets.QWidget()
+        v = QtWidgets.QVBoxLayout(w)
+        v.addWidget(_wrap("What the viewer loads when it starts. <b>Changes take "
+                          "effect next time you launch the app.</b> During a session, "
+                          "load data via File ▸ Open Project Folder or Recent Projects."))
+        demo = QtWidgets.QCheckBox("Load demo sample data at startup")
+        demo.setToolTip("Open the bundled synthetic sample_data/ recording on launch. "
+                        "Off by default.")
+        demo.setChecked(self._settings.value("startup/load_demo", False, type=bool))
+        demo.toggled.connect(
+            lambda on: self._settings.setValue("startup/load_demo", on))
+        v.addWidget(demo)
+        cfg = QtWidgets.QCheckBox("Load data from config.json at startup")
+        roots = ", ".join(load_config(include_sample=False)["data_roots"]) or "(none set)"
+        cfg.setToolTip("Scan the data_roots listed in config.json on launch.\n"
+                       "Current config.json roots:\n" + roots)
+        cfg.setChecked(self._settings.value("startup/load_config_roots", False, type=bool))
+        cfg.toggled.connect(
+            lambda on: self._settings.setValue("startup/load_config_roots", on))
+        v.addWidget(cfg)
+        v.addWidget(_wrap("<i>Both unchecked → start from a blank slate (no recordings "
+                          "loaded). This is the default.</i>"))
+        v.addStretch(1)
+        return w
 
     # -- Cell plot metrics ----------------------------------------------
     def _metrics_tab(self):

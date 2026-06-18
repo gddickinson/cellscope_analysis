@@ -12,11 +12,13 @@ Read this before opening source files. Update it when modules change.
 - **CLAUDE.md** — agent handoff (formats, how to run, conventions, seeds).
 
 ## Entry points
-- **main_viewer.py** — CLI launcher. Resolves recordings (from `config.json`
-  `data_roots`, `--data-root`, or an explicit `--recording/--masks`),
-  discovers them, wraps them in a **Project** (`project.from_entries`, with the
-  data-root folder name as the project name), and opens `ViewerWindow`. Qt is
-  imported lazily so `--help` needs no display.
+- **main_viewer.py** — CLI launcher (`_resolve(args)` → entries/roots/name).
+  Explicit data CLI args win: `--recording/--masks`, `--data-root`, or an explicit
+  `--config`. With **no** data args it follows the persisted **Startup** toggles
+  (`config.startup_roots`): load the demo and/or `config.json` roots, or — both off
+  (default) — open on a **blank slate** (no recordings). Wraps the result in a
+  **Project** (`project.from_entries`) and opens `ViewerWindow`. Qt is imported
+  lazily so `--help` needs no display.
 - **scripts/make_sample_data.py** — writes the synthetic `sample_data/Pos_demo/`
   (recording `.ome.tif` + `.ome.json` + `pipeline_results/masks.npz`). Safe,
   fake data so the app runs out of the box.
@@ -80,9 +82,11 @@ Read this before opening source files. Update it when modules change.
   → `analysis_out/` (gitignored).
 
 ## maskviewer/ (package)
-- **config.py** — `load_config(path)` → dict with `data_roots` (always
-  appends the bundled `sample_data/` as a fallback). `PROJECT_ROOT`,
-  `SAMPLE_DIR`, `CONFIG_PATH` constants.
+- **config.py** — `load_config(path, include_sample=True)` → dict with `data_roots`
+  (appends the bundled `sample_data/` as a fallback when `include_sample`).
+  `startup_roots(load_config_roots, load_demo, config_path=None)` → the roots to
+  scan at GUI launch per the Startup toggles (both off → `[]`, a blank slate); pure,
+  tested in `tests/test_startup.py`. `PROJECT_ROOT`, `SAMPLE_DIR`, `CONFIG_PATH`.
 - **project.py** — `Project` (name, data_roots, entries, design, **`excluded`**
   recording labels + **`excluded_cells`** {label: set(cell_id)} QC flags +
   **`overrides`** label→group; `.conditions` (effective, override-aware),
@@ -245,7 +249,9 @@ Read this before opening source files. Update it when modules change.
   globals, read at call time) + `analysis_params_tag` (compute-cache key). Split out of
   `compare_tables` for size; re-exported there for back-compat.
 - **config_window.py** — `ConfigWindow(QDialog)`: the unified **Config ▸ Settings…**
-  (Ctrl+,) tabbed window — **Cell plot metrics** (checkboxes bound to `cell_info`,
+  (Ctrl+,) tabbed window — **Startup** (`startup/load_demo` + `startup/load_config_roots`
+  checkboxes → QSettings, read at launch by `main_viewer`; both off → blank slate),
+  **Cell plot metrics** (checkboxes bound to `cell_info`,
   **grouped by category**), **Comparison analysis** (toggles
   `analysis_params.COMPARE_OPTIONS` → QSettings → what `build_comparison` computes),
   **Analysis parameters** (`ANALYSIS_PARAMS` spinboxes + `ANALYSIS_CHOICES` combos →
