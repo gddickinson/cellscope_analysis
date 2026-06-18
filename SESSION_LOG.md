@@ -5,6 +5,41 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — IC293 vs IC295 single-cell treatment comparison (scripts + report)
+
+**Task.** Analyse two PIEZO1 single-cell datasets — `ic293_analysis` (manual crops,
+n=78) and `ic295_single-cell-crop_analysis` (programmatic, n=207), same WT/GOF/KO +
+DMSO/Y1/OT arms — for similarities/differences between treatments; produce a report
+with figures.
+
+**Implementation.** New study scripts (each <500 lines, reuse `maskviewer.analysis`):
+`scripts/compare_datasets.py` orchestrates `ds_compute` (cached `build_comparison`
+per-cell tables) → `ds_stats` (per-contrast Cohen's d + Mann–Whitney + Bonferroni;
+per-arm PERMANOVA + leave-one-recording-out AUC over the curated `KEY_METRICS`;
+**cross-dataset concordance** of per-metric effect sizes) → `ds_figures` (matplotlib)
+→ `ds_report` (markdown). Output: `analysis_out/ic293_vs_ic295/{REPORT.md, figs/*.png,
+<key>/*.csv}` (gitignored — derived from private data; scripts committed). Multivariate
++ per-dataset CSVs are cached so the report iterates without recompute. `CELLSCOPE_ROOT`
+env overrides the data path.
+
+**Headline result.** The **genetic arm reproduces across both extraction methods, the
+drug arm does not.** KO vs WT is the clearest, most reproducible signal — effect-size
+concordance r=0.88, LORO-AUC 0.62 (IC293) → 0.78 (IC295, PERMANOVA p=0.003), and the
+only contrast Bonferroni-significant on individual metrics (lower directional
+persistence, more tumbling, lower aspect ratio/eccentricity — rounder + less
+persistent; **opposite the naive "KO faster/straighter" brake prior**, flagged for
+careful interpretation). GOF is weak/near-chance; Y1/OT effect sizes anti-correlate
+between datasets (r<0) and AUC is near/below chance → no robust drug effect
+(underpowered/batch). No single metric is Bonferroni-significant in *both* datasets.
+
+**Notes / gotchas.** `compare.multivariate_contrasts` over all ~80 columns ran for
+minutes on single-cell data (label-permutation null × leave-one-out × degenerate
+constant columns); fixed by restricting to `KEY_METRICS` with reduced permutation
+counts (`cfg.PERM_*`) — AUC exact, p coarser. Report worded descriptively with
+caveats (pseudoreplication: unit = cell not dish; batch; multiple comparisons).
+
+---
+
 ## 2026-06-18 — Manually-assembled projects across cellscope trees (persisted)
 
 **Request.** Build a project by loading recordings from *different* cellscope projects
