@@ -289,7 +289,7 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
   throughout the GUI.
 - **Menus**: File (open recording / **open+save projects** / **Recent Projects** /
-  **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
+  **Include / Exclude Recordings…** / **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
   — frame the canvas on the selected cell, handy in a large sparse FOV), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
@@ -298,6 +298,16 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   opens as a project (recordings discovered under it; internal `_`/`.` dirs pruned),
   a project **`.json`** loads that project, and recording **`.ome.tif`/`.tif`** files
   are appended to the recording list.
+- **Include / Exclude Recordings** (File ▸ Include / Exclude Recordings…,
+  `gui/inclusion.py`): a **dual-list dialog** (Included ↔ Excluded, move with
+  arrows / double-click / multi-select) over the loaded project. The recording
+  dropdown (the "session") shows only **included** recordings, so excluding one
+  **removes it from the session** (and all analysis) and re-including **loads it
+  back**; if the recording on screen is excluded the session hands off to an
+  included one. Non-destructive — it only toggles `Project.excluded` (the same set
+  the Comparison window's Groups editor uses), saved with the project; files are
+  untouched. Loading a project with a pre-set `excluded` (e.g. the IC293
+  dividing-cell `Pos36_div-GOF`) hides those recordings from the session on open.
 Status bar shows frame/time/scale/cell-count + hovered/selected cell, plus a
 **progress bar with ETA** (`gui/status_progress.py`) for long compute — the
 Population / Shape / Cell-table passes run **off the GUI thread**

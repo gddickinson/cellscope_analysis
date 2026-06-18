@@ -46,9 +46,12 @@ class WindowActionsMixin:
         return npzs[0] if npzs else None
 
     def _add_recording_entry(self, fn, mask):
-        """Append a single recording to the current list and select it."""
-        self.entries.append(Entry(os.path.splitext(os.path.basename(fn))[0],
-                                  "", fn, mask))
+        """Append a single recording to the project (canonical list) and select it.
+        Goes into `project.entries` so it shows in the Include/Exclude dialog; the
+        session list (`self.entries`) is the included subset."""
+        self.project.entries.append(Entry(os.path.splitext(os.path.basename(fn))[0],
+                                          "", fn, mask))
+        self.entries = list(self.project.included_entries())
         self.display.set_recordings(self.entries)
         self.display.recording.setCurrentIndex(len(self.entries) - 1)
 
@@ -171,7 +174,7 @@ class WindowActionsMixin:
     def set_project(self, project):
         """Adopt a different project (recordings + experimental design)."""
         self.project = project
-        self.entries = list(project.entries)
+        self.entries = list(project.included_entries())   # session = included only
         self.display.set_recordings(self.entries)
         self.setWindowTitle(f"cellscope_analysis — {project.name}")
         if self._compare_window is not None:

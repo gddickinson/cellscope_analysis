@@ -5,6 +5,39 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Include / Exclude Recordings dialog (session-aware)
+
+**Request.** A menu item acting on the loaded project: two lists (included /
+excluded) with the ability to move recordings between them; changing status
+loads/removes the recording from the session.
+
+**Changes.**
+- New `gui/inclusion.py`: `IncludeExcludeDialog` (dual-list transfer widget — arrows,
+  double-click, multi-select; OK disabled when nothing included) + free functions
+  `manage_inclusion(win)` (opens it from the menu) and `apply_inclusion(win, excluded)`.
+- The **session** (recording dropdown) is now the **included** subset: `ViewerWindow`
+  `__init__` + `set_project` set `self.entries = project.included_entries()`, and
+  `_add_recording_entry` appends to `project.entries` (canonical) then rebuilds the
+  session. So loading a project with a pre-set `excluded` (e.g. `ic293.json`'s
+  `Pos36_div-GOF`) hides it from the dropdown on open.
+- `apply_inclusion` sets `Project.excluded`, rebuilds the dropdown, **keeps the current
+  recording without reloading** if still included, else **hands off to the first
+  included** recording (loads it). Same `excluded` set the Comparison window's Groups
+  editor uses — saved with the project, non-destructive.
+- Menu: File ▸ **Include / Exclude Recordings…** (`menus.py` → `inclusion.manage_inclusion`).
+- Kept `gui/inclusion.py` separate (free functions, not window methods) so
+  `viewer_window.py` (499) and `window_actions.py` (493) stay under 500 lines.
+
+**Test-drive (offscreen, real IC293 `ic293.json`).** Load → dropdown 77, div-cell
+hidden but present in `project.entries`; menu action present; dialog partitions 77/1;
+re-include → 78 + the div recording loads pixels+masks; exclude the on-screen
+recording → 77 and the session hands off to an included recording. Plus
+`tests/test_inclusion.py` (6): dialog partition/move, OK-gating, preset-excluded
+hidden on load, keep-current, load-on-exclude-current, re-include. Full suite **184
+passed**.
+
+---
+
 ## 2026-06-18 — Drag-and-drop opening (folders / project .json / recordings)
 
 **Request.** Drag folders and/or files onto the GUI window to open them.

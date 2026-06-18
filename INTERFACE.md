@@ -251,6 +251,16 @@ Read this before opening source files. Update it when modules change.
   / `analysis_choices` readers, `apply_analysis_params` (push onto analysis-module
   globals, read at call time) + `analysis_params_tag` (compute-cache key). Split out of
   `compare_tables` for size; re-exported there for back-compat.
+- **inclusion.py** — `IncludeExcludeDialog(QDialog)`: dual-list (Included ↔ Excluded)
+  transfer widget over a `Project` (move via arrows / double-click / multi-select;
+  OK disabled when nothing is included). `manage_inclusion(win)` opens it from
+  File ▸ Include / Exclude Recordings…; `apply_inclusion(win, excluded)` sets
+  `Project.excluded` and refreshes the **session** — the recording dropdown shows
+  only `project.included_entries()`, keeping the current recording (no reload) if
+  still included or handing off to an included one if it was excluded. Free
+  functions (not window methods) to keep `window_actions`/`viewer_window` under
+  500 lines. (The session list `ViewerWindow.entries` is the *included* subset;
+  the canonical full list is `project.entries`, used by the dialog + comparison.)
 - **config_window.py** — `ConfigWindow(QDialog)`: the unified **Config ▸ Settings…**
   (Ctrl+,) tabbed window — **Startup** (`startup/load_demo` + `startup/load_config_roots`
   checkboxes → QSettings, read at launch by `main_viewer`; both off → blank slate),
