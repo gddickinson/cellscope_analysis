@@ -5,6 +5,35 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Drag-and-drop opening (folders / project .json / recordings)
+
+**Request.** Drag folders and/or files onto the GUI window to open them.
+
+**Changes.**
+- `viewer_window.py`: `self.setAcceptDrops(True)` (offset by compacting the adjacent
+  `resize(...)` so the file stays at 499 lines).
+- `window_actions.py` (`WindowActionsMixin`, already a ViewerWindow base — so no new
+  import/base in viewer_window): `dragEnterEvent` / `dragMoveEvent` / `dropEvent` →
+  `open_paths(paths)`, which dispatches by kind: a project **`.json`** → load it
+  (`_open_project_path`), **folder(s)** → open as a project via
+  `projmod.from_data_roots` (recordings discovered under them; the new `_`/`.` prune
+  keeps `_cache/` out), recording **`.ome.tif`/`.tif`** files → appended to the list
+  (`_add_recording_entry` + `_sibling_masks` auto-detects `pipeline_results/masks.npz`).
+  Empty/unknown drops warn instead of crashing. Refactored `open_recording_dialog` /
+  `open_project_file` to share `_sibling_masks` / `_add_recording_entry` /
+  `_open_project_path`. Drops on any non-drop-accepting child (canvas, docks)
+  propagate to the window, so the whole window is a drop target.
+- Status-bar feedback on each drop (n recordings / folders / "ignored others").
+
+**Tests.** `tests/test_drag_drop.py` (5) — folder→project, recording-file→entry,
+.json→project, empty-folder→warn (no crash), and dragEnter accept/ignore gating
+(via a tiny fake event — constructing a real `QDragEnterEvent` segfaults under the
+offscreen platform). Windows isolate `_settings` to a temp ini so `_remember_project`
+never touches the real prefs. Full suite **178 passed**; real QSettings verified
+untouched.
+
+---
+
 ## 2026-06-18 — Fix: discovery loaded `_cache/` as a bogus "_cache" recording
 
 **Report.** Opening the *whole* results folder (`…/ic293_analysis`) instead of its

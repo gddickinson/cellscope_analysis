@@ -349,7 +349,10 @@ Read this before opening source files. Update it when modules change.
   `run_task`), falling back to synchronous compute when none is set (tests/headless).
 - **window_actions.py** — `WindowActionsMixin`: File/Window/Help action handlers
   (incl. **project** open-folder / open-file / save-as / recent-projects +
-  `set_project` to adopt a different dataset, `open_compare_window`,
+  `set_project` to adopt a different dataset; **drag-and-drop** `dragEnterEvent` /
+  `dropEvent` → `open_paths` dispatching dropped folders → project, `.json` →
+  project, `.ome.tif` → appended recording — sharing `_open_project_path` /
+  `_add_recording_entry` / `_sibling_masks` with the menu actions; `open_compare_window`,
   **`open_prep_dialog`** / `_apply_correction` — store a recording's channel
   alignment + FOV on the project and reload to apply it — and **`open_scale_dialog`** /
   `_apply_scale` — store the project-wide µm/px + min/frame overrides + reload), the

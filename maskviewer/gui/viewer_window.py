@@ -41,11 +41,11 @@ class ViewerWindow(WindowActionsMixin, QtWidgets.QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("cellscope_analysis — viewer & workbench")
         self.setMinimumSize(720, 480)         # always shrinkable below screen
+        self.setAcceptDrops(True)             # drag folders / files onto the window
         scr = QtWidgets.QApplication.primaryScreen()
         avail = scr.availableGeometry() if scr else None
         if avail:
-            self.resize(min(1280, avail.width() - 40),
-                        min(860, avail.height() - 60))
+            self.resize(min(1280, avail.width() - 40), min(860, avail.height() - 60))
         else:
             self.resize(1100, 760)
         if hasattr(entries, "design"):          # a Project was passed

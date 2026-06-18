@@ -1,11 +1,14 @@
 """Menu-action methods for ViewerWindow, split out to keep viewer_window small.
 
-`WindowActionsMixin` provides the File / Window / Help action handlers; it only
-uses attributes the ViewerWindow already owns (entries, recording, masks, docks,
-display, canvas, _settings, _default_state).
+`WindowActionsMixin` provides the File / Window / Help action handlers (incl.
+**drag-and-drop** opening — drop a project folder, a project `.json`, or a
+recording `.ome.tif` onto the window); it only uses attributes the ViewerWindow
+already owns (entries, recording, masks, docks, display, canvas, _settings,
+_default_state).
 """
 from __future__ import annotations
 
+import glob
 import os
 
 import numpy as np
@@ -25,16 +28,87 @@ class WindowActionsMixin:
             self, "Open recording", "", "OME-TIFF (*.ome.tif *.tif)")
         if not fn:
             return
-        mask = os.path.join(os.path.dirname(fn), "pipeline_results", "masks.npz")
-        if not os.path.exists(mask):
+        mask = self._sibling_masks(fn)
+        if not mask:
             mn, _ = QtWidgets.QFileDialog.getOpenFileName(
                 self, "Masks for this recording (Cancel for none)",
                 os.path.dirname(fn), "NumPy masks (*.npz)")
             mask = mn or None
+        self._add_recording_entry(fn, mask)
+
+    def _sibling_masks(self, fn):
+        """Masks for a recording file: its `pipeline_results/masks.npz`, else any
+        sibling `*.npz`, else None."""
+        mask = os.path.join(os.path.dirname(fn), "pipeline_results", "masks.npz")
+        if os.path.exists(mask):
+            return mask
+        npzs = sorted(glob.glob(os.path.join(os.path.dirname(fn), "*.npz")))
+        return npzs[0] if npzs else None
+
+    def _add_recording_entry(self, fn, mask):
+        """Append a single recording to the current list and select it."""
         self.entries.append(Entry(os.path.splitext(os.path.basename(fn))[0],
                                   "", fn, mask))
         self.display.set_recordings(self.entries)
         self.display.recording.setCurrentIndex(len(self.entries) - 1)
+
+    # -- drag-and-drop opening ------------------------------------------
+    def dragEnterEvent(self, ev):
+        md = ev.mimeData()
+        if md.hasUrls() and any(u.isLocalFile() for u in md.urls()):
+            ev.acceptProposedAction()
+        else:
+            ev.ignore()
+
+    def dragMoveEvent(self, ev):
+        if ev.mimeData().hasUrls():
+            ev.acceptProposedAction()
+        else:
+            ev.ignore()
+
+    def dropEvent(self, ev):
+        paths = [u.toLocalFile() for u in ev.mimeData().urls()
+                 if u.isLocalFile() and u.toLocalFile()]
+        if not paths:
+            ev.ignore()
+            return
+        ev.acceptProposedAction()
+        self.open_paths(paths)
+
+    def open_paths(self, paths):
+        """Open dropped items, dispatched by kind (project .json > folder(s) >
+        recording file(s)). A folder opens as a project (recordings discovered
+        under it); recording files are appended to the current list."""
+        paths = [p for p in paths if p]
+        jsons = [p for p in paths if p.lower().endswith(".json")]
+        dirs = [p for p in paths if os.path.isdir(p)]
+        recs = [p for p in paths if p.lower().endswith((".ome.tif", ".tif"))]
+        if jsons:
+            if self._open_project_path(jsons[0]) and len(paths) > 1:
+                self.statusBar().showMessage(
+                    "Opened project file; ignored the other dropped items.", 6000)
+            return
+        if dirs:
+            proj = projmod.from_data_roots(dirs)
+            if not proj.entries:
+                QtWidgets.QMessageBox.warning(
+                    self, "Nothing found", "No recordings under the dropped folder(s).")
+                return
+            self.set_project(proj)
+            if len(dirs) == 1:
+                self._remember_project(dirs[0])
+            self.statusBar().showMessage(
+                f"Opened {proj.n_recordings} recording(s) from {len(dirs)} folder(s).",
+                6000)
+            return
+        if recs:
+            for fn in recs:
+                self._add_recording_entry(fn, self._sibling_masks(fn))
+            self.statusBar().showMessage(f"Added {len(recs)} recording(s).", 6000)
+            return
+        QtWidgets.QMessageBox.information(
+            self, "Can't open that",
+            "Drop a project folder, a project .json, or a recording (.ome.tif).")
 
     # -- projects -------------------------------------------------------
     def open_data_root_dialog(self):
@@ -53,15 +127,19 @@ class WindowActionsMixin:
     def open_project_file(self):
         fn, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Open project file", "", "Project (*.json)")
-        if not fn:
-            return
+        if fn:
+            self._open_project_path(fn)
+
+    def _open_project_path(self, fn):
+        """Load a project JSON and adopt it; returns True on success."""
         try:
             proj = projmod.load_project(fn)
         except Exception as exc:
             QtWidgets.QMessageBox.critical(self, "Open failed", str(exc))
-            return
+            return False
         self.set_project(proj)
         self._remember_project(fn)
+        return True
 
     def save_project_as(self):
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
