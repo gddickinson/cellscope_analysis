@@ -329,7 +329,7 @@ def test_compare_build_aggregate():
     entries = [FE("A1", "WT", stack([(20, 15), (50, 15)])),
                FE("B1", "KO", stack([(20, 15), (50, 15), (35, 40)]))]
     prog = []
-    pc, msd, _ = compare.build_comparison(
+    pc, msd, *_ = compare.build_comparison(
         entries, progress_cb=lambda i, n: prog.append(i) or True)
     assert set(pc["recording"]) == {"A1", "B1"}
     assert set(pc["condition"]) == {"WT", "KO"}

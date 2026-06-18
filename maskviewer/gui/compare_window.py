@@ -44,7 +44,7 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.resize(1100, 720)
         self.project = project
         self._per_cell = None
-        self._msd = self._autocorr = None
+        self._msd = self._autocorr = self._dir_ratio = self._velcorr = None
         self._thread = self._worker = None
         self._design_editor = None
         self._settings = QtCore.QSettings("cellscope_analysis", "compare")
@@ -159,14 +159,13 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         kr.addStretch(1)
         dl.addLayout(kr)
         dl.addWidget(self.dist_plot)
-        self.msd_plot, self.autocorr_plot = pg.PlotWidget(), pg.PlotWidget()
-        self.scatter_plot = pg.PlotWidget()
-        self.tabs.addTab(dist, "Distributions")
-        self.tabs.addTab(self.msd_plot, "Ensemble MSD")
-        self.tabs.addTab(self.scatter_plot, "Scatter")
-        self.tabs.addTab(self.autocorr_plot, "Dir. autocorr")     # DiPer (recording=unit)
-        self.tabs.setTabToolTip(1, "Ensemble MSD by condition (recording = unit)")
-        self.tabs.setTabToolTip(3, "DiPer direction autocorrelation (recording = unit)")
+        (self.msd_plot, self.scatter_plot, self.autocorr_plot, self.dirratio_plot,
+         self.velcorr_plot) = (pg.PlotWidget() for _ in range(5))   # DiPer family
+        for w, name in ((dist, "Distributions"), (self.msd_plot, "Ensemble MSD"),
+                        (self.scatter_plot, "Scatter"), (self.autocorr_plot, "Dir. autocorr"),
+                        (self.dirratio_plot, "Direct. ratio"),
+                        (self.velcorr_plot, "Vel. autocorr")):
+            self.tabs.addTab(w, name)
 
         self.right_tabs = QtWidgets.QTabWidget()
         self.right_tabs.addTab(self._build_stats_tab(), "Stats")
@@ -183,14 +182,11 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self.busy = StatusProgress()                  # bottom-bar progress + ETA
         self.status.addPermanentWidget(self.busy)
         # shift-right-click any plot → the plot-style dialog
-        self._install_style_filters([self.dist_plot, self.msd_plot,
-                                     self.autocorr_plot, self.scatter_plot, self.hist_plot])
-        self._legends = {
-            self.dist_plot: self.dist_plot.addLegend(offset=(-10, 10)),
-            self.scatter_plot: self.scatter_plot.addLegend(offset=(-10, 10)),
-            self.msd_plot: self.msd_plot.addLegend(offset=(-10, 10)),
-            self.autocorr_plot: self.autocorr_plot.addLegend(offset=(-10, 10)),
-            self.hist_plot: self._hist_legend}
+        _curve_plots = [self.dist_plot, self.scatter_plot, self.msd_plot,
+                        self.autocorr_plot, self.dirratio_plot, self.velcorr_plot]
+        self._install_style_filters(_curve_plots + [self.hist_plot])
+        self._legends = {p: p.addLegend(offset=(-10, 10)) for p in _curve_plots}
+        self._legends[self.hist_plot] = self._hist_legend
 
     def _style_groups(self):
         """(conditions, hidden-set, design) for the graph-options Show-groups list."""
@@ -262,11 +258,12 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
     # -- project ---------------------------------------------------------
     def set_project(self, project):
         self.project = project
-        self._per_cell = self._msd = self._autocorr = None
+        self._per_cell = self._msd = self._autocorr = self._dir_ratio = self._velcorr = None
         self._safe = "".join(c if c.isalnum() else "_" for c in project.name)[:40]
         self._cache = self._cache_path()
         for p in (self.dist_plot, self.msd_plot, self.autocorr_plot,
-                  self.scatter_plot, self.hist_plot):
+                  self.scatter_plot, self.hist_plot, self.dirratio_plot,
+                  self.velcorr_plot):
             p.clear()
         self._hist_legend.clear()
         for t in (self.table, self.rec_table, self.cond_table):
@@ -358,7 +355,8 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
                 with open(self._cache, "rb") as f:
                     blob = pickle.load(f)
                 return self._on_done((blob["per_cell"], blob.get("msd"),
-                                      blob.get("autocorr")), cached=True)
+                                      blob.get("autocorr"), blob.get("dir_ratio"),
+                                      blob.get("velcorr")), cached=True)
             except Exception:
                 pass
         self.compute_btn.setText("Cancel")
@@ -383,20 +381,24 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
             self.busy.fail("compute failed")
             self.status.showMessage(f"Compute failed: {result}")
             return
-        per_cell, msd, *rest = result                  # 3-tuple (per_cell, msd, autocorr)
-        autocorr = rest[0] if rest else None
+        # (per_cell, msd, autocorr, dir_ratio, velcorr) — tolerant of older 3-tuples
+        per_cell, msd, *rest = result
+        autocorr = rest[0] if len(rest) > 0 else None
+        dir_ratio = rest[1] if len(rest) > 1 else None
+        velcorr = rest[2] if len(rest) > 2 else None
         if not cached:
             self.busy.finish()
         if per_cell is None or per_cell.empty:
             self.status.showMessage("No cells found across recordings.")
             return
         self._per_cell, self._msd, self._autocorr = per_cell, msd, autocorr
+        self._dir_ratio, self._velcorr = dir_ratio, velcorr
         if not cached:
             try:
                 os.makedirs(os.path.dirname(self._cache), exist_ok=True)
                 with open(self._cache, "wb") as f:
-                    pickle.dump({"per_cell": per_cell, "msd": msd,
-                                 "autocorr": autocorr}, f)
+                    pickle.dump({"per_cell": per_cell, "msd": msd, "autocorr": autocorr,
+                                 "dir_ratio": dir_ratio, "velcorr": velcorr}, f)
             except Exception:
                 pass
         cols = compare.metric_columns(per_cell)
@@ -420,11 +422,6 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self._replot()
 
     # -- plot / stats ----------------------------------------------------
-    def _filtered_msd(self):
-        return self.project.regroup(self._msd)           # excluded/regroup-aware
-
-    def _filtered_autocorr(self):
-        return self.project.regroup(self._autocorr)
 
     def _pick(self, label):
         self.recordingPicked.emit(label)
@@ -451,14 +448,17 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         gpc = pc[~pc["condition"].isin(hg)] if (pc is not None and hg) else pc
         tab = self.tabs.currentIndex()
         stat = "median" if self.stat.currentText().startswith("median") else "mean"
-        if tab in (1, 3):                              # ensemble MSD (1) / autocorr (3)
-            plot = self.msd_plot if tab == 1 else self.autocorr_plot
+        if tab in (1, 3, 4, 5):                        # DiPer ensemble curve tabs
+            ens = {1: (self.msd_plot, self._msd, compare_plots.ensemble_msd),
+                   3: (self.autocorr_plot, self._autocorr, compare_plots.ensemble_autocorr),
+                   4: (self.dirratio_plot, self._dir_ratio, compare_plots.ensemble_dirratio),
+                   5: (self.velcorr_plot, self._velcorr, compare_plots.ensemble_velcorr)}
+            plot, raw, fn = ens[tab]
             plot.clear(); plot.setLogMode(x=False, y=False); self._prep_legend(plot)
-            long = self._filtered_msd() if tab == 1 else self._filtered_autocorr()
-            if long is not None and gpr is not None:
+            long = self.project.regroup(raw)
+            if long is not None and not getattr(long, "empty", True) and gpr is not None:
                 long = long[long["recording"].isin(set(gpr["recording"]))]
-            (compare_plots.ensemble_msd if tab == 1 else compare_plots.ensemble_autocorr)(
-                plot, long, design, stat, style=self.style)
+            fn(plot, long, design, stat, style=self.style)
         elif gpr is not None and metric in gpr.columns:
             if tab == 2:
                 self.scatter_plot.clear()
