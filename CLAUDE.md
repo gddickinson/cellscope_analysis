@@ -102,8 +102,8 @@ Use the dedicated env (`environment.yml`):
 ```bash
 conda env create -f environment.yml      # once
 conda activate cellscope_analysis
-python main_viewer.py                     # discover via config.json
-python main_viewer.py --data-root /path/to/by_condition
+python main_viewer.py                     # blank slate (or per Config ▸ Startup toggles)
+python main_viewer.py --data-root /path/to/by_condition   # explicit; overrides Startup
 python main_viewer.py --recording R.ome.tif --masks M.npz
 python scripts/make_sample_data.py        # (re)create the synthetic sample
 MASKVIEWER_REMOTE=8765 python main_viewer.py   # + localhost HTTP self-drive (see remote.py)
@@ -237,6 +237,13 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   all analysis settings. **The GUI ships in a minimal/fast state — only cheap basic
   analysis runs by default; the heavier analyses are opt-in here** (so a fresh session
   stays responsive on large stacks).
+  - **Startup**: what the viewer loads on launch — **Load demo sample data** and/or
+    **Load data from config.json** (QSettings `startup/load_demo` /
+    `startup/load_config_roots`, **both default OFF** → the viewer opens on a **blank
+    slate**, no recordings; load data via File ▸ Open Project Folder / Recent Projects).
+    Read at start-up by `main_viewer._resolve` (via `config.startup_roots`); explicit
+    CLI data args (`--recording` / `--data-root` / `--config`) always override. Changes
+    apply at the next launch.
   - **Cell plot metrics**: choose which per-frame metrics are calculated + offered
     in the Cell-Info plot menu (persisted; toggling recomputes at once). **Default =
     the cheap subset** `cell_metrics.DEFAULT_PLOT_METRICS` (area, eccentricity, aspect

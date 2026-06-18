@@ -5,6 +5,43 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Startup settings: blank-slate default + demo/config-roots toggles
+
+**Request.** Add a GUI option to control whether the demo loads at startup (default
+off), and make it possible to start from a blank slate (no files auto-loaded — the
+IC295 results were loading because `config.json` points at them *and* `load_config`
+always appended the demo).
+
+**Changes.**
+- `config.py`: `load_config(path, include_sample=True)` — the demo append is now a
+  flag (default True for analysis scripts). New pure `startup_roots(load_config_roots,
+  load_demo, config_path=None)` → the roots to scan on launch (both off → `[]`, a
+  blank slate). GUI-free, tested.
+- `main_viewer.py`: refactored to `_resolve(args)` → `(entries, roots, name, explicit)`.
+  Explicit data CLI args (`--recording`/`--data-root`/`--config`) win as before; with
+  **no** data args it reads QSettings `startup/load_config_roots` + `startup/load_demo`
+  (**both default off**) via `startup_roots`. App is created before resolving so the
+  toggles can be read. A no-args launch with both off opens an **empty window** (no
+  longer exits with "No recordings"); an *explicit* CLI request that finds nothing still
+  errors (exit 2).
+- `config_window.py`: new **Startup** tab (first tab) with the two checkboxes (persist
+  to QSettings; changes apply at next launch; tooltip shows the current config.json
+  roots).
+- Verified the empty `ViewerWindow` comes up clean (recording/masks None, empty
+  recording combo) and is driven via File ▸ Open Project Folder / Recent Projects.
+
+**To load a new dataset (e.g. IC293):** File ▸ Open Project Folder →
+`…/cellscope/ic293_analysis/by_condition` (auto-design recognises the WT/GOF/KO +
+DMSO/Y1/OT arms). Or tick **Load data from config.json** after pointing config.json
+at it, or `python main_viewer.py --data-root …/ic293_analysis/by_condition`.
+
+**Tests.** `tests/test_startup.py` (5) — the four toggle combinations + the
+`include_sample` flag. Full suite **172 passed**. (A manual smoke briefly wrote
+`startup/load_demo=True` to the real QSettings via `ConfigWindow`'s own settings store;
+reset to default afterwards.)
+
+---
+
 ## 2026-06-16 — Fix: edge precompute fired automatically (+ tests polluted QSettings)
 
 **Report.** Edge-dynamics precompute seemed to run on switching to the Cell Info
