@@ -9,6 +9,15 @@ load any dataset (any treatments / recording counts) and compare it correctly.
 The design is auto-derived from the discovered conditions (it recognises the
 IC295 arms; otherwise it makes one arm with a heuristic control) and can be
 saved / loaded as a small JSON file. GUI-free.
+
+**Portable project files.** A saved project stores its `data_roots` *relative to
+the project file's directory* (e.g. a project written into the data folder gets
+``"data_roots": ["."]``). So the project file travels with its data — copy the
+folder elsewhere, or mount the same share at a different path on another machine,
+and it still resolves. Absolute roots (legacy files, or a different Windows drive
+where no relative path exists) still load as-is; on load every root is resolved
+back to an absolute path. (See `save_project` / `load_project` / `_relpath_to` /
+`_resolve_root`.)
 """
 from __future__ import annotations
 
@@ -211,6 +220,26 @@ def auto_design(conditions):
                   _palette(conds))
 
 
+# ------------------------------------------------------------- portability
+def _relpath_to(root, base):
+    """Store a data root **relative to the project file's directory** (`base`) so
+    the project is portable: move the project file together with its data, or mount
+    the same share at a different path on another machine, and it still resolves.
+    Falls back to an absolute path when no relative one exists (e.g. a different
+    Windows drive)."""
+    try:
+        return os.path.relpath(os.path.abspath(root), base)
+    except ValueError:
+        return os.path.abspath(root)
+
+
+def _resolve_root(root, base):
+    """Resolve a stored data root against the project file's directory: relative
+    roots (the portable form) are joined to `base`; absolute roots (legacy files or
+    cross-drive) are used as-is."""
+    return root if os.path.isabs(root) else os.path.normpath(os.path.join(base, root))
+
+
 # ------------------------------------------------------------- constructors
 def _conditions_of(entries):
     conds = []
@@ -235,10 +264,13 @@ def from_data_roots(roots, name=None):
 
 
 def load_project(path):
-    """Load a project JSON ({name, data_roots, arms?, vehicle?, colors?})."""
+    """Load a project JSON ({name, data_roots, arms?, vehicle?, colors?}). Data roots
+    stored relative to the project file (the portable form) are resolved against its
+    directory; absolute roots are used as-is."""
     with open(path) as f:
         blob = json.load(f)
-    roots = blob.get("data_roots", [])
+    base = os.path.dirname(os.path.abspath(path))
+    roots = [_resolve_root(r, base) for r in blob.get("data_roots", [])]
     entries = discover(roots)
     arms = blob.get("arms")
     if arms:
@@ -259,7 +291,9 @@ def load_project(path):
 
 
 def save_project(project, path):
-    blob = {"name": project.name, "data_roots": project.data_roots,
+    base = os.path.dirname(os.path.abspath(path))
+    blob = {"name": project.name,
+            "data_roots": [_relpath_to(r, base) for r in project.data_roots],
             "arms": project.design.arms, "vehicle": project.design.vehicle,
             "colors": project.design.colors,
             "excluded": sorted(project.excluded), "overrides": project.overrides,
