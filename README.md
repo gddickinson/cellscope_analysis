@@ -108,6 +108,9 @@ Cross-recording / treatment analysis with **recording = experimental unit**:
   contacts. Scope the **current recording or all recordings** (one file per recording /
   combined / **per condition**), pick **which per-frame columns** to write, plus a
   **DiPer-ready trajectory** export and ensemble-curve CSVs.
+- **Export masks** (`Ctrl+M`) for other viewers (Fiji/ImageJ, napari, QuPath…) —
+  **ImageJ TIFF stack**, per-frame **TIFF / PNG** sequence, or **NumPy** `.npz`/`.npy`;
+  auto bit-depth, optional relabel-to-consecutive, current recording or whole project.
 - Save any plot (PNG/SVG), window screenshots, and a **Help ▸ Metrics Reference** that
   documents every metric (tooltips throughout).
 

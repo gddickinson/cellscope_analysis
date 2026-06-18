@@ -9,7 +9,7 @@ from __future__ import annotations
 from PyQt5 import QtWidgets
 
 from .luts import PRESETS
-from . import inclusion, project_build
+from . import inclusion, project_build, mask_export_dialog
 
 
 def _act(parent, text, slot, shortcut=None, tip=None):
@@ -47,6 +47,9 @@ def build_menubar(win):
     f.addSeparator()
     f.addAction(_act(win, "&Export CSV…", win.export_csv, "Ctrl+E",
                      "Export tracks / masks / cell properties as CSV"))
+    f.addAction(_act(win, "Export &Masks…",
+                     lambda: mask_export_dialog.open_mask_export(win), "Ctrl+M",
+                     "Export the label masks as TIFF / PNG / NumPy for other viewers"))
     f.addAction(_act(win, "Save &View Image…", win.save_screenshot, "Ctrl+Shift+P",
                      "Save the image view (canvas) as PNG"))
     f.addAction(_act(win, "Save &Window Screenshot…", win.save_window_screenshot,
