@@ -5,6 +5,26 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — README rewrite for readability + DiPer features
+
+**Request.** The README wasn't easy to read — make it user-friendly; cover the new
+features.
+
+**Change.** Rewrote `README.md`: replaced the wall-of-text "Highlights" (the
+Comparison-window bullet alone ran ~30 lines) with a **scannable, themed "What you can
+do"** (short bullets grouped: View / Inspect / Edge / Contact+lineage / Populations+shapes
+/ Compare / Projects / Export), a **Quick start at the top** (blank-slate default + the
+three load paths), an organised **screenshot gallery** (per-cell · edge↔actin · comparison),
+a tidied **Running it** / **Programmatic use** section, and folded in the recent features
+(DiPer directionality-ratio + velocity-autocorrelation, individual-recording curves,
+diper_clone equivalence, export scope/grouping/per-condition/columns + DiPer-ready
+trajectory export, drag-and-drop, include/exclude, portable projects, Add-Folder, startup).
+Fixed the stale "discovers from config.json" quick-start line. All image links verified.
+(The internal lab report under `analysis_out/lab_report/` — gitignored — was updated in
+step with a new real-data DiPer-family figure.)
+
+---
+
 ## 2026-06-18 — DiPer family: directionality ratio + velocity autocorrelation + curve CSVs
 
 **Request.** Add the DiPer analyses we were missing — **directionality ratio over time**
