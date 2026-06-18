@@ -9,7 +9,7 @@ from __future__ import annotations
 from PyQt5 import QtWidgets
 
 from .luts import PRESETS
-from . import inclusion
+from . import inclusion, project_build
 
 
 def _act(parent, text, slot, shortcut=None, tip=None):
@@ -29,7 +29,10 @@ def build_menubar(win):
     f.addAction(_act(win, "Open &Recording…", win.open_recording_dialog, "Ctrl+O"))
     f.addSeparator()
     f.addAction(_act(win, "Open Project &Folder…", win.open_data_root_dialog,
-                     tip="Open a folder of recordings as a project"))
+                     tip="Open a folder of recordings as a project (replaces current)"))
+    f.addAction(_act(win, "&Add Folder to Project…",
+                     lambda: project_build.add_folder_to_project(win),
+                     tip="Merge another folder's recordings into the current project"))
     f.addAction(_act(win, "Open &Project File…", win.open_project_file))
     f.addAction(_act(win, "&Save Project", lambda: win.save_project_as(win.project.path),
                      "Ctrl+S", "Save to the loaded project file (prompts if none yet)"))

@@ -218,7 +218,13 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   the IC295 genetic/drug arms + WT–DMSO vehicle; else one arm with a heuristic
   control). **Save/Open Project File** (small JSON, incl. per-recording
   include/exclude + group overrides) + **Recent Projects**; switch datasets
-  without restarting (`ViewerWindow.set_project`). **Portable**: a saved project
+  without restarting (`ViewerWindow.set_project`). **Assemble across cellscope
+  projects**: File ▸ **Add Folder to Project** merges another result tree's
+  recordings into the loaded project (`Project.add_folder` → a new `data_root`,
+  auto-discovered; vs Open Project Folder which *replaces*), and Open Recording /
+  dropping a `.ome.tif` adds a one-off (`Project.add_recording`). Both **persist**:
+  data roots auto-rediscover, individually-added recordings save to a `recordings`
+  list (portable relative paths) — so a hand-built mix round-trips. **Portable**: a saved project
   stores its `data_roots` *relative to the project file* (a project written into
   the data folder gets `"data_roots": ["."]`), so the file + data can move together
   / mount the same share at a different path on another machine and still resolve
@@ -293,9 +299,9 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
     (`build_comparison(scale_override=…)`); unset = use each file's own metadata.
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
   throughout the GUI.
-- **Menus**: File (open recording / open project / **Save Project** Ctrl+S (→ loaded
-  file) + Save As / **Recent Projects** / **Include / Exclude Recordings…** /
-  **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
+- **Menus**: File (open recording / open project / **Add Folder to Project** (merge) /
+  **Save Project** Ctrl+S (→ loaded file) + Save As / **Recent Projects** /
+  **Include / Exclude Recordings…** / **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
   — frame the canvas on the selected cell, handy in a large sparse FOV), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
