@@ -293,6 +293,11 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   — frame the canvas on the selected cell, handy in a large sparse FOV), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
+- **Drag-and-drop**: drop items onto the window to open them
+  (`window_actions.dropEvent` → `open_paths`, dispatched by kind) — a **folder**
+  opens as a project (recordings discovered under it; internal `_`/`.` dirs pruned),
+  a project **`.json`** loads that project, and recording **`.ome.tif`/`.tif`** files
+  are appended to the recording list.
 Status bar shows frame/time/scale/cell-count + hovered/selected cell, plus a
 **progress bar with ETA** (`gui/status_progress.py`) for long compute — the
 Population / Shape / Cell-table passes run **off the GUI thread**
