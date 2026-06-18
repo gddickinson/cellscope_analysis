@@ -144,14 +144,17 @@ class WindowActionsMixin:
         self._remember_project(fn)
         return True
 
-    def save_project_as(self):
-        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save project", f"{self.project.name}.json", "Project (*.json)")
-        if not fn:
+    def save_project_as(self, path=None):
+        """Save the project JSON. With a `path` (e.g. the loaded file) save straight
+        there; otherwise prompt. Persists include/exclude, grouping, scale, etc."""
+        if not path:
+            path, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save project", f"{self.project.name}.json", "Project (*.json)")
+        if not path:
             return
-        projmod.save_project(self.project, fn)
-        self._remember_project(fn)
-        self.statusBar().showMessage(f"Saved project → {fn}", 5000)
+        projmod.save_project(self.project, path)
+        self._remember_project(path)
+        self.statusBar().showMessage(f"Saved project → {path}", 5000)
 
     def _remember_project(self, path):
         recent = [path] + [p for p in self._recent_projects() if p != path]
@@ -279,9 +282,12 @@ class WindowActionsMixin:
     def open_compare_window(self):
         if self._compare_window is None:
             from .compare_window import CompareWindow
+            from . import inclusion
             self._compare_window = CompareWindow(self.project, self)
             self._compare_window.recordingPicked.connect(
                 self._select_recording_by_label)
+            self._compare_window.inclusionChanged.connect(   # design editor → session
+                lambda exc: inclusion.apply_inclusion(self, exc, notify_compare=False))
         self._compare_window.show()
         self._compare_window.raise_()
 

@@ -288,8 +288,9 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
     (`build_comparison(scale_override=…)`); unset = use each file's own metadata.
 - **Help ▸ Metrics Reference** documents every metric (what + how); tooltips
   throughout the GUI.
-- **Menus**: File (open recording / **open+save projects** / **Recent Projects** /
-  **Include / Exclude Recordings…** / **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
+- **Menus**: File (open recording / open project / **Save Project** Ctrl+S (→ loaded
+  file) + Save As / **Recent Projects** / **Include / Exclude Recordings…** /
+  **Export CSV** Ctrl+E / screenshot), View (zoom in/out/fit + **Zoom to Cell** `Z`
   — frame the canvas on the selected cell, handy in a large sparse FOV), Image (auto/reset/colormap/
   invert), Analysis (**Comparison window** Ctrl+Shift+C / Export CSV), Config,
   Window (dock toggles), Help.
@@ -308,6 +309,11 @@ via QSettings, View ▸ Window ▸ Reset Layout to restore):
   the Comparison window's Groups editor uses), saved with the project; files are
   untouched. Loading a project with a pre-set `excluded` (e.g. the IC293
   dividing-cell `Pos36_div-GOF`) hides those recordings from the session on open.
+  **Two-way live sync** with the Comparison window's Groups editor: excluding there
+  also removes the recording from the main session (`CompareWindow.inclusionChanged`
+  → `inclusion.apply_inclusion`), and excluding here refreshes the Groups editor +
+  replots — the `notify_compare` flag breaks the echo. Persist it with
+  **File ▸ Save Project (Ctrl+S)** → writes the loaded project file (e.g. `ic293.json`).
 Status bar shows frame/time/scale/cell-count + hovered/selected cell, plus a
 **progress bar with ETA** (`gui/status_progress.py`) for long compute — the
 Population / Shape / Cell-table passes run **off the GUI thread**

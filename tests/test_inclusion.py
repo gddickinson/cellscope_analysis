@@ -99,3 +99,36 @@ def test_apply_inclusion_reinclude_restores(app, tmp_path):
     inclusion.apply_inclusion(win, set())                     # include everything again
     assert len(win.entries) == 4
     assert win.display.recording.count() == 4
+
+
+def test_design_editor_exclude_updates_session(app, tmp_path):
+    """Excluding in the Comparison window's Groups editor removes it from the main
+    viewer's session dropdown (designChanged → inclusionChanged → apply_inclusion)."""
+    win = _window(_project(), tmp_path)
+    win.open_compare_window()
+    win._compare_window._open_design_editor()
+    de = win._compare_window._design_editor
+    de._row_include["R1"].setChecked(False)                   # exclude via design editor
+    assert win.project.excluded == {"R1"}
+    assert "R1" not in [e.label for e in win.entries]         # session synced
+    assert win.display.recording.count() == 3
+
+
+def test_main_inclusion_updates_design_editor(app, tmp_path):
+    """The main viewer's apply_inclusion refreshes the Groups editor checkboxes."""
+    win = _window(_project(), tmp_path)
+    win.open_compare_window()
+    win._compare_window._open_design_editor()
+    de = win._compare_window._design_editor
+    inclusion.apply_inclusion(win, {"R2"})                    # as the File-menu dialog would
+    assert de._row_include["R2"].isChecked() is False         # checkbox synced
+    assert de._row_include["R0"].isChecked() is True
+
+
+def test_save_project_to_path_persists_excluded(app, tmp_path):
+    """File ▸ Save Project (passing the loaded path) writes the excluded set."""
+    win = _window(_project(excluded=["R1"]), tmp_path)
+    fn = str(tmp_path / "proj.json")
+    win.save_project_as(fn)                                   # explicit path → no prompt
+    reloaded = projmod.load_project(fn)
+    assert "R1" in reloaded.excluded

@@ -36,6 +36,7 @@ _DIST_KINDS = ["Strip (mean ± SEM)", "Box (+ Bonferroni)", "Superplot",
 class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixin,
                     QtWidgets.QMainWindow):
     recordingPicked = QtCore.pyqtSignal(str)
+    inclusionChanged = QtCore.pyqtSignal(object)   # new excluded set → main viewer
 
     def __init__(self, project, parent=None):
         super().__init__(parent)
@@ -329,14 +330,14 @@ class CompareWindow(StatsTablesMixin, ResultsIOMixin, PlotStyleMixin, FilterMixi
         self._design_editor.raise_()
 
     def _on_design_changed(self):
-        """Grouping / control / include changed — remap + replot, no recompute."""
+        """Grouping/inclusion changed — remap + replot (no recompute) + forward to viewer."""
         self._refresh_control_combo()
         if self._per_cell is not None and not self._per_cell.empty:
             pc = self._filtered()
-            self.status.showMessage(
-                f"{self.project.name}: {pc['recording'].nunique()} recordings · "
-                f"{pc['condition'].nunique()} groups · {len(pc)} cells")
+            self.status.showMessage(f"{self.project.name}: {pc['recording'].nunique()} "
+                f"recordings · {pc['condition'].nunique()} groups · {len(pc)} cells")
         self._replot()
+        self.inclusionChanged.emit(set(self.project.excluded))
 
     # -- compute ---------------------------------------------------------
     def _cache_path(self):

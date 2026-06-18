@@ -42,8 +42,8 @@ class IncludeExcludeDialog(QtWidgets.QDialog):
             "Move recordings between <b>Included</b> (loaded in the session + used "
             "in all analysis) and <b>Excluded</b> (removed from the session). "
             "Double-click an item or use the arrows; select several at once. Changes "
-            "apply on <b>OK</b> and are saved with the project — files on disk are "
-            "never modified.")
+            "apply on <b>OK</b>; <b>Save Project</b> (Ctrl+S) writes them to the "
+            "project file. Files on disk are never modified.")
         info.setWordWrap(True)
         lay.addWidget(info)
 
@@ -150,10 +150,14 @@ def manage_inclusion(win):
         apply_inclusion(win, dlg.excluded_labels())
 
 
-def apply_inclusion(win, excluded):
+def apply_inclusion(win, excluded, notify_compare=True):
     """Adopt a new excluded set and refresh the session: the dropdown shows only
     included recordings; if the one on screen was excluded, load the first
-    included one (the current recording is kept — no reload — if still included)."""
+    included one (the current recording is kept — no reload — if still included).
+
+    ``notify_compare`` pushes the change into an open Comparison window (refresh its
+    Groups editor + replot); set False when the change *came from* that window, to
+    avoid an echo loop."""
     excluded = set(excluded)
     cur = _current_label(win)                          # before we rebuild win.entries
     win.project.excluded = excluded
@@ -163,13 +167,19 @@ def apply_inclusion(win, excluded):
     if not win.entries:                                # degenerate (dialog forbids it)
         win.recording = win.masks = None
         win.statusBar().showMessage("All recordings excluded — none loaded.", 8000)
-        return
-    keep = next((i for i, e in enumerate(win.entries) if e.label == cur), None)
-    combo.blockSignals(True)
-    combo.setCurrentIndex(keep if keep is not None else 0)
-    combo.blockSignals(False)
-    if keep is None:                                   # current was excluded → load anew
-        win._load_entry(0)
-    win.statusBar().showMessage(
-        f"Session: {len(win.entries)} recording(s) included, {len(excluded)} excluded.",
-        6000)
+    else:
+        keep = next((i for i, e in enumerate(win.entries) if e.label == cur), None)
+        combo.blockSignals(True)
+        combo.setCurrentIndex(keep if keep is not None else 0)
+        combo.blockSignals(False)
+        if keep is None:                               # current was excluded → load anew
+            win._load_entry(0)
+        win.statusBar().showMessage(
+            f"Session: {len(win.entries)} recording(s) included, {len(excluded)} "
+            f"excluded. Save Project (Ctrl+S) to keep this.", 6000)
+    if notify_compare:                                 # push into an open Comparison window
+        cw = getattr(win, "_compare_window", None)
+        if cw is not None:
+            if cw._design_editor is not None:          # refresh its include checkboxes
+                cw._design_editor.set_data(cw._per_cell)
+            cw._on_design_changed()                    # remap + replot (echo is idempotent)

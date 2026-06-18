@@ -31,7 +31,9 @@ def build_menubar(win):
     f.addAction(_act(win, "Open Project &Folder…", win.open_data_root_dialog,
                      tip="Open a folder of recordings as a project"))
     f.addAction(_act(win, "Open &Project File…", win.open_project_file))
-    f.addAction(_act(win, "&Save Project As…", win.save_project_as))
+    f.addAction(_act(win, "&Save Project", lambda: win.save_project_as(win.project.path),
+                     "Ctrl+S", "Save to the loaded project file (prompts if none yet)"))
+    f.addAction(_act(win, "Save Project &As…", win.save_project_as))
     win.recent_menu = f.addMenu("&Recent Projects")
     win.recent_menu.setToolTipsVisible(True)
     win._rebuild_recent_menu()
