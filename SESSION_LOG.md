@@ -5,6 +5,31 @@ change. Most recent first.
 
 ---
 
+## 2026-06-18 — Fix: discovery loaded `_cache/` as a bogus "_cache" recording
+
+**Report.** Opening the *whole* results folder (`…/ic293_analysis`) instead of its
+`by_condition/` subtree loaded an extra recording called **`_cache`**.
+
+**Cause.** A CellScope results root keeps its machinery in underscore-prefixed
+siblings of `by_condition/` — chiefly **`_cache/`**, a flat dump of every converted
+`*.ome.tif` (with *no* per-recording `pipeline_results/masks.npz`). `discover()`
+walked into `_cache/`, found `*.ome.tif`s, and registered the folder itself as one
+Entry labelled `_cache`.
+
+**Fix.** `io/dataset.py::discover` now prunes any directory whose name starts with
+`_` or `.` from the `os.walk` (so `_cache`, `_runs`, `_source_metadata`, hidden
+dirs are never walked or mistaken for a recording). The selected root itself is
+always scanned, so explicitly pointing at such a folder still works. Verified on
+the real IC293 tree: discovering `…/ic293_analysis` now yields the **same 78**
+recordings as `…/by_condition` (all 6 conditions, all with masks), no `_cache`.
+
+**Test.** `tests/test_io.py::test_discover_skips_internal_underscore_folders` builds
+a root with a real `by_condition/WT/Pos0-WT` recording beside `_cache/` (3 maskless
+tifs), `_runs/`, and a hidden `.thumbs/`, and asserts only `Pos0-WT` is found. Full
+suite **173 passed**.
+
+---
+
 ## 2026-06-18 — Startup settings: blank-slate default + demo/config-roots toggles
 
 **Request.** Add a GUI option to control whether the demo loads at startup (default

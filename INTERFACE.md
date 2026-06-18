@@ -129,7 +129,10 @@ Read this before opening source files. Update it when modules change.
 - **dataset.py** — `discover(roots)` → sorted `[Entry]`; an `Entry`
   (`label`, `condition`, `recording_path`, `mask_path`) loads its recording
   / masks lazily. A folder qualifies if it has a `*.ome.tif` + (ideally)
-  `pipeline_results/masks.npz`. The mask label stack is the **only** analysis
+  `pipeline_results/masks.npz`. **Internal/hidden dirs are pruned** from the walk
+  (names starting with `_` or `.` — e.g. `_cache/`, `_runs/`, `_source_metadata/`)
+  so pointing at a whole results root, not just `by_condition/`, never registers
+  `_cache/` as a bogus recording. The mask label stack is the **only** analysis
   input — the pipeline's pre-cleaning `divisions.json` is not read (lineage is
   derived + scored from the masks; see `analysis.lineage.infer_divisions`).
 

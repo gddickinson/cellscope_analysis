@@ -29,6 +29,38 @@ def test_discover_finds_sample():
     assert any(e.label == "Pos_demo" for e in entries)
 
 
+def test_discover_skips_internal_underscore_folders(tmp_path):
+    """A CellScope results root holds a real `by_condition/` tree alongside
+    internal `_cache/` (a flat dump of recordings, no masks), `_runs/`, and a
+    hidden `.thumbs/`. Pointing discovery at the whole root must find only the
+    real recording — never a bogus `_cache` entry (regression for opening the
+    project folder instead of `by_condition/`)."""
+    from maskviewer.io import discover
+    import numpy as np
+    import tifffile
+
+    def _tif(p):
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        tifffile.imwrite(p, np.zeros((2, 4, 4), np.uint16))
+
+    root = tmp_path / "results"
+    # one real recording folder (with masks)
+    rec = root / "by_condition" / "WT" / "Pos0-WT"
+    _tif(str(rec / "Pos0-WT.ome.tif"))
+    os.makedirs(rec / "pipeline_results", exist_ok=True)
+    np.savez(rec / "pipeline_results" / "masks.npz",
+             labels=np.zeros((2, 4, 4), np.int32))
+    # internal cache: a flat dump of .ome.tifs, no masks
+    for name in ("Pos0-WT", "Pos1-WT", "Pos2-WT"):
+        _tif(str(root / "_cache" / f"{name}.ome.tif"))
+    _tif(str(root / "_runs" / "scratch.ome.tif"))
+    _tif(str(root / ".thumbs" / "preview.tif"))
+
+    entries = discover(str(root))
+    assert [e.label for e in entries] == ["Pos0-WT"]
+    assert all(not e.label.startswith(("_", ".")) for e in entries)
+
+
 def test_load_recording_shape_and_meta():
     from maskviewer.io import load_recording
     rec = load_recording(os.path.join(SAMPLE, "Pos_demo.ome.tif"))
