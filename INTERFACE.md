@@ -31,6 +31,14 @@ Read this before opening source files. Update it when modules change.
   already on the share (recordings are *not* copied — the loader reads the
   multi-position originals in place). Writes a ready `config.json`. Read-only on
   sources; idempotent + `--dry-run`.
+- **scripts/repair_cache_symlinks.py** — repairs a project copied to another
+  machine where the `_cache` **symlinks broke** during zip/transfer (Windows /
+  symlink-less unzip turns each link into a text file holding its target — the
+  viewer then reads it as a TIFF → `not a TIFF file: header=b'/Use'`). Walks the
+  tree, matches every broken reference to the real file still in `_cache/` by
+  basename, and re-materialises it (hard-link → no extra disk, else copy). Pure
+  stdlib, cross-platform; dry-run by default, `--apply` to repair, `--copy` to
+  force copies. Idempotent; never touches real files.
 - **scripts/smoke_compare_window.py** — headless (QT offscreen) smoke for the
   Comparison window + Project wiring: drives every tab / dist-kind / OLS / stats
   table on fake multi-arm + single-arm data, checks the editable control combo,
