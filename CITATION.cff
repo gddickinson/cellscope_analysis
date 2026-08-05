@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "cellscope_analysis"
+authors:
+  - family-names: Dickinson
+    given-names: "George D."
+    orcid: https://orcid.org/0000-0001-7711-0388
+    affiliation: University of California, Irvine
+repository-code: "https://github.com/gddickinson/cellscope_analysis"
+url: "https://github.com/gddickinson/cellscope_analysis"
+license: MIT
+date-released: 2026-06-13
