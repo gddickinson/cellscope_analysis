@@ -5,6 +5,34 @@ change. Most recent first.
 
 ---
 
+## 2026-06-24 — Repair script for `_cache` symlinks broken by zip/transfer
+
+**Problem.** A project zipped on the Mac and unzipped on a lab PC failed to open
+recordings: `Load failed: not a TIFF file: header=b'/Use'...`. **Root cause is a
+transfer artifact, not a code bug.** CellScope result trees keep the real
+recordings in a top-level `_cache/` and reference them from every
+`by_condition/<cond>/<rec>/*.ome.tif` via a **symlink**. The zip *does* contain
+the real bytes (in `_cache/`, ~3 GB / 55 GB), but it stores the `by_condition`
+entries as symlinks; a symlink-less unzip (Windows Explorer) extracts each as a
+tiny **text file holding the Mac target path**. The viewer reads that text as the
+image → `header=b'/Use'` (= `/Users/...`). The data was never missing — only the
+references broke.
+
+**Fix.** `scripts/repair_cache_symlinks.py` (new, 185 lines, pure stdlib,
+cross-platform): walks the unzipped tree, finds every broken reference (broken
+symlink **or** former-symlink text file ≤4 KB whose content is a path), matches it
+to the real file still in `_cache/` by basename, and re-materialises it —
+**hard-linking** when possible (same inode → zero extra disk), copying otherwise.
+Dry-run by default; `--apply` to repair, `--copy` to force copies. Idempotent;
+guards (NUL/size/basename-in-cache) ensure real sidecars (`.ome.json`,
+`masks.npz`) are never touched. Verified on a synthetic Windows-unzip tree (text
+files **and** broken symlinks) — real TIFF bytes restored, hard-linked, sidecars
+intact, second `--apply` a no-op.
+
+**Also.** INTERFACE.md scripts section updated. (No GUI / analysis changes.)
+
+---
+
 ## 2026-06-18 — Export Masks (TIFF / PNG / NumPy) for other software
 
 **Request.** A mask-export menu with format options, for importing the masks into other
