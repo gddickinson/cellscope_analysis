@@ -34,7 +34,10 @@ the browser, with a synthetic demo and analyses ported to JS + node-tested.
   divided by elapsed frames, like `mean_speed`); `track_quality` was NaN for one-frame tracks.
 
 **Tests.** Full suite 214 + web passes (`PYTEST_QT_API=pyqt5 PYQTGRAPH_QT_LIB=PyQt5` needed in a
-venv that also has PyQt6/PySide6); one transient Qt abort on a first run, not reproduced.
+venv that also has PyQt6/PySide6).
+- Intermittent `libc++abi: Pure virtual function called!` abort of the full suite (also on main,
+  less often): GUI tests left parentless windows/panels to be garbage-collected during later tests.
+  `tests/conftest.py` now closes them and runs gc at each test's teardown; 5/5 clean full runs.
 
 ## 2026-06-18 — Export Masks (TIFF / PNG / NumPy) for other software
 
