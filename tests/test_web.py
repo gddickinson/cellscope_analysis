@@ -98,7 +98,8 @@ def test_analyze_upload():
 
 
 def test_web_fixture_is_current():
-    """tests/fixtures/web_engine/expected.json still matches the Python code (rtol 1e-9)."""
+    """tests/fixtures/web_engine/expected.json still matches the Python code (rtol 1e-6, atol 1e-9: libm differs
+    between macOS and the Linux CI runner)."""
     import json
     import numpy as np
     sys.path.insert(0, str(ROOT / "scripts"))
@@ -119,7 +120,7 @@ def test_web_fixture_is_current():
             for i, (x, y) in enumerate(zip(a, b)):
                 same(x, y, f"{path}[{i}]")
         elif isinstance(a, float) and isinstance(b, (int, float)):
-            assert abs(a - b) <= 1e-9 * max(1.0, abs(b)), path
+            assert abs(a - b) <= 1e-9 + 1e-6 * abs(b), f"{path}: {a} vs {b}"
         else:
             assert a == b, path
     same(old, new)
