@@ -12,14 +12,17 @@ for a public repo. Re-run any time: `python scripts/make_sample_data.py`.
 from __future__ import annotations
 
 import os
-import json
+import sys
+
 import numpy as np
-import tifffile
 
 T, H, W = 8, 192, 192
 UM_PER_PX = 0.6523
 DT_MIN = 10.0
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, HERE)
+
+from maskviewer.io.writer import write_recording  # noqa: E402
 OUT = os.path.join(HERE, "sample_data", "Pos_demo")
 
 
@@ -29,7 +32,6 @@ def _blob(cy, cx, rad, shape):
 
 
 def main():
-    os.makedirs(os.path.join(OUT, "pipeline_results"), exist_ok=True)
     rng = np.random.default_rng(0)
     # three cells on linear-ish tracks
     tracks = [(40, 30, 1.4, 1.1, 16), (100, 150, -1.0, 0.6, 20),
@@ -48,15 +50,8 @@ def main():
         data[t, 0] = np.clip(fluo, 0, 65535)
         data[t, 1] = np.clip(dic, 0, 65535)
 
-    tif = os.path.join(OUT, "Pos_demo.ome.tif")
-    tifffile.imwrite(tif, data, metadata={"axes": "TCYX"})
-    with open(os.path.join(OUT, "Pos_demo.ome.json"), "w") as f:
-        json.dump({"um_per_px": UM_PER_PX, "time_interval_min": DT_MIN,
-                   "channel_names": ["Fluo (synthetic)", "DIC (synthetic)"],
-                   "name": "Pos_demo", "metadata_source": "make_sample_data.py"},
-                  f, indent=2)
-    np.savez_compressed(os.path.join(OUT, "pipeline_results", "masks.npz"),
-                        labels=labels)
+    write_recording(OUT, "Pos_demo", data, labels, UM_PER_PX, DT_MIN,
+                    ["Fluo (synthetic)", "DIC (synthetic)"], "make_sample_data.py")
     print(f"Wrote synthetic sample → {OUT}  "
           f"(data {data.shape}, {len(tracks)} cells)")
 

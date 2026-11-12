@@ -3,6 +3,7 @@
   recording.py  load_recording(tif) -> Recording  (.ome.tif + .ome.json)
   masks.py      load_masks(npz)     -> Masks       (labels (T,H,W))
   dataset.py    discover(roots)     -> [Entry]     (recording + mask paths)
+  writer.py     write_recording(...)               (write the CellScope layout; synthetic data only)
 
 The mask label stack is the single analysis input — all metrics (incl. lineage)
 are derived from it in-project; the pipeline's pre-cleaning `divisions.json` is
