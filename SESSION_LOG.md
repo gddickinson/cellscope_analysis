@@ -5,6 +5,37 @@ change. Most recent first.
 
 ---
 
+## 2026-11-12 — Web interface + static GitHub Pages site (branch `web-interface`)
+
+**Request.** A web version of the workbench (house web kit) that can load CellScope results in
+the browser, with a synthetic demo and analyses ported to JS + node-tested.
+
+**Changes.**
+- `maskviewer/web/` (new): FastAPI app (`app.py`, port 8213 via `run_web.py`), `api_data.py`
+  (demo listing, Python reference tables, `build_comparison` on the demo, metric docs, upload →
+  full Python per-cell table), `demo_data.py` (SYNTHETIC demo: 6 recordings, 2 simulated motion
+  models, written to gitignored `web_demo/`), `static/` front end (viewer, cells, population,
+  compare, load data, JS-vs-Python check, about).
+- Browser readers: `npz.js` (ZIP/ZIP64 + .npy, deflate via DecompressionStream) and `tiff.js`
+  (lazy TIFF/BigTIFF/OME-TIFF planes, uncompressed or zlib). Checked locally on a real IC295
+  `masks.npz` (97×2048×2048) — nothing real is committed or published.
+- JS ports (`morph_engine.js`, `motion_engine.js`, `tables_engine.js`, `stats_engine.js`) of
+  cell_metrics / state / neighbors / motion / exporters.per_cell_table / compare stats (+ scipy
+  Mann-Whitney U exact/asymptotic). `engine.test.mjs`: 2389 checks vs the Python fixture
+  (`scripts/make_web_fixture.py` → `tests/fixtures/web_engine/`); the demo agrees to ~1e-14.
+- `maskviewer/io/writer.py` (new): `write_recording`, now used by `scripts/make_sample_data.py`
+  (output identical to the committed sample).
+- `scripts/build_static.py`, `scripts/screenshots.py`, `.github/workflows/pages.yml`,
+  `requirements-web.txt`, `tests/test_web.py`, README "Web interface" section, INTERFACE.md.
+
+**Fixes found on the way (separate commits, regression tests first).**
+- Perimeter docs said "Crofton"; the code is Benkrid–Crookes (skimage regionprops) — docs fixed.
+- `per_cell_table`: `speed_isolated/crowded` over-stated steps bridging tracking gaps (now
+  divided by elapsed frames, like `mean_speed`); `track_quality` was NaN for one-frame tracks.
+
+**Tests.** Full suite 214 + web passes (`PYTEST_QT_API=pyqt5 PYQTGRAPH_QT_LIB=PyQt5` needed in a
+venv that also has PyQt6/PySide6); one transient Qt abort on a first run, not reproduced.
+
 ## 2026-06-18 — Export Masks (TIFF / PNG / NumPy) for other software
 
 **Request.** A mask-export menu with format options, for importing the masks into other

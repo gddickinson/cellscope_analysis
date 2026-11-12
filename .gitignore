@@ -31,3 +31,9 @@ analysis_out/
 *.npz
 !sample_data/**/*.tif
 !sample_data/**/*.npz
+
+# Web interface: static build output and the generated synthetic demo set
+site/
+web_demo/
+# the Python-vs-JS fixture (a small SYNTHETIC label stack) is committed
+!tests/fixtures/web_engine/*.npz

@@ -235,6 +235,42 @@ See **[INTERFACE.md](INTERFACE.md)** for the full navigation map.
 
 ---
 
+## Web interface
+
+**Live site:** https://gddickinson.github.io/cellscope_analysis/ (static, runs in the browser).
+
+A browser version of the workbench's core: open a `masks.npz` (+ optional `.ome.tif` and
+`.ome.json` sidecar) or a per-cell CSV, and get the viewer (mask overlay, colour by cell ID /
+state / any metric, trails, timeline, click-a-cell plots with MSD and direction
+autocorrelation), the per-cell table with filters, histogram, scatter and CSV export, the
+population plots (flower plot, mean ± SEM time course, DiPer curves) and the condition
+comparison (recording = unit, superplot, Mann-Whitney U + Bonferroni / BH-FDR, Cohen's d,
+ensemble curves). Files are read in the browser tab and never uploaded.
+
+The analysis runs in JS ports of `cell_metrics`, `state`, `neighbors`, `motion`,
+`exporters.per_cell_table` and the `compare` statistics, checked against the Python code
+(`maskviewer/web/static/engine.test.mjs` on the committed fixture `tests/fixtures/web_engine/`,
+and the site's **JS vs Python check** page on the demo, which agree to ~1e-14). Not ported:
+cell–cell contacts, the Fürth fit, edge dynamics, shape modes, lineage, PERMANOVA and the other
+desktop-only analyses. The demo recordings are **synthetic** (simulated persistent / random
+walks written in the CellScope layout by `maskviewer/web/demo_data.py`); no real data is
+published.
+
+| Viewer | Compare | JS vs Python |
+|---|---|---|
+| ![viewer](docs/img/viewer_rand_2.png) | ![compare](docs/img/compare.png) | ![validate](docs/img/validate.png) |
+
+### Run the web app
+
+```bash
+pip install -r requirements-web.txt
+python run_web.py                    # http://127.0.0.1:8213 (adds the Python API: full per-cell table for uploads)
+python -m pytest -q tests/test_web.py
+python scripts/build_static.py       # static site -> site/ (published by .github/workflows/pages.yml)
+```
+
+---
+
 ## Tests
 
 ```bash

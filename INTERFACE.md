@@ -19,7 +19,7 @@ Read this before opening source files. Update it when modules change.
   (default) — open on a **blank slate** (no recordings). Wraps the result in a
   **Project** (`project.from_entries`) and opens `ViewerWindow`. Qt is imported
   lazily so `--help` needs no display.
-- **scripts/make_sample_data.py** — writes the synthetic `sample_data/Pos_demo/`
+- **scripts/make_sample_data.py** — writes (via `io/writer.py`) the synthetic `sample_data/Pos_demo/`
   (recording `.ome.tif` + `.ome.json` + `pipeline_results/masks.npz`). Safe,
   fake data so the app runs out of the box.
 - **scripts/link_data.py** — populates the gitignored `data/` folder with
@@ -90,6 +90,35 @@ Read this before opening source files. Update it when modules change.
   (matplotlib) + `ds_report` write `analysis_out/ic293_vs_ic295/{REPORT.md, figs/*}`
   (gitignored). `CELLSCOPE_ROOT` env overrides the data location.
 
+## Web interface (`maskviewer/web/`, `run_web.py`)
+- **run_web.py** — starts the FastAPI app on 127.0.0.1:8213.
+- **maskviewer/web/app.py** — routes: `/api/info`, `/api/demo`, `/api/demo/compare`,
+  `/api/demo/{label}/reference`, `/api/metrics`, POST `/api/analyze` (uploaded masks.npz →
+  Python per-cell table); mounts `/static` and the demo files at `/demo`. `STATIC_ENDPOINTS`
+  lists the GETs exported by `scripts/build_static.py`.
+- **maskviewer/web/api_data.py** — demo listing (`io.dataset.discover`), Python reference
+  per-cell tables (`exporters.per_cell_table`), `demo_compare` (`compare.build_comparison` +
+  `ensemble_by_condition` + `ranked_group_comparisons`), `metric_info` (`metric_docs`),
+  `analyse_upload`.
+- **maskviewer/web/demo_data.py** — the SYNTHETIC demo: `simulate()` (star-shaped cells on
+  persistent random walks), `ensure_demo(out)` writes a `by_condition` tree to the gitignored
+  `web_demo/` via **maskviewer/io/writer.py** (`write_recording`, also used by
+  `scripts/make_sample_data.py`).
+- **maskviewer/web/static/** — ES-module front end (no build step):
+  `npz.js` (ZIP + .npy reader → `readMasks`), `tiff.js` (lazy TIFF/OME-TIFF reader → `openTiff`),
+  `morph_engine.js` (regionprops_frame, perimeter, hull, classify_state, frame_nn,
+  per-frame records), `motion_engine.js` (motion.py), `tables_engine.js` (per_cell_table,
+  track_table, per-recording DiPer curves, CSV), `stats_engine.js` (aggregate, Mann-Whitney U,
+  Cohen's d, BH, ensemble_by_condition), `analysis_worker.js` (Web Worker), `state.js`
+  (workspace), `render.js` + `viewer.js` + `cellpanel.js` (viewer), `cells.js`,
+  `population.js`, `compare.js`, `data.js` (load files), `validate.js` (JS vs Python),
+  `home.js`, `about.js`, `charts.js` (SVG charts), `fmt.js`, `core.js` + `style.css`
+  (shared web kit), `static_api.js` (static-site data layer), `engine.test.mjs` (node test).
+- **scripts/make_web_fixture.py** — writes `tests/fixtures/web_engine/` (synthetic masks +
+  Python outputs) for the node test; **scripts/build_static.py** / **scripts/screenshots.py**
+  — static export and browser smoke test / README shots (`docs/img/`).
+- **tests/test_web.py** — API, static build, node engine test, fixture-is-current.
+
 ## maskviewer/ (package)
 - **config.py** — `load_config(path, include_sample=True)` → dict with `data_roots`
   (appends the bundled `sample_data/` as a fallback when `include_sample`).
@@ -125,6 +154,9 @@ Read this before opening source files. Update it when modules change.
   groupings / **image sizes / lengths**) loads + compares correctly. GUI-free.
 
 ### maskviewer/io/  — load data (GUI-free)
+- **writer.py** — `write_recording(folder, name, data, labels, um_per_px, dt, channel_names, source)`:
+  writes one recording folder in the CellScope layout (`.ome.tif` + `.ome.json` +
+  `pipeline_results/masks.npz`). Used for the synthetic sample and web demo only.
 - **recording.py** — `load_recording(tif)` → `Recording` (`data` as
   `(T,C,H,W)`, `channel_names`, `um_per_px`, `time_interval_min`, `.frame(t,c)`).
   Reads the `.ome.json` sidecar; coerces 2-D/3-D inputs to `(T,C,H,W)` so **1-, 2-
@@ -616,6 +648,9 @@ Read this before opening source files. Update it when modules change.
   `clean_subset_test` (stable/non-dividing/in-view cells). `run()`.
 
 ## tests/
+- **test_web.py** — web API + static build + node engine test + web fixture is current.
+- **test_metric_docs.py** — the perimeter doc names the estimator the code uses.
+- **test_exporter_fixes.py** — gap-aware density speeds; track_quality defined for 1-frame tracks.
 - **test_io.py** — smoke tests (discover / load / summary) against the
   synthetic sample; regenerates it if missing. Needs `pytest`.
 - **test_analysis.py** — cell_metrics / motion / exporters (known-answer
