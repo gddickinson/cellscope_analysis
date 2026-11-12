@@ -9,8 +9,8 @@ METRICS = {
     "area": ("Cell footprint size.",
              "Pixel count of the mask × (µm/px)²."),
     "perimeter": ("Boundary length.",
-                  "Crofton estimate from the mask boundary (matches "
-                  "scikit-image), × µm/px."),
+                  "Benkrid–Crookes estimate from the mask boundary (scikit-image "
+                  "regionprops perimeter, neighborhood 4), × µm/px."),
     "circularity": ("How round the outline is (1 = perfect circle).",
                     "4π·area / perimeter²."),
     "eccentricity": ("Elongation of the best-fit ellipse (0 = circle, →1 = line).",

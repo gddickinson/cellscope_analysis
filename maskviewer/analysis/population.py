@@ -2,7 +2,7 @@
 
 Builds a tidy per-(cell, frame) table for plotting distributions / time-courses
 across every cell, and origin-centred trajectories for a flower plot. Reuses the
-per-frame region table (shape + nearest-neighbour + state, incl. a Crofton
+per-frame region table (shape + nearest-neighbour + state, incl. a Benkrid–Crookes
 perimeter + circularity) and adds a per-frame speed column from the centroid
 tracks. pandas-backed; cache the result (one regionprops pass) and re-plot from
 it. The cross-recording / treatment comparison layer builds on this.
