@@ -201,7 +201,8 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
             if nn is not None and cp.shape[0] >= 2:
                 nn = nn.to_numpy()
                 seg = np.sqrt((np.diff(cp, axis=0) ** 2).sum(axis=1))
-                sp = seg / float(dt_min) if dt_min else seg
+                gap = np.diff(fr_present).astype(float)   # frames elapsed per step (≥ 1)
+                sp = seg / (gap * float(dt_min)) if dt_min else seg / gap
                 iso, crd = sp[nn[1:] == 0], sp[nn[1:] > 0]
                 row[f"speed_isolated_{speed_u}"] = float(iso.mean()) if iso.size else np.nan
                 row[f"speed_crowded_{speed_u}"] = float(crd.mean()) if crd.size else np.nan
@@ -217,7 +218,8 @@ def per_cell_table(labels, um_per_px=None, dt_min=None, with_solidity=False,
         # composite track-quality score (0–1)
         frames_score = present.sum() / labels.shape[0]
         area_score = max(0.0, 1.0 - row.get("area_cv", 1.0))
-        path_score = min((m["total_path"] or 0.0) / 50.0, 1.0)
+        tp = m["total_path"]
+        path_score = min((tp if np.isfinite(tp) else 0.0) / 50.0, 1.0)
         row["track_quality"] = float(0.5 * frames_score + 0.3 * area_score
                                      + 0.2 * path_score)
         if with_edge:
